@@ -1,0 +1,25 @@
+.drag-area {
+    border: 2px dashed #cbd5e1;
+    transition: all 0.3s ease;
+}
+.drag-area.active {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+    transform: scale(1.02);
+}
+
+/* Scrollbar personnalisée style "Mac/Modern" */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
