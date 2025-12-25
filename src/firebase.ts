@@ -1,14 +1,15 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
-// Les variables sont injectées par Dokploy au build ou runtime
+// Vos clés Firebase intégrées directement
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyAZ-Zi6fOKCH7duGgCnnHX_qB4TI5wTC5g",
+  authDomain: "solufuse-5647c.firebaseapp.com",
+  projectId: "solufuse-5647c",
+  storageBucket: "solufuse-5647c.firebasestorage.app",
+  messagingSenderId: "718299136180",
+  appId: "1:718299136180:web:fb893609b7f0283c55d7e1",
+  measurementId: "G-B1FVSFY4S2"
 };
 
 const app = initializeApp(firebaseConfig);
