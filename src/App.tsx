@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import ConfigGenerator from './components/ConfigGenerator';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
-import { Upload, FileText, Download, LogOut, Loader2, Zap } from 'lucide-react';
+import { Upload, FileText, Download, LogOut, Loader2, Zap, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 function App() {
   const [user, setUser] = useState(auth.currentUser);
@@ -12,14 +12,15 @@ function App() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- MODIF: LOG DU TOKEN DANS LA CONSOLE ---
+  // --- VARIABLES D'ÉTAT POUR LE TEST API ---
+  const [apiStatus, setApiStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [apiMsg, setApiMsg] = useState("");
+
   auth.onAuthStateChanged((u) => {
     setUser(u);
-    if (u) {
-        u.getIdToken().then((token) => {
-            console.log("%c🔑 TOKEN FIREBASE (A COPIER) :", "color: #00ff00; font-weight: bold; font-size: 14px;");
-            console.log(token);
-        });
+    if(u) {
+        // Log discret pour debug dev
+        u.getIdToken().then(t => console.debug("Token refreshed"));
     }
   });
 
@@ -29,6 +30,40 @@ function App() {
   };
 
   const handleLogout = () => auth.signOut();
+
+  // --- FONCTION DE TEST DE CONNEXION (LE COEUR DU SUJET) ---
+  const handleTestApi = async () => {
+      if (!user) return;
+      setApiStatus('idle');
+      setApiMsg("Test en cours...");
+
+      try {
+          // 1. Récupération du Token Frais
+          const token = await user.getIdToken();
+          const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
+
+          // 2. Appel d'une route PROTÉGÉE (/session/details)
+          // Si le backend valide le token, il répond 200. Sinon 401.
+          const res = await fetch(`${apiUrl}/session/details`, {
+              method: 'GET',
+              headers: {
+                  'Authorization': `Bearer ${token}` // <--- C'EST ICI QUE CA SE PASSE
+              }
+          });
+
+          if (res.ok) {
+              const data = await res.json();
+              setApiStatus('success');
+              setApiMsg(`✅ Succès ! Backend connecté. (Fichiers en session: ${data.file_count})`);
+          } else {
+              setApiStatus('error');
+              setApiMsg(`❌ Erreur ${res.status}: Le Backend a refusé le token.`);
+          }
+      } catch (e) {
+          setApiStatus('error');
+          setApiMsg("❌ Erreur Réseau : Impossible de joindre l'API.");
+      }
+  };
 
   const handleRun = async () => {
     if (!files || !finalConfigJson || !user) return;
@@ -43,7 +78,6 @@ function App() {
         const token = await user.getIdToken();
         const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
         
-        // Etape 1: Lancer le calcul
         const runRes = await fetch(`${apiUrl}/loadflow/run-win`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
@@ -52,7 +86,6 @@ function App() {
         
         if (!runRes.ok) throw new Error("Erreur lors de l'analyse");
         
-        // Etape 2: Télécharger le ZIP
         const zipRes = await fetch(`${apiUrl}/loadflow/export-l1fs`, {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -94,7 +127,17 @@ function App() {
           <h1 className="text-2xl font-extrabold flex items-center gap-2 text-slate-900">
             <Zap className="w-8 h-8 text-blue-600 fill-blue-600" /> Solufuse Loadflow
           </h1>
+          
           <div className="flex items-center gap-4">
+            {/* BOUTON DE TEST API */}
+            <button 
+                onClick={handleTestApi} 
+                className="text-xs font-bold px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full hover:bg-indigo-200 transition-colors flex items-center gap-1"
+                title="Vérifier la connexion avec le Backend"
+            >
+                <ShieldCheck className="w-4 h-4" /> Test API
+            </button>
+
             <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-full">
               <div className="w-8 h-8 bg-blue-600 rounded-full text-white flex items-center justify-center font-bold text-sm">
                 {user.displayName ? user.displayName[0] : 'U'}
@@ -107,6 +150,13 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* BANDEAU DE RESULTAT DU TEST API */}
+      {apiMsg && (
+          <div className={`w-full py-2 text-center text-sm font-bold ${apiStatus === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {apiMsg}
+          </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
