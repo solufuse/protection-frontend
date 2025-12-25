@@ -1,32 +1,25 @@
-import { useState, useRef, useEffect } from 'react';
-import ConfigGenerator from './components/ConfigGenerator';
+import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
-import { Upload, FileText, Download, LogOut, Loader2, Zap, ShieldCheck } from 'lucide-react';
+import { Zap } from 'lucide-react';
+
+// Composants
+import Navbar from './components/Navbar';
+import Loadflow from './pages/Loadflow';
+import Protection from './pages/Protection';
+import Files from './pages/Files';
 
 function App() {
   const [user, setUser] = useState(auth.currentUser);
-  const [files, setFiles] = useState<FileList | null>(null);
-  const [finalConfigJson, setFinalConfigJson] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  // --- TEST API STATES ---
-  const [apiStatus, setApiStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [apiMsg, setApiMsg] = useState("");
-
-  // --- CORRECTION CRITIQUE : USE EFFECT ---
-  // On utilise useEffect avec [] pour ne lancer l'écouteur qu'une seule fois au chargement.
+  // Gestion Globale de l'Auth
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       setUser(u);
-      if(u) {
-          // Debug discret
-          u.getIdToken().then(() => console.debug("Auth Token Refresh"));
-      }
+      setAuthLoading(false);
     });
-    // Nettoyage de l'écouteur quand on quitte la page
     return () => unsubscribe();
   }, []);
 
@@ -37,77 +30,12 @@ function App() {
 
   const handleLogout = () => auth.signOut();
 
-  // --- FONCTION DE TEST API ---
-  const handleTestApi = async () => {
-      if (!user) return;
-      setApiStatus('idle');
-      setApiMsg("Test en cours...");
+  // Écran de chargement initial
+  if (authLoading) {
+      return <div className="h-screen flex items-center justify-center bg-slate-50"><Zap className="w-10 h-10 text-slate-300 animate-pulse" /></div>;
+  }
 
-      try {
-          const token = await user.getIdToken();
-          // Utilisation correcte de la variable d'environnement
-          const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
-
-          const res = await fetch(`${apiUrl}/session/details`, {
-              method: 'GET',
-              headers: {
-                  'Authorization': `Bearer ${token}`
-              }
-          });
-
-          if (res.ok) {
-              const data = await res.json();
-              setApiStatus('success');
-              setApiMsg(`✅ Succès ! Backend connecté. (Fichiers: ${data.file_count})`);
-          } else {
-              setApiStatus('error');
-              setApiMsg(`❌ Erreur ${res.status}: Token refusé.`);
-          }
-      } catch (e) {
-          setApiStatus('error');
-          setApiMsg("❌ Erreur Réseau : API injoignable.");
-      }
-  };
-
-  const handleRun = async () => {
-    if (!files || !finalConfigJson || !user) return;
-    setLoading(true);
-    setDownloadUrl(null);
-
-    const formData = new FormData();
-    Array.from(files).forEach(file => formData.append('files', file));
-    formData.append('config', finalConfigJson);
-
-    try {
-        const token = await user.getIdToken();
-        const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
-        
-        const runRes = await fetch(`${apiUrl}/loadflow/run-win`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-        
-        if (!runRes.ok) throw new Error("Erreur analyse");
-        
-        const zipRes = await fetch(`${apiUrl}/loadflow/export-l1fs`, {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (!zipRes.ok) throw new Error("Erreur téléchargement");
-
-        const blob = await zipRes.blob();
-        const url = window.URL.createObjectURL(blob);
-        setDownloadUrl(url);
-        
-    } catch (e) {
-        alert("Erreur: " + e);
-    } finally {
-        setLoading(false);
-    }
-  };
-
+  // Écran de Login (Si pas connecté)
   if (!user) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
@@ -124,94 +52,23 @@ function App() {
     );
   }
 
+  // Application Principale (Avec Router)
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-extrabold flex items-center gap-2 text-slate-900">
-            <Zap className="w-8 h-8 text-blue-600 fill-blue-600" /> Solufuse Loadflow
-          </h1>
-          
-          <div className="flex items-center gap-4">
-            <button 
-                onClick={handleTestApi} 
-                className="text-xs font-bold px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full hover:bg-indigo-200 transition-colors flex items-center gap-1"
-                title="Vérifier connexion API"
-            >
-                <ShieldCheck className="w-4 h-4" /> Test API
-            </button>
-
-            <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-full">
-              <div className="w-8 h-8 bg-blue-600 rounded-full text-white flex items-center justify-center font-bold text-sm">
-                {user.displayName ? user.displayName[0] : 'U'}
-              </div>
-              <span className="text-sm font-medium text-slate-600 hidden sm:block">{user.displayName}</span>
-            </div>
-            <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 transition-colors p-2">
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {apiMsg && (
-          <div className={`w-full py-2 text-center text-sm font-bold ${apiStatus === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {apiMsg}
-          </div>
-      )}
-
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          <div className="space-y-8">
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-               <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
-                 <Upload className="w-6 h-6 text-blue-600" /> 1. Fichiers Sources
-               </h2>
-               <div 
-                 onClick={() => fileInputRef.current?.click()}
-                 className="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all group"
-               >
-                 <input type="file" multiple ref={fileInputRef} onChange={(e) => setFiles(e.target.files)} className="hidden" />
-                 <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                   <FileText className="w-8 h-8" />
-                 </div>
-                 <p className="text-slate-600 font-medium">Cliquez pour ajouter vos fichiers</p>
-               </div>
-               {files && files.length > 0 && (
-                 <div className="mt-6 bg-slate-50 rounded-xl p-4 border border-slate-100">
-                   <p className="text-sm font-bold text-slate-700 mb-2">{files.length} fichier(s)</p>
-                   <ul className="max-h-32 overflow-y-auto space-y-1 pr-2">
-                     {Array.from(files).map((f, i) => (
-                       <li key={i} className="text-xs text-slate-500 flex justify-between">
-                         <span className="truncate">{f.name}</span>
-                         <span className="whitespace-nowrap ml-2 text-slate-300">{(f.size/1024).toFixed(0)}KB</span>
-                       </li>
-                     ))}
-                   </ul>
-                 </div>
-               )}
-            </div>
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
-                <button 
-                    onClick={handleRun}
-                    disabled={loading || !files}
-                    className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-3"
-                >
-                    {loading ? (<><Loader2 className="animate-spin" /> Analyse...</>) : (<> 🚀 Lancer l'Analyse </>)}
-                </button>
-                {downloadUrl && (
-                    <div className="mt-6 animate-fade-in">
-                        <a href={downloadUrl} download="resultats.zip" className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-md">
-                            <Download className="w-5 h-5" /> Télécharger (.ZIP)
-                        </a>
-                    </div>
-                )}
-            </div>
-          </div>
-          <ConfigGenerator onConfigChange={setFinalConfigJson} />
-        </div>
-      </main>
-    </div>
+    <Router>
+      <div className="min-h-screen bg-slate-50 font-sans">
+        <Navbar user={user} onLogout={handleLogout} />
+        
+        <Routes>
+          <Route path="/" element={<Navigate to="/loadflow" replace />} />
+          <Route path="/loadflow" element={<Loadflow user={user} />} />
+          <Route path="/protection" element={<Protection />} />
+          <Route path="/files" element={<Files user={user} />} />
+          {/* Redirection par défaut si route inconnue */}
+          <Route path="*" element={<Navigate to="/loadflow" replace />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
+
 export default App;
