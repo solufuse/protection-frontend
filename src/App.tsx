@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import ConfigGenerator from './components/ConfigGenerator';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
-import { Upload, FileText, Download, LogOut, Loader2, Zap, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, Download, LogOut, Loader2, Zap, ShieldCheck } from 'lucide-react';
 
 function App() {
   const [user, setUser] = useState(auth.currentUser);
@@ -19,8 +19,8 @@ function App() {
   auth.onAuthStateChanged((u) => {
     setUser(u);
     if(u) {
-        // Log discret pour debug dev
-        u.getIdToken().then(t => console.debug("Token refreshed"));
+        // CORRECTION ICI : On utilise () au lieu de (t) pour dire qu'on ignore l'argument
+        u.getIdToken().then(() => console.debug("Token refreshed"));
     }
   });
 
@@ -31,23 +31,20 @@ function App() {
 
   const handleLogout = () => auth.signOut();
 
-  // --- FONCTION DE TEST DE CONNEXION (LE COEUR DU SUJET) ---
+  // --- FONCTION DE TEST DE CONNEXION ---
   const handleTestApi = async () => {
       if (!user) return;
       setApiStatus('idle');
       setApiMsg("Test en cours...");
 
       try {
-          // 1. Récupération du Token Frais
           const token = await user.getIdToken();
           const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
 
-          // 2. Appel d'une route PROTÉGÉE (/session/details)
-          // Si le backend valide le token, il répond 200. Sinon 401.
           const res = await fetch(`${apiUrl}/session/details`, {
               method: 'GET',
               headers: {
-                  'Authorization': `Bearer ${token}` // <--- C'EST ICI QUE CA SE PASSE
+                  'Authorization': `Bearer ${token}`
               }
           });
 
@@ -129,7 +126,6 @@ function App() {
           </h1>
           
           <div className="flex items-center gap-4">
-            {/* BOUTON DE TEST API */}
             <button 
                 onClick={handleTestApi} 
                 className="text-xs font-bold px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full hover:bg-indigo-200 transition-colors flex items-center gap-1"
@@ -151,7 +147,6 @@ function App() {
         </div>
       </header>
 
-      {/* BANDEAU DE RESULTAT DU TEST API */}
       {apiMsg && (
           <div className={`w-full py-2 text-center text-sm font-bold ${apiStatus === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
               {apiMsg}
