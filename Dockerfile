@@ -4,10 +4,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-# On passe juste l'URL API (facultatif, par défaut 'https://api.solufuse.com')
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
-
 RUN npm run build
 
 # Stage 2: Serve
