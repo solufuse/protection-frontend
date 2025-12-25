@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ConfigGenerator from './components/ConfigGenerator';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
@@ -12,17 +12,23 @@ function App() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- VARIABLES D'ÉTAT POUR LE TEST API ---
+  // --- TEST API STATES ---
   const [apiStatus, setApiStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [apiMsg, setApiMsg] = useState("");
 
-  auth.onAuthStateChanged((u) => {
-    setUser(u);
-    if(u) {
-        // CORRECTION ICI : On utilise () au lieu de (t) pour dire qu'on ignore l'argument
-        u.getIdToken().then(() => console.debug("Token refreshed"));
-    }
-  });
+  // --- CORRECTION CRITIQUE : USE EFFECT ---
+  // On utilise useEffect avec [] pour ne lancer l'écouteur qu'une seule fois au chargement.
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((u) => {
+      setUser(u);
+      if(u) {
+          // Debug discret
+          u.getIdToken().then(() => console.debug("Auth Token Refresh"));
+      }
+    });
+    // Nettoyage de l'écouteur quand on quitte la page
+    return () => unsubscribe();
+  }, []);
 
   const handleLogin = async () => {
     try { await signInWithPopup(auth, googleProvider); } 
@@ -31,7 +37,7 @@ function App() {
 
   const handleLogout = () => auth.signOut();
 
-  // --- FONCTION DE TEST DE CONNEXION ---
+  // --- FONCTION DE TEST API ---
   const handleTestApi = async () => {
       if (!user) return;
       setApiStatus('idle');
@@ -39,6 +45,7 @@ function App() {
 
       try {
           const token = await user.getIdToken();
+          // Utilisation correcte de la variable d'environnement
           const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
 
           const res = await fetch(`${apiUrl}/session/details`, {
@@ -51,14 +58,14 @@ function App() {
           if (res.ok) {
               const data = await res.json();
               setApiStatus('success');
-              setApiMsg(`✅ Succès ! Backend connecté. (Fichiers en session: ${data.file_count})`);
+              setApiMsg(`✅ Succès ! Backend connecté. (Fichiers: ${data.file_count})`);
           } else {
               setApiStatus('error');
-              setApiMsg(`❌ Erreur ${res.status}: Le Backend a refusé le token.`);
+              setApiMsg(`❌ Erreur ${res.status}: Token refusé.`);
           }
       } catch (e) {
           setApiStatus('error');
-          setApiMsg("❌ Erreur Réseau : Impossible de joindre l'API.");
+          setApiMsg("❌ Erreur Réseau : API injoignable.");
       }
   };
 
@@ -81,21 +88,21 @@ function App() {
             body: formData
         });
         
-        if (!runRes.ok) throw new Error("Erreur lors de l'analyse");
+        if (!runRes.ok) throw new Error("Erreur analyse");
         
         const zipRes = await fetch(`${apiUrl}/loadflow/export-l1fs`, {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (!zipRes.ok) throw new Error("Erreur lors du téléchargement");
+        if (!zipRes.ok) throw new Error("Erreur téléchargement");
 
         const blob = await zipRes.blob();
         const url = window.URL.createObjectURL(blob);
         setDownloadUrl(url);
         
     } catch (e) {
-        alert("Une erreur est survenue: " + e);
+        alert("Erreur: " + e);
     } finally {
         setLoading(false);
     }
@@ -129,7 +136,7 @@ function App() {
             <button 
                 onClick={handleTestApi} 
                 className="text-xs font-bold px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full hover:bg-indigo-200 transition-colors flex items-center gap-1"
-                title="Vérifier la connexion avec le Backend"
+                title="Vérifier connexion API"
             >
                 <ShieldCheck className="w-4 h-4" /> Test API
             </button>
@@ -155,30 +162,21 @@ function App() {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          
           <div className="space-y-8">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
                <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
                  <Upload className="w-6 h-6 text-blue-600" /> 1. Fichiers Sources
                </h2>
-               
                <div 
                  onClick={() => fileInputRef.current?.click()}
                  className="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all group"
                >
-                 <input 
-                   type="file" 
-                   multiple 
-                   ref={fileInputRef}
-                   onChange={(e) => setFiles(e.target.files)} 
-                   className="hidden" 
-                 />
+                 <input type="file" multiple ref={fileInputRef} onChange={(e) => setFiles(e.target.files)} className="hidden" />
                  <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                    <FileText className="w-8 h-8" />
                  </div>
                  <p className="text-slate-600 font-medium">Cliquez pour ajouter vos fichiers</p>
                </div>
-
                {files && files.length > 0 && (
                  <div className="mt-6 bg-slate-50 rounded-xl p-4 border border-slate-100">
                    <p className="text-sm font-bold text-slate-700 mb-2">{files.length} fichier(s)</p>
@@ -193,43 +191,27 @@ function App() {
                  </div>
                )}
             </div>
-
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
                 <button 
                     onClick={handleRun}
                     disabled={loading || !files}
                     className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-3"
                 >
-                    {loading ? (
-                        <> <Loader2 className="animate-spin" /> Analyse en cours... </>
-                    ) : (
-                        <> 🚀 Lancer l'Analyse & Télécharger ZIP </>
-                    )}
+                    {loading ? (<><Loader2 className="animate-spin" /> Analyse...</>) : (<> 🚀 Lancer l'Analyse </>)}
                 </button>
-
                 {downloadUrl && (
                     <div className="mt-6 animate-fade-in">
-                        <p className="text-green-600 font-bold mb-3 flex items-center justify-center gap-2">
-                            <span className="bg-green-100 p-1 rounded-full">✅</span> Succès !
-                        </p>
-                        <a 
-                            href={downloadUrl} 
-                            download="gagnants_loadflow.zip"
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-md"
-                        >
+                        <a href={downloadUrl} download="resultats.zip" className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-md">
                             <Download className="w-5 h-5" /> Télécharger (.ZIP)
                         </a>
                     </div>
                 )}
             </div>
           </div>
-
           <ConfigGenerator onConfigChange={setFinalConfigJson} />
-
         </div>
       </main>
     </div>
   );
 }
-
 export default App;
