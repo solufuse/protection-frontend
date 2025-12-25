@@ -34,7 +34,7 @@ function App() {
         const token = await user.getIdToken();
         const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
         
-        // Etape 1: Lancer le calcul (POST /run-win)
+        // Etape 1: Lancer le calcul
         const runRes = await fetch(`${apiUrl}/loadflow/run-win`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
@@ -43,7 +43,7 @@ function App() {
         
         if (!runRes.ok) throw new Error("Erreur lors de l'analyse");
         
-        // Etape 2: Télécharger le ZIP (GET /export-l1fs)
+        // Etape 2: Télécharger le ZIP
         const zipRes = await fetch(`${apiUrl}/loadflow/export-l1fs`, {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -70,7 +70,6 @@ function App() {
             <Zap className="w-10 h-10 text-blue-600" /> Solufuse
           </h1>
           <button onClick={handleLogin} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-bold shadow-xl transition-all flex items-center gap-3 mx-auto">
-            {/* Icône Google simplifiée */}
             <span className="bg-white text-blue-600 font-bold px-2 rounded">G</span>
             Se connecter avec Google
           </button>
@@ -103,7 +102,6 @@ function App() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           
-          {/* GAUCHE : UPLOAD */}
           <div className="space-y-8">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
                <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
@@ -124,12 +122,12 @@ function App() {
                  <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                    <FileText className="w-8 h-8" />
                  </div>
-                 <p className="text-slate-600 font-medium">Cliquez pour ajouter vos fichiers (.LF1S, .SI2S...)</p>
+                 <p className="text-slate-600 font-medium">Cliquez pour ajouter vos fichiers</p>
                </div>
 
                {files && files.length > 0 && (
                  <div className="mt-6 bg-slate-50 rounded-xl p-4 border border-slate-100">
-                   <p className="text-sm font-bold text-slate-700 mb-2">{files.length} fichier(s) sélectionné(s)</p>
+                   <p className="text-sm font-bold text-slate-700 mb-2">{files.length} fichier(s)</p>
                    <ul className="max-h-32 overflow-y-auto space-y-1 pr-2">
                      {Array.from(files).map((f, i) => (
                        <li key={i} className="text-xs text-slate-500 flex justify-between">
@@ -142,7 +140,6 @@ function App() {
                )}
             </div>
 
-            {/* ACTION BUTTON */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
                 <button 
                     onClick={handleRun}
@@ -159,21 +156,20 @@ function App() {
                 {downloadUrl && (
                     <div className="mt-6 animate-fade-in">
                         <p className="text-green-600 font-bold mb-3 flex items-center justify-center gap-2">
-                            <span className="bg-green-100 p-1 rounded-full">✅</span> Analyse terminée avec succès !
+                            <span className="bg-green-100 p-1 rounded-full">✅</span> Succès !
                         </p>
                         <a 
                             href={downloadUrl} 
                             download="gagnants_loadflow.zip"
                             className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-md"
                         >
-                            <Download className="w-5 h-5" /> Télécharger les Gagnants (.ZIP)
+                            <Download className="w-5 h-5" /> Télécharger (.ZIP)
                         </a>
                     </div>
                 )}
             </div>
           </div>
 
-          {/* DROITE : CONFIGURATEUR */}
           <ConfigGenerator onConfigChange={setFinalConfigJson} />
 
         </div>
