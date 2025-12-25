@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
   FileText, 
   Zap, 
   Shield, 
@@ -18,7 +17,7 @@ interface SidebarProps {
 
 export default function Sidebar({ onLogout, userEmail }: SidebarProps) {
   const location = useLocation();
-  const [isOpen, setIsOpen] = useState(false); // État pour ouvrir/fermer sur mobile
+  const [isOpen, setIsOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   
@@ -31,7 +30,7 @@ export default function Sidebar({ onLogout, userEmail }: SidebarProps) {
 
   return (
     <>
-      {/* --- 1. BARRE MOBILE (Visible uniquement sur petits écrans) --- */}
+      {/* MOBILE HEADER */}
       <div className="md:hidden bg-white border-b border-slate-200 p-4 flex justify-between items-center sticky top-0 z-20">
         <div className="flex items-center gap-2 font-bold text-slate-800">
             <Zap className="w-5 h-5 text-blue-600" />
@@ -45,8 +44,7 @@ export default function Sidebar({ onLogout, userEmail }: SidebarProps) {
         </button>
       </div>
 
-      {/* --- 2. SIDEBAR (Le menu principal) --- */}
-      {/* Sur mobile : il glisse ou apparaît. Sur PC : il est toujours là. */}
+      {/* SIDEBAR MENU */}
       <div className={`
         fixed inset-y-0 left-0 z-10 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out
         md:translate-x-0 md:static md:h-screen
@@ -54,19 +52,19 @@ export default function Sidebar({ onLogout, userEmail }: SidebarProps) {
       `}>
         <div className="flex flex-col h-full">
             
-            {/* Logo (Visible sur PC uniquement, car déjà en haut sur mobile) */}
+            {/* Logo Desktop */}
             <div className="h-16 flex items-center px-6 border-b border-slate-800 bg-slate-950">
                 <Zap className="w-6 h-6 text-blue-400 mr-2" />
                 <span className="text-xl font-bold tracking-wide">Solufuse</span>
             </div>
 
-            {/* Liens de navigation */}
+            {/* Nav Links */}
             <nav className="flex-1 px-4 py-6 space-y-2">
                 {navItems.map((item) => (
                     <Link
                         key={item.path}
                         to={item.path}
-                        onClick={() => setIsOpen(false)} // Ferme le menu quand on clique (mobile)
+                        onClick={() => setIsOpen(false)}
                         className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
                             isActive(item.path)
                                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
@@ -79,7 +77,7 @@ export default function Sidebar({ onLogout, userEmail }: SidebarProps) {
                 ))}
             </nav>
 
-            {/* Pied de page (Utilisateur + Logout) */}
+            {/* Footer User */}
             <div className="p-4 border-t border-slate-800 bg-slate-950">
                 <div className="flex items-center gap-3 mb-4 px-2">
                     <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold">
@@ -101,7 +99,7 @@ export default function Sidebar({ onLogout, userEmail }: SidebarProps) {
         </div>
       </div>
 
-      {/* --- 3. OVERLAY (Fond sombre quand menu ouvert sur mobile) --- */}
+      {/* Mobile Overlay */}
       {isOpen && (
         <div 
             className="fixed inset-0 bg-black/50 z-0 md:hidden"
