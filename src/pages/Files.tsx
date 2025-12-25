@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Copy, ShieldCheck, Trash2, RefreshCw, Upload, FileText, Database } from 'lucide-react';
+import { RefreshCw, Upload, FileText, Database } from 'lucide-react';
 
 interface FilesProps {
   user: any;
