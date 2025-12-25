@@ -12,7 +12,16 @@ function App() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  auth.onAuthStateChanged((u) => setUser(u));
+  // --- MODIF: LOG DU TOKEN DANS LA CONSOLE ---
+  auth.onAuthStateChanged((u) => {
+    setUser(u);
+    if (u) {
+        u.getIdToken().then((token) => {
+            console.log("%c🔑 TOKEN FIREBASE (A COPIER) :", "color: #00ff00; font-weight: bold; font-size: 14px;");
+            console.log(token);
+        });
+    }
+  });
 
   const handleLogin = async () => {
     try { await signInWithPopup(auth, googleProvider); } 
