@@ -10,13 +10,21 @@ export default function Files({ user }: FilesProps) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. Récupérer la liste
+  // --- GET TOKEN HELPER ---
+  // Cette fonction récupère le token Firebase à coup sûr
+  const getAuthToken = async () => {
+    if (!user) return null;
+    // true = Force le rafraîchissement si le token est vieux
+    return await user.getIdToken(true);
+  };
+
   const fetchSession = async () => {
     if (!user) return;
     setLoading(true);
     try {
-        const token = await user.getIdToken();
+        const token = await getAuthToken();
         const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
+        
         const res = await fetch(`${apiUrl}/session/details`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -27,7 +35,6 @@ export default function Files({ user }: FilesProps) {
 
   useEffect(() => { fetchSession(); }, [user]);
 
-  // 2. Upload
   const handleUpload = async (e: any) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !user) return;
@@ -37,7 +44,7 @@ export default function Files({ user }: FilesProps) {
     Array.from(files).forEach((file: any) => formData.append('files', file));
 
     try {
-        const token = await user.getIdToken();
+        const token = await getAuthToken();
         const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
         
         const res = await fetch(`${apiUrl}/session/upload`, {
@@ -52,49 +59,69 @@ export default function Files({ user }: FilesProps) {
             alert("Erreur lors de l'upload");
         }
     } catch (err) {
-        alert("Erreur réseau");
+        alert("Erreur réseau upload");
     } finally {
         setUploading(false);
         if(fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  // 3. Supprimer (Bouton Bin)
   const handleDelete = async (filename: string) => {
-      if(!user) return;
-      if(!confirm("Supprimer " + filename + " ?")) return;
-
+      if(!user || !confirm("Supprimer " + filename + " ?")) return;
       try {
-        const token = await user.getIdToken();
+        const token = await getAuthToken();
         const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
         
-        // encodeURIComponent est important pour les fichiers avec des espaces
-        await fetch(`${apiUrl}/session/file/${encodeURIComponent(filename)}`, {
+        const res = await fetch(`${apiUrl}/session/file/${encodeURIComponent(filename)}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        fetchSession();
+        
+        if(res.ok) fetchSession();
+        else alert("Erreur Backend: " + res.status);
+        
       } catch(e) { alert("Erreur suppression: " + e); }
   };
 
-  // 4. Tout Vider
+  // --- FONCTION TOUT VIDER CORRIGÉE ---
   const handleClearAll = async () => {
-      if(!user || !confirm("Tout supprimer ?")) return;
+      if(!user || !confirm("Voulez-vous vraiment TOUT supprimer ?")) return;
+      
       try {
-        const token = await user.getIdToken();
+        // 1. On récupère le TOKEN FIREBASE
+        const token = await getAuthToken();
         const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
-        await fetch(`${apiUrl}/session/clear`, {
+        
+        console.log("Envoi requête DELETE /clear avec token...");
+
+        // 2. Appel au Backend
+        const res = await fetch(`${apiUrl}/session/clear`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
         });
-        fetchSession();
-      } catch(e) { alert("Erreur: " + e); }
+
+        // 3. Gestion des erreurs précise
+        if (res.ok) {
+            await fetchSession();
+            alert("✅ Mémoire vidée avec succès !");
+        } else if (res.status === 404) {
+            alert("❌ Erreur 404 : La route /session/clear n'existe pas sur le Backend. Il faut mettre à jour le Backend.");
+        } else if (res.status === 401) {
+            alert("❌ Erreur 401 : Token refusé ou expiré.");
+        } else {
+            alert("❌ Erreur Backend : " + res.status);
+        }
+
+      } catch(e) { 
+          alert("Erreur technique : " + e); 
+      }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
-      
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-8 border-b border-slate-200 pb-4">
         <div>
             <h1 className="text-2xl font-bold text-slate-900">Gestionnaire de Fichiers</h1>
@@ -120,29 +147,22 @@ export default function Files({ user }: FilesProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        
-        {/* COLONNE GAUCHE : UPLOAD */}
         <div className="md:col-span-1">
             <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                 <h2 className="font-bold text-lg mb-4 text-slate-800">Ajouter</h2>
-                
                 <div 
                     onClick={() => fileInputRef.current?.click()}
                     className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-colors"
                 >
                     <input type="file" multiple ref={fileInputRef} onChange={handleUpload} className="hidden" />
-                    
                     <span className="text-blue-600 font-bold block mb-2">
                         {uploading ? "Envoi..." : "Cliquez pour uploader"}
                     </span>
-                    <span className="text-xs text-slate-400">
-                        .zip, .json, .xlsx...
-                    </span>
+                    <span className="text-xs text-slate-400">.zip, .json, .xlsx...</span>
                 </div>
             </div>
         </div>
 
-        {/* COLONNE DROITE : LISTE */}
         <div className="md:col-span-2">
             <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
                 {data?.files && data.files.length > 0 ? (
@@ -182,7 +202,6 @@ export default function Files({ user }: FilesProps) {
                 )}
             </div>
         </div>
-
       </div>
     </div>
   );
