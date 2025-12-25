@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FileText, RefreshCw, Trash2 } from 'lucide-react';
+import { FileText, RefreshCw } from 'lucide-react';
 
 interface FilesProps {
   user: any;
