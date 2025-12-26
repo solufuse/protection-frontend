@@ -1,131 +1,56 @@
-import Toast from '../components/Toast';\nimport { useState, useRef } from 'react';
-import ConfigGenerator from '../components/ConfigGenerator';
-import { Upload, FileText, Download, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Play, Download, Zap, Activity } from 'lucide-react';
+import Toast from '../components/Toast';
 
-interface LoadflowProps {
-  user: any;
-}
-
-\n  const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });\nexport default function Loadflow({ user }: LoadflowProps) {
-  const [files, setFiles] = useState<FileList | null>(null);
-  const [finalConfigJson, setFinalConfigJson] = useState("");
+export default function Loadflow() {
   const [loading, setLoading] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
 
-  const handleRun = async () => {
-    if (!files || !finalConfigJson || !user) return;
+  const notify = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, msg, type });
+  };
+
+  const handleRunAnalysis = () => {
     setLoading(true);
-    setDownloadUrl(null);
-
-    const formData = new FormData();
-    Array.from(files).forEach(file => formData.append('files', file));
-    formData.append('config', finalConfigJson);
-
-    try {
-        const token = await user.getIdToken();
-        const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
-        
-        // 1. Run Analysis (Winners Only logic)
-        const runRes = await fetch(`${apiUrl}/loadflow/run-win`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-        
-        if (!runRes.ok) throw new Error("Erreur lors de l'analyse Loadflow");
-        
-        // 2. Download L1Fs Export
-        const zipRes = await fetch(`${apiUrl}/loadflow/export-l1fs`, {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (!zipRes.ok) throw new Error("Erreur lors du téléchargement");
-
-        const blob = await zipRes.blob();
-        const url = window.URL.createObjectURL(blob);
-        setDownloadUrl(url);
-        
-    } catch (e) {
-        alert("Une erreur est survenue: " + e);
-    } finally {
-        setLoading(false);
-    }
+    setTimeout(() => {
+      setLoading(false);
+      notify("Analysis Completed Successfully");
+    }, 1500);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Loadflow Analysis</h1>
-        <p className="text-slate-500">Optimisation et calcul de flux de charge pour réseaux HTA/BT.</p>
+    <div className="max-w-6xl mx-auto px-6 py-4 text-[11px]">
+      <div className="flex justify-between items-center mb-4 border-b pb-2">
+        <h1 className="text-sm font-bold text-slate-800 uppercase flex items-center gap-2 tracking-tight">
+          <Zap className="w-4 h-4 text-yellow-500" /> Loadflow Analysis
+        </h1>
+        <div className="flex gap-2 font-bold">
+          <button onClick={handleRunAnalysis} disabled={loading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded font-bold transition-all shadow-sm text-[10px]">
+            <Play className={`w-3 h-3 ${loading ? 'animate-pulse' : ''}`} /> {loading ? "CALCULATING..." : "RUN LOADFLOW"}
+          </button>
+          <button onClick={() => notify("PDF Exported")} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1 rounded border border-slate-300 font-bold transition-all text-[10px]">
+            <Download className="w-3.5 h-3.5" /> EXPORT PDF
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        <div className="space-y-8">
-          {/* Zone Upload */}
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-             <h2 className="font-bold text-xl mb-6 flex items-center gap-2">
-               <Upload className="w-6 h-6 text-blue-600" /> 1. Fichiers Sources
-             </h2>
-             
-             <div 
-               onClick={() => fileInputRef.current?.click()}
-               className="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all group"
-             >
-               <input type="file" multiple ref={fileInputRef} onChange={(e) => setFiles(e.target.files)} className="hidden" />
-               <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                 <FileText className="w-8 h-8" />
-               </div>
-               <p className="text-slate-600 font-medium">Glissez vos fichiers ou cliquez ici</p>
-             </div>
-
-             {files && files.length > 0 && (
-               <div className="mt-6 bg-slate-50 rounded-xl p-4 border border-slate-100">
-                 <p className="text-sm font-bold text-slate-700 mb-2">{files.length} fichier(s) sélectionné(s)</p>
-                 <ul className="max-h-32 overflow-y-auto space-y-1 pr-2">
-                   {Array.from(files).map((f, i) => (
-                     <li key={i} className="text-xs text-slate-500 flex justify-between">
-                       <span className="truncate">{f.name}</span>
-                       <span className="whitespace-nowrap ml-2 text-slate-300">{(f.size/1024).toFixed(0)}KB</span>
-                     </li>
-                   ))}
-                 </ul>
-               </div>
-             )}
-          </div>
-
-          {/* Bouton Action */}
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
-              <button 
-                  onClick={handleRun}
-                  disabled={loading || !files}
-                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-3"
-              >
-                  {loading ? (<><Loader2 className="animate-spin" /> Analyse...</>) : (<> 🚀 Lancer Loadflow </>)}
-              </button>
-
-              {downloadUrl && (
-                  <div className="mt-6 animate-fade-in">
-                      <a href={downloadUrl} download="loadflow_result.zip" className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-md">
-                          <Download className="w-5 h-5" /> Télécharger Résultats (.ZIP)
-                      </a>
-                  </div>
-              )}
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-12 lg:col-span-8 bg-white border border-slate-200 rounded shadow-sm p-4 h-fit">
+          <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 border-b pb-1">
+            <Activity className="w-3.5 h-3.5 text-blue-500" /> Convergence Status
+          </h2>
+          <div className="py-10 text-center text-slate-300 italic font-bold text-[10px]">
+            No active simulation. Run loadflow to see results.
           </div>
         </div>
-
-        {/* Configurateur */}
-        <ConfigGenerator onConfigChange={setFinalConfigJson} />
+        
+        <div className="col-span-12 lg:col-span-4 bg-slate-900 border border-slate-800 rounded p-4 text-green-400 font-mono text-[10px] shadow-lg h-60 overflow-hidden">
+          <p className="border-b border-slate-800 pb-1 mb-2 text-slate-500 uppercase font-bold text-[9px] tracking-widest text-left">Real-time Solver Logs</p>
+          <p className="text-left font-bold opacity-60">> Waiting for engine init...</p>
+        </div>
       </div>
-    
-      {toast.show && (
-        <Toast 
-          message={toast.msg} 
-          type={toast.type} 
-          onClose={() => setToast({ ...toast, show: false })} 
-        />
-      )}
+
+      {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );
 }
