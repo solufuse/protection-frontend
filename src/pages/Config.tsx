@@ -55,8 +55,8 @@ export default function Config({ user }: { user: any }) {
       {/* 1. PROJECT */}
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <div className="flex flex-col">
-          <label className="text-[9px] text-slate-400 font-bold uppercase">Project Name</label>
-          <input className="text-lg font-bold text-slate-800 uppercase bg-transparent border-none outline-none p-0" value={config.project_name} onChange={e => setConfig({...config, project_name: e.target.value})} />
+          <label className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Project Name</label>
+          <input className="text-lg font-bold text-slate-800 uppercase bg-transparent border-none outline-none p-0 focus:ring-0" value={config.project_name} onChange={e => setConfig({...config, project_name: e.target.value})} />
         </div>
         <div className="flex gap-2">
           <button onClick={handleDownload} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded border border-slate-300 font-bold text-slate-600 transition-all"><Download className="w-3.5 h-3.5" /> DOWNLOAD</button>
@@ -64,24 +64,19 @@ export default function Config({ user }: { user: any }) {
         </div>
       </div>
 
-      {message && <div className="mb-4 p-2 bg-green-50 text-green-700 border border-green-200 rounded font-bold">{message}</div>}
-
-      <div className="grid grid-cols-12 gap-6 text-[10px]">
+      <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12 lg:col-span-8 space-y-4">
           
           {/* 2. INRUSH */}
           <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('inrush')}>
-              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">
-                {openSections.inrush ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>}
-                <Activity className="w-3.5 h-3.5 text-orange-500" /> Inrush (Transformers)
-              </h2>
+              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.inrush ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Activity className="w-3.5 h-3.5 text-orange-500" /> Inrush</h2>
               {openSections.inrush && <button onClick={e => { e.stopPropagation(); setConfig({...config, transformers: [...config.transformers, {name: "TX-NEW", sn_kva: 0, u_kv: 0, ratio_iencl: 0, tau_ms: 0}]})}} className="text-[9px] font-bold bg-white text-orange-600 px-2 py-0.5 rounded border border-orange-200">+ ADD</button>}
             </div>
             {openSections.inrush && (
-              <div className="p-3 border-t border-slate-100 max-h-40 overflow-y-auto custom-scrollbar">
+              <div className="p-2 border-t border-slate-100">
                 <table className="w-full text-left font-bold">
-                  <thead className="text-[9px] text-slate-400 uppercase"><tr><th className="py-1">Name</th><th className="text-center">Sn (kVA)</th><th className="text-center">Un (kV)</th><th className="text-center">Ratio</th><th className="text-center">Tau (ms)</th><th className="w-5"></th></tr></thead>
+                  <thead className="text-[9px] text-slate-400 uppercase tracking-widest"><tr><th className="py-1">Name</th><th className="text-center">Sn (kVA)</th><th className="text-center">Un (kV)</th><th className="text-center">Ratio</th><th className="text-center">Tau (ms)</th><th className="w-5"></th></tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {config.transformers.map((tx: any, i: number) => (
                       <tr key={i} className="hover:bg-slate-50">
@@ -108,7 +103,7 @@ export default function Config({ user }: { user: any }) {
               <div className="p-3 border-t border-slate-100 grid grid-cols-3 gap-4">
                 <div><label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Target (MW)</label><input type="number" value={config.loadflow_settings.target_mw} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, target_mw: parseFloat(e.target.value)}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500"/></div>
                 <div><label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Tolerance</label><input type="number" value={config.loadflow_settings.tolerance_mw} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, tolerance_mw: parseFloat(e.target.value)}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500"/></div>
-                <div><label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Swing Bus ID</label><input type="text" value={config.loadflow_settings.swing_bus_id} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, swing_bus_id: e.target.value}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500" placeholder="Bus ID..."/></div>
+                <div><label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Swing Bus ID</label><input type="text" value={config.loadflow_settings.swing_bus_id} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, swing_bus_id: e.target.value}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500"/></div>
               </div>
             )}
           </div>
@@ -120,7 +115,7 @@ export default function Config({ user }: { user: any }) {
             </div>
             {openSections.protection && (
               <div className="p-3 border-t border-slate-100 space-y-4">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-3 font-bold">
                   {['coeff_stab_max', 'coeff_backup_min', 'coeff_inrush_margin'].map(k => (
                     <div key={k}><label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">{k.replace(/_/g,' ')}</label>
                       <input type="number" step="0.05" value={config.settings.std_51[k]} onChange={e => setConfig({...config, settings: {...config.settings, std_51: {...config.settings.std_51, [k]: parseFloat(e.target.value)}}})} className="w-full p-1 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-blue-500"/>
@@ -138,30 +133,46 @@ export default function Config({ user }: { user: any }) {
             )}
           </div>
 
-          {/* 5. COORDINATION */}
+          {/* 5. COORDINATION (FULL ROW TABLE) */}
           <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('coordination')}>
               <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.coordination ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Settings className="w-3.5 h-3.5 text-indigo-500" /> Protection Coordination</h2>
               {openSections.coordination && <button onClick={e => { e.stopPropagation(); setConfig({...config, plans: [...config.plans, {id: "ID_NEW", title: "New Plan", type: "TRANSFORMER", ct_primary: "CT 0/1 A", related_source: "TX-1", active_functions: ["51"]}]})}} className="text-[9px] font-bold bg-white text-indigo-600 px-2 py-0.5 rounded border border-indigo-200 hover:bg-indigo-50">+ ADD PLAN</button>}
             </div>
             {openSections.coordination && (
-              <div className="p-3 border-t border-slate-100 max-h-48 overflow-y-auto custom-scrollbar">
-                <div className="grid grid-cols-2 gap-3">
-                  {config.plans.map((p: any, i: number) => (
-                    <div key={i} className="p-2 bg-slate-50 border rounded flex items-center justify-between group relative">
-                      <div className="flex-1 pr-4">
-                        <input className="font-bold text-slate-700 bg-transparent outline-none border-b border-transparent focus:border-slate-300 w-full mb-1" value={p.id} onChange={e => { const n = [...config.plans]; n[i].id = e.target.value; setConfig({...config, plans: n}); }} />
-                        <div className="grid grid-cols-2 gap-1 text-[8px] text-slate-500 uppercase">
-                          <select className="bg-transparent outline-none" value={p.type} onChange={e => { const n = [...config.plans]; n[i].type = e.target.value; setConfig({...config, plans: n}); }}>
-                            <option value="TRANSFORMER">TRANSFORMER</option><option value="INCOMER">INCOMER</option><option value="COUPLING">COUPLING</option>
+              <div className="p-2 border-t border-slate-100 max-h-60 overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left font-bold border-collapse">
+                  <thead className="text-[8px] text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                    <tr>
+                      <th className="py-1 px-1">ID</th>
+                      <th className="px-1">Title</th>
+                      <th className="px-1">Type</th>
+                      <th className="px-1">CT Primary</th>
+                      <th className="px-1">Source</th>
+                      <th className="px-1">ANSI</th>
+                      <th className="w-5"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {config.plans.map((p: any, i: number) => (
+                      <tr key={i} className="hover:bg-slate-50 group">
+                        <td className="py-1 px-1"><input value={p.id} onChange={e => { const n = [...config.plans]; n[i].id = e.target.value; setConfig({...config, plans: n}); }} className="w-full bg-transparent text-slate-800 outline-none border-b border-transparent focus:border-indigo-300"/></td>
+                        <td className="px-1"><input value={p.title} onChange={e => { const n = [...config.plans]; n[i].title = e.target.value; setConfig({...config, plans: n}); }} className="w-full bg-transparent text-slate-600 outline-none border-b border-transparent focus:border-indigo-300"/></td>
+                        <td className="px-1">
+                          <select value={p.type} onChange={e => { const n = [...config.plans]; n[i].type = e.target.value; setConfig({...config, plans: n}); }} className="bg-transparent outline-none text-[9px] text-slate-500">
+                            <option value="TRANSFORMER">TX</option>
+                            <option value="INCOMER">INCOMER</option>
+                            <option value="COUPLING">CPL</option>
                           </select>
-                          <input className="bg-transparent outline-none text-right" value={p.ct_primary} onChange={e => { const n = [...config.plans]; n[i].ct_primary = e.target.value; setConfig({...config, plans: n}); }} />
-                        </div>
-                      </div>
-                      <button onClick={() => setConfig({...config, plans: config.plans.filter((_:any,idx:number)=>idx!==i)})} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5"/></button>
-                    </div>
-                  ))}
-                </div>
+                        </td>
+                        <td className="px-1"><input value={p.ct_primary} onChange={e => { const n = [...config.plans]; n[i].ct_primary = e.target.value; setConfig({...config, plans: n}); }} className="w-full bg-transparent text-slate-500 outline-none border-b border-transparent focus:border-indigo-300"/></td>
+                        <td className="px-1"><input value={p.related_source} onChange={e => { const n = [...config.plans]; n[i].related_source = e.target.value; setConfig({...config, plans: n}); }} className="w-full bg-transparent text-slate-500 outline-none border-b border-transparent focus:border-indigo-300"/></td>
+                        <td className="px-1"><input value={p.active_functions.join(', ')} onChange={e => { const n = [...config.plans]; n[i].active_functions = e.target.value.split(',').map(s => s.trim()); setConfig({...config, plans: n}); }} className="w-full bg-transparent text-indigo-600 outline-none border-b border-transparent focus:border-indigo-300"/></td>
+                        <td><button onClick={() => setConfig({...config, plans: config.plans.filter((_:any,idx:number)=>idx!==i)})} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3"/></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
