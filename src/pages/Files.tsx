@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import Toast from '../components/Toast';\nimport { useEffect, useState, useRef } from 'react';
 import { RefreshCw, Upload, FileText, Database } from 'lucide-react';
 
 interface FilesProps {
   user: any;
 }
 
-export default function Files({ user }: FilesProps) {
+\n  const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });\nexport default function Files({ user }: FilesProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -200,6 +200,14 @@ export default function Files({ user }: FilesProps) {
         </div>
 
       </div>
+    
+      {toast.show && (
+        <Toast 
+          message={toast.msg} 
+          type={toast.type} 
+          onClose={() => setToast({ ...toast, show: false })} 
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import Toast from '../components/Toast';\nimport { useState, useRef } from 'react';
 import ConfigGenerator from '../components/ConfigGenerator';
 import { Upload, FileText, Download, Loader2 } from 'lucide-react';
 
@@ -6,7 +6,7 @@ interface LoadflowProps {
   user: any;
 }
 
-export default function Loadflow({ user }: LoadflowProps) {
+\n  const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });\nexport default function Loadflow({ user }: LoadflowProps) {
   const [files, setFiles] = useState<FileList | null>(null);
   const [finalConfigJson, setFinalConfigJson] = useState("");
   const [loading, setLoading] = useState(false);
@@ -118,6 +118,14 @@ export default function Loadflow({ user }: LoadflowProps) {
         {/* Configurateur */}
         <ConfigGenerator onConfigChange={setFinalConfigJson} />
       </div>
+    
+      {toast.show && (
+        <Toast 
+          message={toast.msg} 
+          type={toast.type} 
+          onClose={() => setToast({ ...toast, show: false })} 
+        />
+      )}
     </div>
   );
 }

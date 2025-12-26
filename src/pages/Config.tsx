@@ -1,8 +1,8 @@
-
+import Toast from '../components/Toast';\n
 import { useState, useEffect, useRef } from 'react';
 import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck } from 'lucide-react';
 
-export default function Config({ user }: { user: any }) {
+\n  const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });\nexport default function Config({ user }: { user: any }) {
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [openSections, setOpenSections] = useState({ inrush: true, loadflow: true, protection: true, coordination: true });
@@ -214,6 +214,14 @@ export default function Config({ user }: { user: any }) {
         <option value="59">59 - Overvoltage</option>
         <option value="81">81 - Frequency Relay</option>
       </datalist>
+    
+      {toast.show && (
+        <Toast 
+          message={toast.msg} 
+          type={toast.type} 
+          onClose={() => setToast({ ...toast, show: false })} 
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
-import { Shield } from 'lucide-react';
+import Toast from '../components/Toast';\nimport { Shield } from 'lucide-react';
 
-export default function Protection() {
+\n  const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });\nexport default function Protection() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 text-center">
       <div className="bg-white rounded-3xl p-12 shadow-sm border border-slate-200 inline-block">
@@ -17,6 +17,14 @@ export default function Protection() {
             </span>
         </div>
       </div>
+    
+      {toast.show && (
+        <Toast 
+          message={toast.msg} 
+          type={toast.type} 
+          onClose={() => setToast({ ...toast, show: false })} 
+        />
+      )}
     </div>
   );
 }
