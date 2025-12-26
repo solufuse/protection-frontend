@@ -8,6 +8,7 @@ import Navbar from './components/Navbar';
 import Loadflow from './pages/Loadflow';
 import Protection from './pages/Protection';
 import Files from './pages/Files';
+import Config from './pages/Config';
 
 function App() {
   const [user, setUser] = useState(auth.currentUser);
@@ -56,7 +57,8 @@ function App() {
           <Route path="/" element={<Navigate to="/loadflow" replace />} />
           <Route path="/loadflow" element={<Loadflow user={user} />} />
           <Route path="/protection" element={<Protection />} />
-          <Route path="/files" element={<Files user={user} />} />
+          <Route path="/config" element={user ? <Config user={user} /> : <Navigate to="/auth" />} />
+                <Route path="/files" element={<Files user={user} />} />
           <Route path="*" element={<Navigate to="/loadflow" replace />} />
         </Routes>
       </div>
