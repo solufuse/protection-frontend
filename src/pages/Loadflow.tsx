@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Play, Download, Zap, Activity } from 'lucide-react';
 import Toast from '../components/Toast';
 
-export default function Loadflow() {
+export default function Loadflow({ user }: { user: any }) {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
 
@@ -11,6 +11,7 @@ export default function Loadflow() {
   };
 
   const handleRunAnalysis = () => {
+    if (!user) return;
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
@@ -35,7 +36,7 @@ export default function Loadflow() {
       </div>
 
       <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-12 lg:col-span-8 bg-white border border-slate-200 rounded shadow-sm p-4 h-fit">
+        <div className="col-span-12 lg:col-span-8 bg-white border border-slate-200 rounded shadow-sm p-4 h-fit text-left">
           <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 border-b pb-1">
             <Activity className="w-3.5 h-3.5 text-blue-500" /> Convergence Status
           </h2>
@@ -44,9 +45,9 @@ export default function Loadflow() {
           </div>
         </div>
         
-        <div className="col-span-12 lg:col-span-4 bg-slate-900 border border-slate-800 rounded p-4 text-green-400 font-mono text-[10px] shadow-lg h-60 overflow-hidden">
-          <p className="border-b border-slate-800 pb-1 mb-2 text-slate-500 uppercase font-bold text-[9px] tracking-widest text-left">Real-time Solver Logs</p>
-          <p className="text-left font-bold opacity-60">&gt; Waiting for engine init...</p>
+        <div className="col-span-12 lg:col-span-4 bg-slate-900 border border-slate-800 rounded p-4 text-green-400 font-mono text-[10px] shadow-lg h-60 overflow-hidden text-left">
+          <p className="border-b border-slate-800 pb-1 mb-2 text-slate-500 uppercase font-bold text-[9px] tracking-widest">Solver Logs</p>
+          <p className="opacity-60">&gt; Waiting for engine init...</p>
         </div>
       </div>
 

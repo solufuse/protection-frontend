@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Shield, ChevronRight, Settings, SlidersHorizontal } from 'lucide-react';
 import Toast from '../components/Toast';
 
-export default function Protection() {
+export default function Protection({ user }: { user: any }) {
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -15,15 +15,15 @@ export default function Protection() {
         <h1 className="text-sm font-bold text-slate-800 uppercase flex items-center gap-2 tracking-tight">
           <Shield className="w-4 h-4 text-blue-600" /> Protection Coordination
         </h1>
-        <button onClick={() => notify("Coordination Saved")} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px]">
+        <button onClick={() => notify("Coordination Saved")} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded font-bold shadow-sm transition-all text-[10px]">
           <SlidersHorizontal className="w-3.5 h-3.5" /> SAVE SETTINGS
         </button>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-12 gap-6 text-left">
         <div className="col-span-12 lg:col-span-4 space-y-4">
           <div className="bg-white border border-slate-200 rounded shadow-sm p-3">
-            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 border-b pb-1 text-left">Circuit Breakers</h2>
+            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 border-b pb-1">Circuit Breakers</h2>
             <div className="space-y-1.5">
               {['CB_TX1-A', 'CB_TX1-B', 'CB_TX2-A', 'CB_CPL-A'].map(cb => (
                 <div key={cb} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded hover:border-blue-300 hover:bg-white cursor-pointer transition-all group font-bold">
