@@ -29,13 +29,13 @@ export const useIngestion = (userId: string | undefined | null) => {
     setStep('starting');
 
     try {
-      // 1. UPLOAD
+      // 1. UPLOAD (Vers Firebase Storage)
       setStep('uploading');
       const storageRef = ref(storage, `uploads/${userId}/${file.name}`);
       await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(storageRef);
 
-      // 2. TRIGGER API
+      // 2. TRIGGER API (Vers Backend Python)
       setStep('processing');
       const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
       
@@ -51,7 +51,7 @@ export const useIngestion = (userId: string | undefined | null) => {
 
       if (!response.ok) throw new Error("Erreur Backend: " + response.statusText);
 
-      // 3. LISTEN RESULT
+      // 3. LISTEN (Attente du résultat dans Firestore)
       console.log("👂 Waiting for Firestore result...");
       const q = query(
         collection(db, "users", userId, "configurations"),
@@ -63,6 +63,7 @@ export const useIngestion = (userId: string | undefined | null) => {
         if (snapshot.empty) return;
         
         const change = snapshot.docChanges()[0];
+        // On vérifie que c'est bien le fichier qu'on vient d'envoyer (créé maintenant)
         if (change && change.type === 'added') {
           const config = change.doc.data() as SmartConfig;
           if (!config.processed) return;
@@ -70,7 +71,7 @@ export const useIngestion = (userId: string | undefined | null) => {
           setStep('downloading');
           let finalData = null;
 
-          // 4. SMART RETRIEVAL
+          // 4. SMART RETRIEVAL (Récupération JSON)
           if (config.is_large_file && config.storage_path) {
             const jsonRef = ref(storage, config.storage_path);
             const jsonUrl = await getDownloadURL(jsonRef);
@@ -80,7 +81,7 @@ export const useIngestion = (userId: string | undefined | null) => {
             finalData = config.raw_data;
           }
 
-          // 5. SAVE LOCAL
+          // 5. SAVE LOCAL (Dexie Cache)
           setStep('saving');
           try {
               await localDB.files.add({
