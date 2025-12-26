@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, FileText, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye } from 'lucide-react';
+import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -21,7 +21,6 @@ export default function Files({ user }: FilesProps) {
     setToast({ show: true, msg, type });
   };
 
-  // 1. SESSION SYNC: On écoute Firestore en temps réel (Remplace l'ancien fetchSession)
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "users", user.uid, "configurations"), orderBy("created_at", "desc"));
@@ -35,7 +34,6 @@ export default function Files({ user }: FilesProps) {
     return () => unsubscribe();
   }, [user]);
 
-  // Notifications du hook
   useEffect(() => {
       if (error) notify(error, 'error');
       if (step === 'done') notify("Traitement terminé avec succès !");
@@ -56,24 +54,18 @@ export default function Files({ user }: FilesProps) {
       } catch(e) { notify("Erreur suppression", "error"); }
   };
 
-  // --- FONCTIONS QUE TU AVAIS DANS INGESTION.PY ---
-  
   const handleDownloadZip = (format: 'xlsx' | 'json') => {
       if (!user) return;
       notify(`Génération du ZIP (${format.toUpperCase()})...`);
-      // Appel direct au Backend pour générer le ZIP de tous les fichiers récents
       window.location.href = `${API_URL}/ingestion/download-all/${format}?user_id=${user.uid}`;
   };
 
   const handlePreview = (file: any) => {
-      // Si on voulait faire une preview, on pourrait appeler /ingestion/preview
-      // Pour l'instant on affiche juste les métadonnées
       alert(`Fichier: ${file.source_type}\nID: ${file.id}\nCréé le: ${new Date(file.created_at.seconds * 1000).toLocaleString()}`);
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-4 h-[calc(100vh-80px)] flex flex-col">
-      {/* HEADER: TITRE + BOUTONS ZIP */}
       <div className="flex justify-between items-center mb-2 border-b border-slate-200 pb-2 flex-shrink-0 text-[11px]">
         <div className="flex items-center gap-2">
             <Cloud className="w-4 h-4 text-blue-600" />
@@ -95,10 +87,7 @@ export default function Files({ user }: FilesProps) {
         </div>
       </div>
 
-      {/* ZONE PRINCIPALE */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 flex-1 overflow-hidden min-h-0">
-        
-        {/* COLONNE GAUCHE : UPLOAD */}
         <div className="md:col-span-1 flex flex-col h-full">
             <div onClick={() => !loading && fileInputRef.current?.click()} className={`bg-white border border-dashed border-slate-300 rounded h-full max-h-32 md:max-h-full flex flex-col justify-center items-center cursor-pointer transition-colors group ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-500 hover:bg-blue-50'}`}>
                 <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept=".si2s,.mdb,.sqlite,.lf1s" disabled={loading} />
@@ -112,7 +101,6 @@ export default function Files({ user }: FilesProps) {
             </div>
         </div>
 
-        {/* COLONNE DROITE : LISTE DES FICHIERS (SESSION) */}
         <div className="md:col-span-3 bg-white border border-slate-200 rounded flex flex-col overflow-hidden h-full shadow-sm text-[11px]">
             <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase flex-shrink-0">
                 <span className="pl-1">Fichiers en Session</span><span className="pr-8">Actions</span>
