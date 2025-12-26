@@ -46,7 +46,7 @@ export default function Loadflow() {
         
         <div className="col-span-12 lg:col-span-4 bg-slate-900 border border-slate-800 rounded p-4 text-green-400 font-mono text-[10px] shadow-lg h-60 overflow-hidden">
           <p className="border-b border-slate-800 pb-1 mb-2 text-slate-500 uppercase font-bold text-[9px] tracking-widest text-left">Real-time Solver Logs</p>
-          <p className="text-left font-bold opacity-60">> Waiting for engine init...</p>
+          <p className="text-left font-bold opacity-60">&gt; Waiting for engine init...</p>
         </div>
       </div>
 
