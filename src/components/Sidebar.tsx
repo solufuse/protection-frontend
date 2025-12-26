@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   FileText, 
   Zap, 
-  Shield, 
+  Shield, Settings, 
   Database, 
   LogOut, 
   Menu, 
