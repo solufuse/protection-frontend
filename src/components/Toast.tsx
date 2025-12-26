@@ -1,4 +1,3 @@
-
 import { CheckCircle, AlertCircle, X } from 'lucide-react';
 import { useEffect } from 'react';
 
