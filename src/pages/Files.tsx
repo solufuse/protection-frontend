@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye, FileArchive } from 'lucide-react';
+import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye, FileArchive, FileCode } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -66,8 +66,10 @@ export default function Files({ user }: FilesProps) {
 
   // Helper pour l'icône selon le type
   const getIcon = (type: string) => {
-      if (type?.includes('mdb')) return <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
-      if (type?.includes('zip')) return <FileArchive className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
+      const lower = type?.toLowerCase() || "";
+      if (lower.includes('mdb')) return <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
+      if (lower.includes('zip')) return <FileArchive className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
+      if (lower.includes('json')) return <FileCode className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />; // Icône pour JSON
       return <FileSpreadsheet className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />;
   };
 
@@ -100,15 +102,15 @@ export default function Files({ user }: FilesProps) {
         {/* COLONNE GAUCHE : UPLOAD */}
         <div className="md:col-span-1 flex flex-col h-full">
             <div onClick={() => !loading && fileInputRef.current?.click()} className={`bg-white border border-dashed border-slate-300 rounded h-full max-h-32 md:max-h-full flex flex-col justify-center items-center cursor-pointer transition-colors group ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-500 hover:bg-blue-50'}`}>
-                {/* AJOUT DE .zip DANS ACCEPT */}
-                <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept=".si2s,.mdb,.sqlite,.lf1s,.zip" disabled={loading} />
+                {/* AJOUT DE .json DANS ACCEPT */}
+                <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept=".si2s,.mdb,.sqlite,.lf1s,.zip,.json" disabled={loading} />
                 <div className="mb-1 text-blue-500 group-hover:scale-110 transition-transform">
                     {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
                 </div>
                 <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-2">
                     {loading ? "Traitement..." : "Importer un fichier"}
                 </span>
-                <span className="text-[9px] text-slate-400 mt-1">(SI2S, MDB, ZIP)</span>
+                <span className="text-[9px] text-slate-400 mt-1">(SI2S, MDB, ZIP, JSON)</span>
             </div>
         </div>
 
