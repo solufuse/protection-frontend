@@ -45,7 +45,8 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-colors">
               <Server className="w-4 h-4" /> API Docs
             </a>
-          </nav>
+            <Link to="/config" className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${isActive('/config')}`}><Settings className="w-4 h-4" /> Config</Link>
+      </nav>
 
           {/* USER INFO & LOGOUT (Desktop) */}
           <div className="hidden md:flex items-center gap-4">
