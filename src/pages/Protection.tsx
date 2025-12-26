@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Shield, ChevronRight, Settings, SlidersHorizontal } from 'lucide-react';
 import Toast from '../components/Toast';
 
-export default function Protection({ user }: { user: any }) {
+export default function Protection() {
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => {
