@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, Settings, Zap, ShieldCheck, Info } from 'lucide-react';
+import { Save, Plus, Trash2, Settings, Zap, ShieldCheck } from 'lucide-react';
 
 export default function Config({ user }: { user: any }) {
   const [config, setConfig] = useState<any>(null);
