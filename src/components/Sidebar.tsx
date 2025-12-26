@@ -22,6 +22,7 @@ export default function Sidebar({ onLogout, userEmail }: SidebarProps) {
   const isActive = (path: string) => location.pathname === path;
   
   const navItems = [
+    { name: 'Configuration', path: '/config', icon: Settings },
     { name: 'Loadflow', path: '/loadflow', icon: Zap },
     { name: 'Protection', path: '/protection', icon: Shield },
     { name: 'Files (RAM)', path: '/files', icon: Database },
