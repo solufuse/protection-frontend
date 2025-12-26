@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye } from 'lucide-react';
+import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye, FileArchive } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -64,8 +64,16 @@ export default function Files({ user }: FilesProps) {
       alert(`Fichier: ${file.source_type}\nID: ${file.id}\nCréé le: ${new Date(file.created_at.seconds * 1000).toLocaleString()}`);
   };
 
+  // Helper pour l'icône selon le type
+  const getIcon = (type: string) => {
+      if (type?.includes('mdb')) return <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
+      if (type?.includes('zip')) return <FileArchive className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
+      return <FileSpreadsheet className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />;
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-4 h-[calc(100vh-80px)] flex flex-col">
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-2 border-b border-slate-200 pb-2 flex-shrink-0 text-[11px]">
         <div className="flex items-center gap-2">
             <Cloud className="w-4 h-4 text-blue-600" />
@@ -88,19 +96,23 @@ export default function Files({ user }: FilesProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 flex-1 overflow-hidden min-h-0">
+        
+        {/* COLONNE GAUCHE : UPLOAD */}
         <div className="md:col-span-1 flex flex-col h-full">
             <div onClick={() => !loading && fileInputRef.current?.click()} className={`bg-white border border-dashed border-slate-300 rounded h-full max-h-32 md:max-h-full flex flex-col justify-center items-center cursor-pointer transition-colors group ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-500 hover:bg-blue-50'}`}>
-                <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept=".si2s,.mdb,.sqlite,.lf1s" disabled={loading} />
+                {/* AJOUT DE .zip DANS ACCEPT */}
+                <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept=".si2s,.mdb,.sqlite,.lf1s,.zip" disabled={loading} />
                 <div className="mb-1 text-blue-500 group-hover:scale-110 transition-transform">
                     {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
                 </div>
                 <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-2">
                     {loading ? "Traitement..." : "Importer un fichier"}
                 </span>
-                <span className="text-[9px] text-slate-400 mt-1">(SI2S, MDB, LF1S)</span>
+                <span className="text-[9px] text-slate-400 mt-1">(SI2S, MDB, ZIP)</span>
             </div>
         </div>
 
+        {/* COLONNE DROITE : LISTE */}
         <div className="md:col-span-3 bg-white border border-slate-200 rounded flex flex-col overflow-hidden h-full shadow-sm text-[11px]">
             <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase flex-shrink-0">
                 <span className="pl-1">Fichiers en Session</span><span className="pr-8">Actions</span>
@@ -113,10 +125,7 @@ export default function Files({ user }: FilesProps) {
                                 <tr key={file.id} className="hover:bg-blue-50 transition-colors border-b border-slate-50 last:border-0 h-10">
                                     <td className="px-3 py-0 align-middle w-full max-w-0">
                                         <div className="flex items-center gap-2 overflow-hidden">
-                                            {file.source_type?.includes('mdb') ? 
-                                                <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" /> : 
-                                                <FileSpreadsheet className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                                            }
+                                            {getIcon(file.source_type)}
                                             <div className="flex flex-col min-w-0">
                                                 <span className="text-[10px] text-slate-700 truncate leading-tight">
                                                     {file.source_type?.toUpperCase() || "FICHIER INCONNU"}
