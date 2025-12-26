@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Zap, Activity, FileText, Server, LogOut, Shield, Menu, X } from 'lucide-react';
+import { Zap, Settings, Activity, FileText, Server, LogOut, Shield, Menu, X } from 'lucide-react';
 
 interface NavbarProps {
   user: any;
