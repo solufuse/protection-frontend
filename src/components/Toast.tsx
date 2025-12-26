@@ -20,7 +20,7 @@ export default function Toast({ message, type, onClose }: ToastProps) {
     }`}>
       {type === 'success' ? <CheckCircle className="w-5 h-5 text-green-500" /> : <AlertCircle className="w-5 h-5 text-red-500" />}
       <span className="font-bold text-sm">{message}</span>
-      <button onClick={onClose} className="ml-2 hover:opacity-70">
+      <button onClick={onClose} className="ml-2 hover:opacity-70 transition-opacity">
         <X className="w-4 h-4 opacity-40" />
       </button>
     </div>
