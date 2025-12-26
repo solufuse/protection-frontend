@@ -49,7 +49,7 @@ export default function Config({ user }: { user: any }) {
   if (!config) return null;
 
   return (
-    <div className="max-w-full mx-auto px-4 py-2 text-[11px]">
+    <div className="max-w-6xl mx-auto px-6 py-2 text-[11px]">
       <div className="flex justify-between items-center mb-2 border-b border-slate-200 pb-1">
         <input 
           className="text-sm font-bold text-slate-800 uppercase tracking-tight bg-transparent border-none outline-none focus:ring-0"
