@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, FileText, Database, Cloud, Trash2 } from 'lucide-react';
+import { RefreshCw, Upload, FileText, Cloud, Trash2 } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -14,14 +14,12 @@ export default function Files({ user }: FilesProps) {
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success'|'error'}>({ show: false, msg: '', type: 'success' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Notre nouveau hook
   const { processFile, loading, step, error } = useIngestion(user?.uid);
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, msg, type });
   };
 
-  // Effet pour écouter la liste des fichiers en temps réel (Cloud)
   useEffect(() => {
     if (!user) return;
 
@@ -37,7 +35,6 @@ export default function Files({ user }: FilesProps) {
     return () => unsubscribe();
   }, [user]);
 
-  // Gestion des erreurs du hook
   useEffect(() => {
       if (error) notify(error, 'error');
       if (step === 'done') notify("Fichier traité avec succès !");
@@ -53,7 +50,8 @@ export default function Files({ user }: FilesProps) {
   const handleDelete = async (docId: string) => {
       if(!confirm("Supprimer ce fichier du Cloud ?")) return;
       try {
-          await deleteDoc(doc.id(db, "users", user.uid, "configurations", docId));
+          // CORRECTION ICI : doc() et non doc.id()
+          await deleteDoc(doc(db, "users", user.uid, "configurations", docId));
           notify("Fichier supprimé");
       } catch(e) { notify("Erreur suppression", "error"); }
   };
