@@ -60,21 +60,20 @@ export default function Files({ user }: FilesProps) {
       window.location.href = `${API_URL}/ingestion/download-all/${format}?user_id=${user.uid}`;
   };
 
-  const handlePreview = (file: any) => {
-      alert(`Fichier: ${file.source_type}\nID: ${file.id}\nCréé le: ${new Date(file.created_at.seconds * 1000).toLocaleString()}`);
-  };
-
-  // --- NOUVEAU : COPIER LE TOKEN USER ---
   const handleCopyToken = async () => {
     if (!user) return;
     try {
-        const token = await user.getIdToken(true); // true = force refresh si besoin
+        const token = await user.getIdToken(true);
         await navigator.clipboard.writeText(token);
-        notify("🔑 Token copié ! Prêt pour Swagger/Postman.");
+        notify("🔑 Token copié !");
     } catch (e) {
-        notify("Erreur lors de la récupération du token", "error");
-        console.error(e);
+        notify("Erreur token", "error");
     }
+  };
+
+  const handlePreview = (file: any) => {
+      // Affiche les infos complètes pour débugger
+      alert(`Nom: ${file.original_name}\nType: ${file.source_type}\nID: ${file.id}`);
   };
 
   const getIcon = (type: string) => {
@@ -100,21 +99,22 @@ export default function Files({ user }: FilesProps) {
         <div className="flex gap-2 items-center">
            {loading && <span className="text-blue-600 font-bold animate-pulse uppercase text-[10px] mr-2">Status: {step}...</span>}
            
-           {/* BOUTON TOKEN */}
-           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-slate-800 text-white px-2 py-1 rounded hover:bg-slate-700 text-[10px] font-bold transition-colors shadow-sm mr-2" title="Copier le Token d'authentification">
+           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-slate-800 text-white px-2 py-1 rounded hover:bg-slate-700 text-[10px] font-bold transition-colors shadow-sm mr-2">
                 <Key className="w-3.5 h-3.5" /> TOKEN
            </button>
 
-           <button onClick={() => handleDownloadZip('json')} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded hover:bg-slate-50 text-[10px] font-bold transition-colors shadow-sm" title="Sauvegarder la session en JSON">
+           <button onClick={() => handleDownloadZip('json')} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded hover:bg-slate-50 text-[10px] font-bold transition-colors shadow-sm">
                 <FileJson className="w-3.5 h-3.5" /> ZIP JSON
            </button>
-           <button onClick={() => handleDownloadZip('xlsx')} className="flex items-center gap-1 bg-green-600 border border-green-700 text-white px-2 py-1 rounded hover:bg-green-700 text-[10px] font-bold transition-colors shadow-sm" title="Tout exporter en Excel">
+           <button onClick={() => handleDownloadZip('xlsx')} className="flex items-center gap-1 bg-green-600 border border-green-700 text-white px-2 py-1 rounded hover:bg-green-700 text-[10px] font-bold transition-colors shadow-sm">
                 <Download className="w-3.5 h-3.5" /> ZIP EXCEL
            </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 flex-1 overflow-hidden min-h-0">
+        
+        {/* UPLOAD ZONE */}
         <div className="md:col-span-1 flex flex-col h-full">
             <div onClick={() => !loading && fileInputRef.current?.click()} className={`bg-white border border-dashed border-slate-300 rounded h-full max-h-32 md:max-h-full flex flex-col justify-center items-center cursor-pointer transition-colors group ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-500 hover:bg-blue-50'}`}>
                 <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept=".si2s,.mdb,.sqlite,.lf1s,.zip,.json" disabled={loading} />
@@ -128,6 +128,7 @@ export default function Files({ user }: FilesProps) {
             </div>
         </div>
 
+        {/* FILE LIST */}
         <div className="md:col-span-3 bg-white border border-slate-200 rounded flex flex-col overflow-hidden h-full shadow-sm text-[11px]">
             <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase flex-shrink-0">
                 <span className="pl-1">Fichiers en Session</span><span className="pr-8">Actions</span>
@@ -142,14 +143,15 @@ export default function Files({ user }: FilesProps) {
                                         <div className="flex items-center gap-2 overflow-hidden">
                                             {getIcon(file.source_type)}
                                             <div className="flex flex-col min-w-0">
-                                                <span className="text-[10px] text-slate-700 truncate leading-tight">
-                                                    {file.source_type?.toUpperCase() || "FICHIER INCONNU"}
+                                                {/* MISE A JOUR ICI : AFFICHAGE DU NOM REEL */}
+                                                <span className="text-[10px] font-bold text-slate-700 truncate leading-tight" title={file.original_name}>
+                                                    {file.original_name || "Fichier sans nom"}
                                                 </span>
                                                 <span className="text-[9px] text-slate-400 font-normal truncate">
-                                                    {file.created_at?.seconds ? new Date(file.created_at.seconds * 1000).toLocaleString() : ""}
+                                                    {file.source_type?.toUpperCase()} • {file.created_at?.seconds ? new Date(file.created_at.seconds * 1000).toLocaleString() : ""}
                                                 </span>
                                             </div>
-                                            {file.is_large_file && <span className="text-[8px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded ml-auto flex-shrink-0">HEAVY</span>}
+                                            {file.is_large_file && <span className="text-[8px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded ml-auto flex-shrink-0">READY</span>}
                                         </div>
                                     </td>
                                     <td className="px-3 py-0 align-middle w-20 text-right whitespace-nowrap">
