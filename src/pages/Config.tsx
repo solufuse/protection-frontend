@@ -1,11 +1,19 @@
 
 import { useState, useEffect } from 'react';
-import { Save, Trash2, Settings, Zap, ShieldCheck, Download, Activity } from 'lucide-react';
+import { Save, Trash2, Settings, Zap, ShieldCheck, Download, Activity, ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Config({ user }: { user: any }) {
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  
+  // État pour minimiser les fenêtres
+  const [openSections, setOpenSections] = useState({
+    inrush: true,
+    loadflow: true,
+    protection: true,
+    coordination: true
+  });
 
   const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
 
@@ -21,6 +29,10 @@ export default function Config({ user }: { user: any }) {
       plans: []
     });
   }, []);
+
+  const toggleSection = (section: string) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
+  };
 
   const handleDownload = () => {
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
@@ -73,87 +85,126 @@ export default function Config({ user }: { user: any }) {
       {message && <div className="mb-4 p-2 bg-green-50 text-green-700 border border-green-200 rounded font-bold">{message}</div>}
 
       <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 lg:col-span-8 space-y-6">
+        <div className="col-span-12 lg:col-span-8 space-y-4">
           
-          {/* 2. INRUSH SECTION (STANDARDS) */}
-          <div className="bg-white p-3 border border-slate-200 rounded shadow-sm">
-            <div className="flex justify-between items-center mb-2 border-b pb-1">
-              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase"><Activity className="w-3.5 h-3.5 text-orange-500" /> Inrush Standards (Transformers)</h2>
-              <button onClick={() => setConfig({...config, transformers: [...config.transformers, {name: "TX-NEW", sn_kva: 0, u_kv: 0, ratio_iencl: 0, tau_ms: 0}]})} className="text-[9px] font-bold bg-orange-50 text-orange-600 px-2 py-0.5 rounded border border-orange-100 hover:bg-orange-100">+ ADD TRANSFORMER</button>
+          {/* 2. INRUSH SECTION */}
+          <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
+            <div 
+              className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+              onClick={() => toggleSection('inrush')}
+            >
+              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">
+                {openSections.inrush ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>}
+                <Activity className="w-3.5 h-3.5 text-orange-500" /> Inrush (Transformers)
+              </h2>
+              {openSections.inrush && (
+                <button onClick={(e) => { e.stopPropagation(); setConfig({...config, transformers: [...config.transformers, {name: "TX-NEW", sn_kva: 0, u_kv: 0, ratio_iencl: 0, tau_ms: 0}]})}} className="text-[9px] font-bold bg-white text-orange-600 px-2 py-0.5 rounded border border-orange-200">+ ADD</button>
+              )}
             </div>
-            <div className="max-h-32 overflow-y-auto custom-scrollbar">
-              <table className="w-full text-left">
-                <thead className="text-[9px] text-slate-400 uppercase">
-                  <tr><th className="py-1">Name</th><th className="text-center">Sn (kVA)</th><th className="text-center">Un (kV)</th><th className="text-center">Ratio</th><th className="text-center">Tau (ms)</th><th className="w-5"></th></tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-[10px]">
-                  {config.transformers.map((tx: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="py-1"><input value={tx.name} onChange={e => { const n = [...config.transformers]; n[idx].name = e.target.value; setConfig({...config, transformers: n}); }} className="w-full bg-transparent font-bold text-blue-600 outline-none"/></td>
-                      <td><input type="number" value={tx.sn_kva} onChange={e => { const n = [...config.transformers]; n[idx].sn_kva = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none"/></td>
-                      <td><input type="number" value={tx.u_kv} onChange={e => { const n = [...config.transformers]; n[idx].u_kv = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none"/></td>
-                      <td><input type="number" value={tx.ratio_iencl} onChange={e => { const n = [...config.transformers]; n[idx].ratio_iencl = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none"/></td>
-                      <td><input type="number" value={tx.tau_ms} onChange={e => { const n = [...config.transformers]; n[idx].tau_ms = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none"/></td>
-                      <td><button onClick={() => setConfig({...config, transformers: config.transformers.filter((_:any,i:number)=>i!==idx)})} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3"/></button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {openSections.inrush && (
+              <div className="p-3 border-t border-slate-100 max-h-40 overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left">
+                  <thead className="text-[9px] text-slate-400 uppercase">
+                    <tr><th className="py-1">Name</th><th className="text-center">Sn (kVA)</th><th className="text-center">Un (kV)</th><th className="text-center">Ratio</th><th className="text-center">Tau (ms)</th><th className="w-5"></th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-[10px]">
+                    {config.transformers.map((tx: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="py-1"><input value={tx.name} onChange={e => { const n = [...config.transformers]; n[idx].name = e.target.value; setConfig({...config, transformers: n}); }} className="w-full bg-transparent font-bold text-blue-600 outline-none"/></td>
+                        <td><input type="number" value={tx.sn_kva} onChange={e => { const n = [...config.transformers]; n[idx].sn_kva = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none"/></td>
+                        <td><input type="number" value={tx.u_kv} onChange={e => { const n = [...config.transformers]; n[idx].u_kv = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none"/></td>
+                        <td><input type="number" value={tx.ratio_iencl} onChange={e => { const n = [...config.transformers]; n[idx].ratio_iencl = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none"/></td>
+                        <td><input type="number" value={tx.tau_ms} onChange={e => { const n = [...config.transformers]; n[idx].tau_ms = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none"/></td>
+                        <td><button onClick={() => setConfig({...config, transformers: config.transformers.filter((_:any,i:number)=>i!==idx)})} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3"/></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* 3. LOADFLOW SECTION */}
-          <div className="bg-white p-3 border border-slate-200 rounded shadow-sm">
-            <h2 className="font-bold mb-3 flex items-center gap-1.5 border-b pb-1 text-slate-700 uppercase"><Zap className="w-3.5 h-3.5 text-yellow-500" /> Loadflow Analysis</h2>
-            <div className="grid grid-cols-3 gap-4">
-              <div><label className="text-[9px] text-slate-400 font-bold uppercase">Target (MW)</label>
-                <input type="number" value={config.loadflow_settings.target_mw} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, target_mw: parseFloat(e.target.value)}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500"/>
-              </div>
-              <div><label className="text-[9px] text-slate-400 font-bold uppercase">Tolerance</label>
-                <input type="number" value={config.loadflow_settings.tolerance_mw} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, tolerance_mw: parseFloat(e.target.value)}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500"/>
-              </div>
-              <div><label className="text-[9px] text-slate-400 font-bold uppercase">Swing Bus ID</label>
-                <input type="text" value={config.loadflow_settings.swing_bus_id} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, swing_bus_id: e.target.value}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500" placeholder="Bus ID..."/>
-              </div>
+          <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
+            <div 
+              className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+              onClick={() => toggleSection('loadflow')}
+            >
+              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">
+                {openSections.loadflow ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>}
+                <Zap className="w-3.5 h-3.5 text-yellow-500" /> Loadflow Analysis
+              </h2>
             </div>
+            {openSections.loadflow && (
+              <div className="p-3 border-t border-slate-100 grid grid-cols-3 gap-4">
+                <div><label className="text-[9px] text-slate-400 font-bold uppercase">Target (MW)</label>
+                  <input type="number" value={config.loadflow_settings.target_mw} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, target_mw: parseFloat(e.target.value)}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500"/>
+                </div>
+                <div><label className="text-[9px] text-slate-400 font-bold uppercase">Tolerance</label>
+                  <input type="number" value={config.loadflow_settings.tolerance_mw} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, tolerance_mw: parseFloat(e.target.value)}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500"/>
+                </div>
+                <div><label className="text-[9px] text-slate-400 font-bold uppercase">Swing Bus ID</label>
+                  <input type="text" value={config.loadflow_settings.swing_bus_id} onChange={e => setConfig({...config, loadflow_settings: {...config.loadflow_settings, swing_bus_id: e.target.value}})} className="w-full p-1.5 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-yellow-500" placeholder="Bus ID..."/>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* 4. PROTECTION SECTION (51 + COORDINATION) */}
-          <div className="space-y-4">
-            <div className="bg-white p-3 border border-slate-200 rounded shadow-sm">
-              <h2 className="font-bold mb-3 flex items-center gap-1.5 border-b pb-1 text-slate-700 uppercase"><ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Protection 51</h2>
-              
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <div><label className="text-[9px] text-slate-400 font-bold uppercase">Stab Max</label>
-                  <input type="number" step="0.1" value={config.settings.std_51.coeff_stab_max} onChange={e => setConfig({...config, settings: {...config.settings, std_51: {...config.settings.std_51, coeff_stab_max: parseFloat(e.target.value)}}})} className="w-full p-1 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-blue-500"/>
-                </div>
-                <div><label className="text-[9px] text-slate-400 font-bold uppercase">Backup Min</label>
-                  <input type="number" step="0.1" value={config.settings.std_51.coeff_backup_min} onChange={e => setConfig({...config, settings: {...config.settings, std_51: {...config.settings.std_51, coeff_backup_min: parseFloat(e.target.value)}}})} className="w-full p-1 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-blue-500"/>
-                </div>
-                <div><label className="text-[9px] text-slate-400 font-bold uppercase">Inrush Margin</label>
-                  <input type="number" step="0.05" value={config.settings.std_51.coeff_inrush_margin} onChange={e => setConfig({...config, settings: {...config.settings, std_51: {...config.settings.std_51, coeff_inrush_margin: parseFloat(e.target.value)}}})} className="w-full p-1 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-blue-500"/>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-2 rounded border border-slate-100">
-                <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">Selectivity Settings</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-[9px] text-slate-500 uppercase">Margin (A)</label>
-                    <input type="number" value={config.settings.selectivity.margin_amperemetric} onChange={e => setConfig({...config, settings: {...config.settings, selectivity: {...config.settings.selectivity, margin_amperemetric: parseFloat(e.target.value)}}})} className="w-full p-1 bg-white border rounded outline-none focus:ring-1 focus:ring-blue-400"/>
-                  </div>
-                  <div><label className="text-[9px] text-slate-500 uppercase">Coeff Amperemetric</label>
-                    <input type="number" step="0.1" value={config.settings.selectivity.coeff_amperemetric} onChange={e => setConfig({...config, settings: {...config.settings, selectivity: {...config.settings.selectivity, coeff_amperemetric: parseFloat(e.target.value)}}})} className="w-full p-1 bg-white border rounded outline-none focus:ring-1 focus:ring-blue-400"/>
-                  </div>
-                </div>
-              </div>
+          {/* 4. PROTECTION 51 SECTION */}
+          <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
+            <div 
+              className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+              onClick={() => toggleSection('protection')}
+            >
+              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">
+                {openSections.protection ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>}
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Protection 51
+              </h2>
             </div>
-
-            <div className="bg-white p-3 border border-slate-200 rounded shadow-sm">
-               <div className="flex justify-between items-center mb-2 border-b pb-1">
-                <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase text-[10px]"><Settings className="w-3.5 h-3.5 text-indigo-500" /> Protection Coordination</h2>
-                <button onClick={() => setConfig({...config, plans: [...config.plans, {id: "NEW_ID", title: "New Plan", type: "TRANSFORMER", ct_primary: "CT 0/1 A", related_source: "TX-1", active_functions: ["51"]}]})} className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100 hover:bg-indigo-100">+ ADD PLAN</button>
+            {openSections.protection && (
+              <div className="p-3 border-t border-slate-100">
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div><label className="text-[9px] text-slate-400 font-bold uppercase">Stab Max</label>
+                    <input type="number" step="0.1" value={config.settings.std_51.coeff_stab_max} onChange={e => setConfig({...config, settings: {...config.settings, std_51: {...config.settings.std_51, coeff_stab_max: parseFloat(e.target.value)}}})} className="w-full p-1 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-blue-500"/>
+                  </div>
+                  <div><label className="text-[9px] text-slate-400 font-bold uppercase">Backup Min</label>
+                    <input type="number" step="0.1" value={config.settings.std_51.coeff_backup_min} onChange={e => setConfig({...config, settings: {...config.settings, std_51: {...config.settings.std_51, coeff_backup_min: parseFloat(e.target.value)}}})} className="w-full p-1 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-blue-500"/>
+                  </div>
+                  <div><label className="text-[9px] text-slate-400 font-bold uppercase">Inrush Margin</label>
+                    <input type="number" step="0.05" value={config.settings.std_51.coeff_inrush_margin} onChange={e => setConfig({...config, settings: {...config.settings, std_51: {...config.settings.std_51, coeff_inrush_margin: parseFloat(e.target.value)}}})} className="w-full p-1 bg-slate-50 border rounded outline-none focus:ring-1 focus:ring-blue-500"/>
+                  </div>
+                </div>
+                <div className="bg-slate-50 p-2 rounded border border-slate-100">
+                  <p className="text-[9px] text-slate-400 font-bold uppercase mb-2 italic">Selectivity (Second Plan)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="text-[9px] text-slate-500 uppercase font-bold">Margin (A)</label>
+                      <input type="number" value={config.settings.selectivity.margin_amperemetric} onChange={e => setConfig({...config, settings: {...config.settings, selectivity: {...config.settings.selectivity, margin_amperemetric: parseFloat(e.target.value)}}})} className="w-full p-1 bg-white border rounded outline-none focus:ring-1 focus:ring-blue-400"/>
+                    </div>
+                    <div><label className="text-[9px] text-slate-500 uppercase font-bold">Coeff Amperemetric</label>
+                      <input type="number" step="0.1" value={config.settings.selectivity.coeff_amperemetric} onChange={e => setConfig({...config, settings: {...config.selectivity, selectivity: {...config.settings.selectivity, coeff_amperemetric: parseFloat(e.target.value)}}})} className="w-full p-1 bg-white border rounded outline-none focus:ring-1 focus:ring-blue-400"/>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="max-h-40 overflow-y-auto custom-scrollbar">
+            )}
+          </div>
+
+          {/* 5. COORDINATION SECTION */}
+          <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
+            <div 
+              className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+              onClick={() => toggleSection('coordination')}
+            >
+              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">
+                {openSections.coordination ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>}
+                <Settings className="w-3.5 h-3.5 text-indigo-500" /> Protection Coordination
+              </h2>
+              {openSections.coordination && (
+                <button onClick={(e) => { e.stopPropagation(); setConfig({...config, plans: [...config.plans, {id: "NEW_ID", title: "New Plan", type: "TRANSFORMER", ct_primary: "CT 0/1 A", related_source: "TX-1", active_functions: ["51"]}]})}} className="text-[9px] font-bold bg-white text-indigo-600 px-2 py-0.5 rounded border border-indigo-200 hover:bg-indigo-50">+ ADD PLAN</button>
+              )}
+            </div>
+            {openSections.coordination && (
+              <div className="p-3 border-t border-slate-100 max-h-40 overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-2 gap-2">
                   {config.plans.map((p: any, idx: number) => (
                     <div key={idx} className="p-2 bg-slate-50 border border-slate-100 rounded flex items-center justify-between group">
@@ -166,14 +217,14 @@ export default function Config({ user }: { user: any }) {
                   ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* JSON PREVIEW */}
+        {/* RIGHT COLUMN: PREVIEW */}
         <div className="col-span-12 lg:col-span-4">
           <div className="bg-slate-900 rounded border border-slate-800 p-3 h-full sticky top-4">
-            <p className="text-[9px] text-slate-500 font-bold uppercase mb-2 border-b border-slate-700 pb-1">Live configuration preview</p>
+            <p className="text-[9px] text-slate-500 font-bold uppercase mb-2 border-b border-slate-700 pb-1 italic">Live JSON Sync</p>
             <pre className="text-[9px] text-green-500 font-mono leading-tight max-h-[600px] overflow-auto custom-scrollbar">
               {JSON.stringify(config, null, 2)}
             </pre>
