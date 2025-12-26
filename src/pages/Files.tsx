@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, FileText, Cloud, Trash2 } from 'lucide-react';
+import { RefreshCw, Upload, FileText, Cloud, Trash2, Download, FileJson } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -15,6 +15,7 @@ export default function Files({ user }: FilesProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { processFile, loading, step, error } = useIngestion(user?.uid);
+  const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, msg, type });
@@ -22,7 +23,6 @@ export default function Files({ user }: FilesProps) {
 
   useEffect(() => {
     if (!user) return;
-
     const q = query(collection(db, "users", user.uid, "configurations"), orderBy("created_at", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -31,7 +31,6 @@ export default function Files({ user }: FilesProps) {
       }));
       setFiles(docs);
     });
-
     return () => unsubscribe();
   }, [user]);
 
@@ -50,10 +49,20 @@ export default function Files({ user }: FilesProps) {
   const handleDelete = async (docId: string) => {
       if(!confirm("Supprimer ce fichier du Cloud ?")) return;
       try {
-          // CORRECTION ICI : doc() et non doc.id()
           await deleteDoc(doc(db, "users", user.uid, "configurations", docId));
           notify("Fichier supprimé");
       } catch(e) { notify("Erreur suppression", "error"); }
+  };
+
+  // --- NOUVELLE FONCTION : DOWNLOAD ZIP ---
+  const handleDownloadZip = (format: 'xlsx' | 'json') => {
+      if (!user) return;
+      // Appel direct à l'API Backend qui génère le ZIP à la volée
+      const downloadUrl = `${API_URL}/ingestion/download-all/${format}?user_id=${user.uid}`;
+      
+      // On déclenche le téléchargement navigateur
+      window.location.href = downloadUrl;
+      notify(`Génération du ZIP (${format.toUpperCase()}) en cours...`);
   };
 
   return (
@@ -66,8 +75,17 @@ export default function Files({ user }: FilesProps) {
                 {files.length}
             </span>
         </div>
-        <div className="flex gap-2">
-           {loading && <span className="text-blue-600 font-bold animate-pulse uppercase text-[10px]">Status: {step}...</span>}
+        
+        {/* BOUTONS D'EXPORT */}
+        <div className="flex gap-2 items-center">
+           {loading && <span className="text-blue-600 font-bold animate-pulse uppercase text-[10px] mr-2">Status: {step}...</span>}
+           
+           <button onClick={() => handleDownloadZip('json')} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded hover:bg-slate-50 text-[10px] font-bold transition-colors" title="Tout télécharger en JSON">
+                <FileJson className="w-3.5 h-3.5" /> ZIP JSON
+           </button>
+           <button onClick={() => handleDownloadZip('xlsx')} className="flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-2 py-1 rounded hover:bg-green-100 text-[10px] font-bold transition-colors" title="Tout télécharger en Excel">
+                <Download className="w-3.5 h-3.5" /> ZIP EXCEL
+           </button>
         </div>
       </div>
 
