@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye, FileArchive, FileCode } from 'lucide-react';
+import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye, FileArchive, FileCode, Key } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -64,12 +64,24 @@ export default function Files({ user }: FilesProps) {
       alert(`Fichier: ${file.source_type}\nID: ${file.id}\nCréé le: ${new Date(file.created_at.seconds * 1000).toLocaleString()}`);
   };
 
-  // Helper pour l'icône selon le type
+  // --- NOUVEAU : COPIER LE TOKEN USER ---
+  const handleCopyToken = async () => {
+    if (!user) return;
+    try {
+        const token = await user.getIdToken(true); // true = force refresh si besoin
+        await navigator.clipboard.writeText(token);
+        notify("🔑 Token copié ! Prêt pour Swagger/Postman.");
+    } catch (e) {
+        notify("Erreur lors de la récupération du token", "error");
+        console.error(e);
+    }
+  };
+
   const getIcon = (type: string) => {
       const lower = type?.toLowerCase() || "";
       if (lower.includes('mdb')) return <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
       if (lower.includes('zip')) return <FileArchive className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
-      if (lower.includes('json')) return <FileCode className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />; // Icône pour JSON
+      if (lower.includes('json')) return <FileCode className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />;
       return <FileSpreadsheet className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />;
   };
 
@@ -88,6 +100,11 @@ export default function Files({ user }: FilesProps) {
         <div className="flex gap-2 items-center">
            {loading && <span className="text-blue-600 font-bold animate-pulse uppercase text-[10px] mr-2">Status: {step}...</span>}
            
+           {/* BOUTON TOKEN */}
+           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-slate-800 text-white px-2 py-1 rounded hover:bg-slate-700 text-[10px] font-bold transition-colors shadow-sm mr-2" title="Copier le Token d'authentification">
+                <Key className="w-3.5 h-3.5" /> TOKEN
+           </button>
+
            <button onClick={() => handleDownloadZip('json')} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded hover:bg-slate-50 text-[10px] font-bold transition-colors shadow-sm" title="Sauvegarder la session en JSON">
                 <FileJson className="w-3.5 h-3.5" /> ZIP JSON
            </button>
@@ -98,11 +115,8 @@ export default function Files({ user }: FilesProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 flex-1 overflow-hidden min-h-0">
-        
-        {/* COLONNE GAUCHE : UPLOAD */}
         <div className="md:col-span-1 flex flex-col h-full">
             <div onClick={() => !loading && fileInputRef.current?.click()} className={`bg-white border border-dashed border-slate-300 rounded h-full max-h-32 md:max-h-full flex flex-col justify-center items-center cursor-pointer transition-colors group ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-500 hover:bg-blue-50'}`}>
-                {/* AJOUT DE .json DANS ACCEPT */}
                 <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept=".si2s,.mdb,.sqlite,.lf1s,.zip,.json" disabled={loading} />
                 <div className="mb-1 text-blue-500 group-hover:scale-110 transition-transform">
                     {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
@@ -114,7 +128,6 @@ export default function Files({ user }: FilesProps) {
             </div>
         </div>
 
-        {/* COLONNE DROITE : LISTE */}
         <div className="md:col-span-3 bg-white border border-slate-200 rounded flex flex-col overflow-hidden h-full shadow-sm text-[11px]">
             <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase flex-shrink-0">
                 <span className="pl-1">Fichiers en Session</span><span className="pr-8">Actions</span>
