@@ -59,12 +59,24 @@ export default function Config({ user }: { user: any }) {
     setLoading(true);
     try {
       const token = await user.getIdToken();
+      // On envoie le JSON comme un fichier nommé 'config.json'
       const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
       const formData = new FormData();
       formData.append('files', blob, 'config.json');
-      await fetch(`${apiUrl}/session/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
-      notify("Saved to Session");
-    } catch (e) { notify("Save Error", "error"); }
+      
+      // Envoi vers le Backend qui va stocker ça dans Firestore/Storage
+      const response = await fetch(`${apiUrl}/session/upload`, { 
+          method: 'POST', 
+          headers: { 'Authorization': `Bearer ${token}` }, 
+          body: formData 
+      });
+      
+      if (!response.ok) throw new Error("Backend error");
+      notify("Sauvegardé en Session (Cloud) !");
+    } catch (e) { 
+        notify("Erreur de sauvegarde", "error"); 
+        console.error(e);
+    }
     finally { setLoading(false); }
   };
 
@@ -87,6 +99,9 @@ export default function Config({ user }: { user: any }) {
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12 lg:col-span-8 space-y-4">
+          
+          {/* SECTIONS STANDARDS UNIQUEMENT */}
+          
           <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('inrush')}>
               <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.inrush ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Activity className="w-3.5 h-3.5 text-orange-500" /> Inrush</h2>
