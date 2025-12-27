@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, DragEvent } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
-  FileSpreadsheet, FileJson, FileDown,
+  FileSpreadsheet, FileDown,
   RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, ChevronDown, ChevronRight, Calendar, ExternalLink
 } from 'lucide-react';
 import Toast from '../components/Toast';
@@ -72,7 +72,7 @@ export default function Files({ user }: { user: any }) {
       if (!res.ok) throw new Error();
       notify(`${fileList.length} Uploaded`);
       fetchFiles();
-    } catch (e) { notify("Upload Error", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    } catch (e) { notify("Echec Upload", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
   const handleDelete = async (path: string) => {
