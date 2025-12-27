@@ -1,252 +1,172 @@
 import { useEffect, useState, useRef } from 'react';
-// On n'importe QUE ce qu'on utilise vraiment dans le JSX ci-dessous
-import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, FileArchive, FileCode, Key, XCircle, HardDrive, Eye, X } from 'lucide-react';
+import { RefreshCw, Upload, Trash2, FileSpreadsheet, FileCode, Key, XCircle, HardDrive, Eye, X, ToggleLeft, ToggleRight, Zap } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
 import Toast from '../components/Toast';
 
-interface FilesProps {
-  user: any;
-}
-
-export default function Files({ user }: FilesProps) {
+export default function Files({ user }: { user: any }) {
   const [files, setFiles] = useState<any[]>([]);
+  const [cloudEnabled, setCloudEnabled] = useState(true);
   const [previewData, setPreviewData] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success'|'error'}>({ show: false, msg: '', type: 'success' });
+  const [toast, setToast] = useState({show: false, msg: '', type: 'success' as 'success'|'error'});
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const { processFile, loading, step, error } = useIngestion(user?.uid);
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
+  
+  const { processFile, loading, step } = useIngestion(user?.uid);
 
-  const notify = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast({ show: true, msg, type });
-  };
+  const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
 
-  // --- 1. CHARGEMENT DES FICHIERS ---
+  // 1. Monitor Session (Real-time from Firebase)
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "users", user.uid, "configurations"), orderBy("created_at", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setFiles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setFiles(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsubscribe();
   }, [user]);
 
-  // --- 2. NOTIFICATIONS ---
-  useEffect(() => {
-      if (error) notify(error, 'error');
-      if (step === 'done') notify("Processing complete!");
-  }, [error, step]);
+  // 2. Actions
+  const toggleCloud = async () => {
+    const newState = !cloudEnabled;
+    setCloudEnabled(newState);
+    try {
+        await fetch(`${API_URL}/ingestion/toggle-cloud?user_id=${user.uid}&enabled=${newState}`, { method: 'POST' });
+        notify(newState ? "Cloud Sync Enabled" : "RAM-Only Mode (Private Dev)", "success");
+    } catch (e) { notify("Error toggling cloud", "error"); }
+  };
 
-  // --- 3. ACTIONS ---
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+  const handleUpload = (e: any) => {
+    if (e.target.files[0]) {
       processFile(e.target.files[0]);
-      if(fileInputRef.current) fileInputRef.current.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleDelete = async (docId: string) => {
-      if(!confirm("Are you sure you want to delete this file?")) return;
+  const handlePreview = async (fileId: string) => {
       try {
-          await deleteDoc(doc(db, "users", user.uid, "configurations", docId));
-          notify("File deleted");
-      } catch(e) { notify("Delete error", "error"); }
+          const res = await fetch(`${API_URL}/ingestion/preview/${fileId}?user_id=${user.uid}`);
+          const data = await res.json();
+          setPreviewData(data);
+          setShowPreview(true);
+      } catch (e) { notify("Preview failed", "error"); }
   };
 
-  const handleClearAll = async () => {
-      if (files.length === 0) return;
-      if (!confirm("⚠️ WARNING: Delete ALL files in this session?")) return;
-      try {
-          const batch = writeBatch(db);
-          files.forEach((file) => batch.delete(doc(db, "users", user.uid, "configurations", file.id)));
-          await batch.commit();
-          notify("🗑️ Session cleared!");
-      } catch (e) { notify("Error clearing session", "error"); }
-  };
-
-  const handleDownloadGlobal = (format: 'xlsx' | 'json' | 'raw') => {
-      if (!user) return;
-      notify(`Generating ZIP (${format.toUpperCase()})...`);
-      window.location.href = `${API_URL}/ingestion/download-all/${format}?user_id=${user.uid}`;
-  };
-
-  const handleDownloadSingle = (fileId: string, format: 'xlsx' | 'json' | 'raw') => {
-      if (!user) return;
+  const handleDownload = (fileId: string, format: 'xlsx' | 'json' | 'raw') => {
       window.open(`${API_URL}/ingestion/download/${fileId}/${format}?user_id=${user.uid}`, '_blank');
   };
 
-  const handlePreview = async (file: any) => {
-      if (!user) return;
-      notify("Loading preview...", "success");
+  const handleDelete = async (fileId: string) => {
+      if (!confirm("Delete this file?")) return;
       try {
-          const response = await fetch(`${API_URL}/ingestion/preview/${file.id}?user_id=${user.uid}`);
-          if (!response.ok) throw new Error("Failed to load");
-          const data = await response.json();
-          setPreviewData(data);
-          setShowPreview(true);
-      } catch (e) { notify("Could not load preview", "error"); }
+          await deleteDoc(doc(db, "users", user.uid, "configurations", fileId));
+          notify("File removed");
+      } catch (e) { notify("Delete failed", "error"); }
   };
 
-  const handleCopyToken = async () => {
-    if (!user) return;
-    try {
-        const token = await user.getIdToken(true);
-        await navigator.clipboard.writeText(token);
-        notify("🔑 Token copied!");
-    } catch (e) { notify("Token error", "error"); }
-  };
-
-  // --- 4. HELPER ICONES ---
-  const getIcon = (type: string) => {
-      const lower = type?.toLowerCase() || "";
-      if (lower.includes('mdb') || lower.includes('si2s') || lower.includes('sqlite') || lower.includes('lf1s')) {
-          return <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
-      }
-      if (lower.includes('zip')) return <FileArchive className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
-      return <FileCode className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />;
+  const handleClearAll = async () => {
+    if (files.length === 0 || !confirm("Clear entire session?")) return;
+    const batch = writeBatch(db);
+    files.forEach(f => batch.delete(doc(db, "users", user.uid, "configurations", f.id)));
+    await batch.commit();
+    notify("Session cleared");
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-4 h-[calc(100vh-80px)] flex flex-col font-sans relative">
-      
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-2 border-b border-slate-200 pb-2 flex-shrink-0 text-[11px]">
-        <div className="flex items-center gap-2">
-            <HardDrive className="w-4 h-4 text-blue-600" />
-            <h1 className="text-sm font-bold text-slate-800 tracking-tight">Session Manager</h1>
-            <span className="bg-slate-100 text-slate-600 text-[10px] font-mono px-1.5 rounded-full">{files.length}</span>
+      <div className="flex justify-between items-center mb-4 border-b pb-2">
+        <div className="flex items-center gap-4">
+            <h1 className="text-lg font-black text-slate-800 tracking-tighter flex items-center gap-2">
+                <Zap className="w-5 h-5 text-yellow-500 fill-yellow-500" /> SESSION MANAGER
+            </h1>
+            <button onClick={toggleCloud} className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${cloudEnabled ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                {cloudEnabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                {cloudEnabled ? "CLOUD SYNC ON" : "RAM ONLY MODE"}
+            </button>
         </div>
-        
         <div className="flex gap-2 items-center">
-           {loading && <span className="text-blue-600 font-bold animate-pulse uppercase text-[10px] mr-2">Status: {step}...</span>}
-           
-           {files.length > 0 && (
-               <button onClick={handleClearAll} className="flex items-center gap-1 bg-red-50 border border-red-200 text-red-600 px-2 py-1 rounded hover:bg-red-100 text-[10px] font-bold transition-colors shadow-sm mr-2">
-                    <XCircle className="w-3.5 h-3.5" /> CLEAR ALL
-               </button>
-           )}
-           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-slate-800 text-white px-2 py-1 rounded hover:bg-slate-700 text-[10px] font-bold transition-colors shadow-sm mr-2">
-                <Key className="w-3.5 h-3.5" /> TOKEN
-           </button>
-           <div className="h-4 w-[1px] bg-slate-300 mx-1"></div>
-           <span className="text-[9px] font-bold text-slate-400 uppercase mr-1">Export All:</span>
-           
-           <button onClick={() => handleDownloadGlobal('raw')} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 text-[10px] font-bold transition-colors shadow-sm">
-                <HardDrive className="w-3.5 h-3.5" /> ZIP RAW
-           </button>
-           <button onClick={() => handleDownloadGlobal('json')} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded hover:bg-slate-50 text-[10px] font-bold transition-colors shadow-sm">
-                <FileJson className="w-3.5 h-3.5" /> ZIP JSON
-           </button>
-           <button onClick={() => handleDownloadGlobal('xlsx')} className="flex items-center gap-1 bg-green-600 border border-green-700 text-white px-2 py-1 rounded hover:bg-green-700 text-[10px] font-bold transition-colors shadow-sm">
-                <Download className="w-3.5 h-3.5" /> ZIP XL
-           </button>
+            {loading && <span className="text-[10px] font-bold text-blue-500 animate-pulse uppercase">{step}...</span>}
+            <button onClick={handleClearAll} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Clear All">
+                <XCircle className="w-5 h-5" />
+            </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 flex-1 overflow-hidden min-h-0">
-        
-        {/* UPLOAD ZONE */}
-        <div className="md:col-span-1 flex flex-col h-full">
-            <div onClick={() => !loading && fileInputRef.current?.click()} className={`bg-white border border-dashed border-slate-300 rounded h-full flex flex-col justify-center items-center cursor-pointer transition-colors group ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-500 hover:bg-blue-50'}`}>
-                <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept=".si2s,.mdb,.sqlite,.lf1s,.zip,.json" disabled={loading} />
-                <div className="mb-1 text-blue-500 group-hover:scale-110 transition-transform">
-                    {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                </div>
-                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-2">{loading ? "UPLOADING..." : "UPLOAD FILE"}</span>
-                <span className="text-[9px] text-slate-400 mt-1">(Drag & Drop or Click)</span>
-            </div>
+      <div className="grid grid-cols-4 gap-4 flex-1 overflow-hidden">
+        {/* UPLOAD BOX */}
+        <div className="col-span-1 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center p-6 hover:bg-slate-50 cursor-pointer group transition-all" onClick={() => !loading && fileInputRef.current?.click()}>
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleUpload} />
+            {loading ? <RefreshCw className="w-10 h-10 text-blue-500 animate-spin" /> : <Upload className="w-10 h-10 text-slate-300 group-hover:text-blue-500 group-hover:scale-110 transition-all" />}
+            <span className="mt-4 text-[10px] font-black text-slate-400 group-hover:text-slate-600 uppercase tracking-widest text-center">
+                {loading ? "Processing..." : "Drop or Click to Upload"}
+            </span>
         </div>
 
-        {/* FILE LIST */}
-        <div className="md:col-span-3 bg-white border border-slate-200 rounded flex flex-col overflow-hidden h-full shadow-sm text-[11px]">
-            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase flex-shrink-0">
-                <span className="pl-1">Filename</span><span className="pr-8">Actions (View / Raw / JSON / Excel)</span>
+        {/* LIST BOX */}
+        <div className="col-span-3 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
+            <div className="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Files ({files.length})</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status & Actions</span>
             </div>
-            <div className="overflow-y-auto flex-1 p-0 custom-scrollbar bg-white">
-                {files.length > 0 ? (
-                    <table className="w-full border-collapse font-bold">
-                        <tbody>
-                            {files.map((file) => (
-                                <tr key={file.id} className="hover:bg-blue-50 transition-colors border-b border-slate-50 last:border-0 h-10">
-                                    <td className="px-3 py-0 align-middle w-full max-w-0">
-                                        <div className="flex items-center gap-2 overflow-hidden">
-                                            {getIcon(file.source_type)}
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="text-[10px] font-bold text-slate-700 truncate leading-tight" title={file.original_name}>{file.original_name}</span>
-                                                <span className="text-[9px] text-slate-400 font-normal truncate">{file.source_type?.toUpperCase()} • {file.created_at?.seconds ? new Date(file.created_at.seconds * 1000).toLocaleDateString() : ""}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    {/* ACTIONS ZONE */}
-                                    <td className="px-3 py-0 align-middle w-auto text-right whitespace-nowrap">
-                                        <div className="flex items-center justify-end gap-1">
-                                            <button onClick={() => handlePreview(file)} className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors" title="Preview Data">
-                                                <Eye className="w-3.5 h-3.5"/>
-                                            </button>
-                                            
-                                            <div className="h-4 w-[1px] bg-slate-200 mx-1"></div>
-
-                                            {/* RAW DOWNLOAD */}
-                                            {file.raw_file_path && (
-                                                <button onClick={() => handleDownloadSingle(file.id, 'raw')} className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors" title="Download ORIGINAL File">
-                                                    <HardDrive className="w-3.5 h-3.5"/>
-                                                </button>
-                                            )}
-
-                                            <button onClick={() => handleDownloadSingle(file.id, 'json')} className="text-slate-400 hover:text-yellow-600 hover:bg-yellow-50 rounded p-1 transition-colors" title="Download JSON">
-                                                <FileJson className="w-3.5 h-3.5"/>
-                                            </button>
-                                            <button onClick={() => handleDownloadSingle(file.id, 'xlsx')} className="text-slate-400 hover:text-green-600 hover:bg-green-50 rounded p-1 transition-colors" title="Download Excel">
-                                                <FileSpreadsheet className="w-3.5 h-3.5"/>
-                                            </button>
-                                            
-                                            <div className="h-4 w-[1px] bg-slate-200 mx-1"></div>
-                                            <button onClick={() => handleDelete(file.id)} className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors" title="Delete">
-                                                <Trash2 className="w-3.5 h-3.5"/>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-300 uppercase tracking-widest gap-2">
-                        <Cloud className="w-8 h-8 opacity-20" />
-                        <p className="text-[10px] font-bold">Empty Session</p>
+            <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                {files.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center opacity-20">
+                        <HardDrive className="w-12 h-12 mb-2" />
+                        <span className="text-xs font-bold uppercase">No files in session</span>
                     </div>
+                ) : (
+                    files.map(f => (
+                        <div key={f.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-all mb-1">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <FileCode className="w-5 h-5 text-blue-500" />
+                                <div className="flex flex-col min-w-0">
+                                    <span className="text-xs font-bold text-slate-700 truncate" title={f.original_name}>{f.original_name}</span>
+                                    <span className="text-[9px] text-slate-400 uppercase font-mono">{f.source_type} • {f.id.substring(0,8)}</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${f.cloud_synced ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600 animate-pulse'}`}>
+                                    {f.cloud_synced ? 'SAVED TO CLOUD' : 'RAM ONLY (SYNCING 5s)'}
+                                </span>
+                                <div className="flex gap-1 border-l pl-3">
+                                    <button onClick={() => handlePreview(f.id)} className="p-1.5 hover:bg-blue-50 rounded text-slate-400 hover:text-blue-600 transition-all" title="View Data"><Eye className="w-4 h-4"/></button>
+                                    <button onClick={() => handleDownload(f.id, 'xlsx')} className="p-1.5 hover:bg-green-50 rounded text-slate-400 hover:text-green-600 transition-all" title="Excel"><FileSpreadsheet className="w-4 h-4"/></button>
+                                    <button onClick={() => handleDownload(f.id, 'raw')} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-800 transition-all" title="Original"><HardDrive className="w-4 h-4"/></button>
+                                    <button onClick={() => handleDelete(f.id)} className="p-1.5 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-all" title="Delete"><Trash2 className="w-4 h-4"/></button>
+                                </div>
+                            </div>
+                        </div>
+                    ))
                 )}
             </div>
         </div>
       </div>
-      
+
       {/* PREVIEW MODAL */}
-      {showPreview && previewData && (
-        <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col border border-slate-300">
-                <div className="flex justify-between items-center p-3 border-b border-slate-200 bg-slate-50">
-                    <h3 className="font-bold text-slate-700 text-xs uppercase flex items-center gap-2">
-                         <FileCode className="w-4 h-4 text-blue-500" /> 
-                         Data Preview: {previewData.source_file || "Unknown"}
-                    </h3>
-                    <button onClick={() => setShowPreview(false)} className="text-slate-400 hover:text-red-500 transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
+      {showPreview && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-8">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[80vh] flex flex-col overflow-hidden border border-white/20">
+                <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Live Data Preview</span>
+                    </div>
+                    <button onClick={() => setShowPreview(false)} className="hover:rotate-90 transition-transform p-1"><X className="w-6 h-6 text-slate-400" /></button>
                 </div>
-                <div className="flex-1 overflow-auto p-4 bg-slate-50 font-mono text-[10px] text-slate-600">
+                <div className="flex-1 overflow-auto bg-slate-900 p-6 font-mono text-blue-300 text-[11px] selection:bg-blue-500/30">
                     <pre>{JSON.stringify(previewData, null, 2)}</pre>
                 </div>
-                <div className="p-2 border-t border-slate-200 bg-white flex justify-end">
-                    <button onClick={() => setShowPreview(false)} className="bg-slate-800 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-slate-700">CLOSE</button>
+                <div className="p-4 bg-white border-t flex justify-end">
+                    <button onClick={() => setShowPreview(false)} className="bg-slate-800 text-white px-6 py-2 rounded-xl text-xs font-bold hover:bg-black transition-colors">CLOSE INSPECTOR</button>
                 </div>
             </div>
         </div>
       )}
 
-      {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
+      {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({...toast, show:false})} />}
     </div>
   );
 }
