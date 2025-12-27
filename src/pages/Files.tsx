@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, FileArchive, FileCode, Key, XCircle, HardDrive } from 'lucide-react';
+import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, FileArchive, FileCode, Key, XCircle, HardDrive, Eye, X } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -11,6 +11,8 @@ interface FilesProps {
 
 export default function Files({ user }: FilesProps) {
   const [files, setFiles] = useState<any[]>([]);
+  const [previewData, setPreviewData] = useState<any>(null); // Pour stocker les données à voir
+  const [showPreview, setShowPreview] = useState(false);
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success'|'error'}>({ show: false, msg: '', type: 'success' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -72,6 +74,20 @@ export default function Files({ user }: FilesProps) {
       window.open(`${API_URL}/ingestion/download/${fileId}/${format}?user_id=${user.uid}`, '_blank');
   };
 
+  const handlePreview = async (file: any) => {
+      if (!user) return;
+      notify("Loading preview...", "success");
+      try {
+          const response = await fetch(`${API_URL}/ingestion/preview/${file.id}?user_id=${user.uid}`);
+          if (!response.ok) throw new Error("Failed to load");
+          const data = await response.json();
+          setPreviewData(data);
+          setShowPreview(true);
+      } catch (e) {
+          notify("Could not load preview", "error");
+      }
+  };
+
   const handleCopyToken = async () => {
     if (!user) return;
     try {
@@ -83,13 +99,14 @@ export default function Files({ user }: FilesProps) {
 
   const getIcon = (type: string) => {
       const lower = type?.toLowerCase() || "";
-      if (lower.includes('mdb')) return <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
+      if (lower.includes('mdb') || lower.includes('si2s')) return <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
       if (lower.includes('zip')) return <FileArchive className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
       return <FileCode className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />;
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-4 h-[calc(100vh-80px)] flex flex-col font-sans">
+    <div className="max-w-7xl mx-auto px-4 py-4 h-[calc(100vh-80px)] flex flex-col font-sans relative">
+      
       {/* HEADER */}
       <div className="flex justify-between items-center mb-2 border-b border-slate-200 pb-2 flex-shrink-0 text-[11px]">
         <div className="flex items-center gap-2">
@@ -106,18 +123,15 @@ export default function Files({ user }: FilesProps) {
                     <XCircle className="w-3.5 h-3.5" /> CLEAR ALL
                </button>
            )}
-
            <button onClick={handleCopyToken} className="flex items-center gap-1 bg-slate-800 text-white px-2 py-1 rounded hover:bg-slate-700 text-[10px] font-bold transition-colors shadow-sm mr-2">
                 <Key className="w-3.5 h-3.5" /> API TOKEN
            </button>
-
            <div className="h-4 w-[1px] bg-slate-300 mx-1"></div>
-
            <span className="text-[9px] font-bold text-slate-400 uppercase mr-1">Export All:</span>
-           <button onClick={() => handleDownloadGlobal('json')} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded hover:bg-slate-50 text-[10px] font-bold transition-colors shadow-sm" title="Download all files as JSON ZIP">
+           <button onClick={() => handleDownloadGlobal('json')} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded hover:bg-slate-50 text-[10px] font-bold transition-colors shadow-sm">
                 <FileJson className="w-3.5 h-3.5" /> ZIP
            </button>
-           <button onClick={() => handleDownloadGlobal('xlsx')} className="flex items-center gap-1 bg-green-600 border border-green-700 text-white px-2 py-1 rounded hover:bg-green-700 text-[10px] font-bold transition-colors shadow-sm" title="Download all files as Excel ZIP">
+           <button onClick={() => handleDownloadGlobal('xlsx')} className="flex items-center gap-1 bg-green-600 border border-green-700 text-white px-2 py-1 rounded hover:bg-green-700 text-[10px] font-bold transition-colors shadow-sm">
                 <Download className="w-3.5 h-3.5" /> ZIP
            </button>
         </div>
@@ -160,16 +174,18 @@ export default function Files({ user }: FilesProps) {
                                     {/* ACTIONS ZONE */}
                                     <td className="px-3 py-0 align-middle w-auto text-right whitespace-nowrap">
                                         <div className="flex items-center justify-end gap-1">
-                                            <button onClick={() => handleDownloadSingle(file.id, 'json')} className="text-slate-400 hover:text-yellow-600 hover:bg-yellow-50 rounded p-1 transition-colors" title="Download as JSON">
+                                            <button onClick={() => handlePreview(file)} className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors" title="View Data">
+                                                <Eye className="w-3.5 h-3.5"/>
+                                            </button>
+                                            <div className="h-4 w-[1px] bg-slate-200 mx-1"></div>
+                                            <button onClick={() => handleDownloadSingle(file.id, 'json')} className="text-slate-400 hover:text-yellow-600 hover:bg-yellow-50 rounded p-1 transition-colors" title="Download JSON">
                                                 <FileJson className="w-3.5 h-3.5"/>
                                             </button>
-                                            <button onClick={() => handleDownloadSingle(file.id, 'xlsx')} className="text-slate-400 hover:text-green-600 hover:bg-green-50 rounded p-1 transition-colors" title="Download as Excel">
+                                            <button onClick={() => handleDownloadSingle(file.id, 'xlsx')} className="text-slate-400 hover:text-green-600 hover:bg-green-50 rounded p-1 transition-colors" title="Download Excel">
                                                 <FileSpreadsheet className="w-3.5 h-3.5"/>
                                             </button>
-                                            
                                             <div className="h-4 w-[1px] bg-slate-200 mx-1"></div>
-
-                                            <button onClick={() => handleDelete(file.id)} className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors" title="Delete File">
+                                            <button onClick={() => handleDelete(file.id)} className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors" title="Delete">
                                                 <Trash2 className="w-3.5 h-3.5"/>
                                             </button>
                                         </div>
@@ -187,6 +203,30 @@ export default function Files({ user }: FilesProps) {
             </div>
         </div>
       </div>
+      
+      {/* PREVIEW MODAL */}
+      {showPreview && previewData && (
+        <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col border border-slate-300">
+                <div className="flex justify-between items-center p-3 border-b border-slate-200 bg-slate-50">
+                    <h3 className="font-bold text-slate-700 text-xs uppercase flex items-center gap-2">
+                         <FileCode className="w-4 h-4 text-blue-500" /> 
+                         Data Preview: {previewData.source_file || "Unknown"}
+                    </h3>
+                    <button onClick={() => setShowPreview(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="flex-1 overflow-auto p-4 bg-slate-50 font-mono text-[10px] text-slate-600">
+                    <pre>{JSON.stringify(previewData, null, 2)}</pre>
+                </div>
+                <div className="p-2 border-t border-slate-200 bg-white flex justify-end">
+                    <button onClick={() => setShowPreview(false)} className="bg-slate-800 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-slate-700">CLOSE</button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );
