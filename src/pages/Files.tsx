@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye, FileArchive, FileCode, Key, XCircle } from 'lucide-react';
+import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, FileArchive, FileCode, Key, XCircle } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -69,7 +69,6 @@ export default function Files({ user }: FilesProps) {
 
   const handleDownloadSingle = (fileId: string, format: 'xlsx' | 'json') => {
       if (!user) return;
-      // On ouvre dans un nouvel onglet pour déclencher le téléchargement
       window.open(`${API_URL}/ingestion/download/${fileId}/${format}?user_id=${user.uid}`, '_blank');
   };
 
@@ -157,7 +156,6 @@ export default function Files({ user }: FilesProps) {
                                     {/* ACTIONS ZONE */}
                                     <td className="px-3 py-0 align-middle w-auto text-right whitespace-nowrap">
                                         <div className="flex items-center justify-end gap-1">
-                                            {/* BOUTONS EXCEL / JSON INDIVIDUELS */}
                                             <button onClick={() => handleDownloadSingle(file.id, 'json')} className="text-slate-400 hover:text-yellow-600 hover:bg-yellow-50 rounded p-1 transition-colors" title="Télécharger JSON">
                                                 <FileJson className="w-3.5 h-3.5"/>
                                             </button>
