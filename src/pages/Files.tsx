@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, DragEvent } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
   FileSpreadsheet, FileJson, FileDown,
-  RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, ChevronDown, ChevronRight, Calendar
+  RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, ChevronDown, ChevronRight, Calendar, ExternalLink
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -10,7 +10,7 @@ interface SessionFile {
   path: string;
   filename: string;
   size: number;
-  uploaded_at?: string; // New field
+  uploaded_at?: string;
   content_type: string;
 }
 
@@ -25,7 +25,6 @@ export default function Files({ user }: { user: any }) {
   const [previewData, setPreviewData] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  const [token, setToken] = useState<string>("");
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -41,24 +40,22 @@ export default function Files({ user }: { user: any }) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Helper pour obtenir un token frais
   const getToken = async () => {
     if (!user) return null;
-    const t = await user.getIdToken(true);
-    setToken(t);
-    return t;
+    return await user.getIdToken(true); // Force refresh
   };
 
   useEffect(() => {
     if (user) {
-        getToken().then((t) => fetchFiles(t));
+        fetchFiles();
     }
   }, [user]);
 
-  const fetchFiles = async (authToken?: string | null) => {
-    const t = authToken || token;
-    if (!t) return;
+  const fetchFiles = async () => {
     setLoading(true);
     try {
+      const t = await getToken();
       const res = await fetch(`${API_URL}/session/details`, { headers: { 'Authorization': `Bearer ${t}` } });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
@@ -77,7 +74,7 @@ export default function Files({ user }: { user: any }) {
       const res = await fetch(`${API_URL}/session/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
       if (!res.ok) throw new Error();
       notify(`${fileList.length} Uploaded`);
-      fetchFiles(t);
+      fetchFiles();
     } catch (e) { notify("Echec Upload", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
@@ -102,7 +99,29 @@ export default function Files({ user }: { user: any }) {
     } catch (e) { notify("Error", "error"); }
   };
 
-  // --- ACTIONS (Preview uses URL Token now) ---
+  // --- NEW: OPEN LINK WITH FRESH TOKEN ---
+  // Cette fonction remplace les balises <a> statiques
+  const handleOpenLink = async (type: 'raw' | 'xlsx' | 'json_tab', filename: string) => {
+      try {
+          const t = await getToken();
+          let url = "";
+          
+          if (type === 'raw') {
+              url = `${API_URL}/session/download?filename=${encodeURIComponent(filename)}&token=${t}`;
+          } else if (type === 'xlsx') {
+              url = `${API_URL}/ingestion/download/xlsx?filename=${encodeURIComponent(filename)}&token=${t}`;
+          } else if (type === 'json_tab') {
+              url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}`;
+          }
+          
+          if (url) window.open(url, '_blank');
+          
+      } catch (e) {
+          notify("Impossible de générer le lien sécurisé", "error");
+      }
+  };
+
+  // --- ACTIONS (Inline Preview) ---
 
   const togglePreview = async (filename: string) => {
     if (expandedFileId === filename) {
@@ -114,9 +133,9 @@ export default function Files({ user }: { user: any }) {
     setPreviewData(null);
 
     try {
-      // Use current token from state (refreshed by getToken logic elsewhere if needed)
-      // Note: We use the Query Param method now supported by backend
-      const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${token}`);
+      const t = await getToken();
+      // On garde fetch ici pour l'affichage inline
+      const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}`);
       if (!res.ok) throw new Error("Preview unavailable");
       const data = await res.json();
       setPreviewData(data);
@@ -128,10 +147,11 @@ export default function Files({ user }: { user: any }) {
     }
   };
   
-  const handleCopyToken = () => {
-    if (!token) return notify("No Token", "error");
-    navigator.clipboard.writeText(token);
-    notify("Token Copied");
+  const handleCopyToken = async () => {
+    const t = await getToken();
+    if (!t) return notify("No Token", "error");
+    navigator.clipboard.writeText(t);
+    notify("Fresh Token Copied");
   };
 
   const onDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
@@ -151,7 +171,7 @@ export default function Files({ user }: { user: any }) {
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors">
             <Key className="w-3.5 h-3.5" /> TOKEN
           </button>
-          <button onClick={() => fetchFiles(token)} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold transition-colors">
+          <button onClick={() => fetchFiles()} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> REFRESH
           </button>
           <button onClick={handleClear} className="flex items-center gap-1 bg-white hover:bg-red-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-red-600 font-bold transition-colors">
@@ -229,21 +249,20 @@ export default function Files({ user }: { user: any }) {
                           <td className="px-3 py-1 text-right">
                             <div className="flex justify-end gap-1.5 items-center">
                               
-                              {/* BOUTON RAW : LIEN DIRECT */}
-                              <a href={`${API_URL}/session/download?filename=${encodeURIComponent(file.filename)}&token=${token}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 transition-colors no-underline">
+                              {/* BOUTONS DYNAMIQUES */}
+                              <button onClick={() => handleOpenLink('raw', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 transition-colors" title="Download Raw">
                                 <FileDown className="w-3 h-3"/> <span className="text-[9px]">RAW</span>
-                              </a>
+                              </button>
 
                               {isConvertible && (
                                 <>
-                                  <a href={`${API_URL}/ingestion/download/xlsx?filename=${encodeURIComponent(file.filename)}&token=${token}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 hover:bg-green-100 text-green-700 rounded border border-green-200 transition-colors no-underline">
+                                  <button onClick={() => handleOpenLink('xlsx', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 hover:bg-green-100 text-green-700 rounded border border-green-200 transition-colors" title="Download Excel">
                                     <FileSpreadsheet className="w-3 h-3"/> <span className="text-[9px]">XLSX</span>
-                                  </a>
+                                  </button>
                                   
-                                  {/* Link to JSON Preview (New tab) */}
-                                  <a href={`${API_URL}/ingestion/preview?filename=${encodeURIComponent(file.filename)}&token=${token}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded border border-yellow-200 transition-colors no-underline" title="Open JSON in new tab">
+                                  <button onClick={() => handleOpenLink('json_tab', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded border border-yellow-200 transition-colors" title="Open JSON in new Tab">
                                     <FileJson className="w-3 h-3"/> <span className="text-[9px]">JSON</span>
-                                  </a>
+                                  </button>
 
                                   <div className="w-px h-3 bg-slate-300 mx-1"></div>
                                   
