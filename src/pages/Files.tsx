@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, Trash2, FileSpreadsheet, FileCode, XCircle, HardDrive, Eye, X, ToggleLeft, ToggleRight, Zap, CloudOff, CloudCheck } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot, deleteDoc, doc, writeBatch } from 'firebase/firestore';
+// Nettoyage des imports inutilisés et correction de CloudCheck -> Cloud
+import { Upload, Trash2, FileSpreadsheet, FileCode, Eye, X, ToggleLeft, ToggleRight, Zap, Cloud } from 'lucide-react';
+import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
 import Toast from '../components/Toast';
@@ -27,8 +28,12 @@ export default function Files({ user }: { user: any }) {
   const toggleCloud = async () => {
     const newState = !cloudEnabled;
     setCloudEnabled(newState);
-    await fetch(`${API_URL}/ingestion/toggle-cloud?user_id=${user.uid}&enabled=${newState}`, { method: 'POST' });
-    setToast({ show: true, msg: newState ? "Cloud Sync Enabled" : "RAM-Only Mode (Fast Dev)", type: 'success' });
+    try {
+        await fetch(`${API_URL}/ingestion/toggle-cloud?user_id=${user.uid}&enabled=${newState}`, { method: 'POST' });
+        setToast({ show: true, msg: newState ? "Cloud Sync Enabled" : "RAM-Only Mode (Fast Dev)", type: 'success' });
+    } catch (e) {
+        setToast({ show: true, msg: "Failed to toggle cloud", type: 'error' });
+    }
   };
 
   const handleUpload = (e: any) => {
@@ -39,10 +44,24 @@ export default function Files({ user }: { user: any }) {
   };
 
   const handlePreview = async (id: string) => {
-      const res = await fetch(`${API_URL}/ingestion/preview/${id}?user_id=${user.uid}`);
-      const data = await res.json();
-      setPreviewData(data);
-      setShowPreview(true);
+      try {
+          const res = await fetch(`${API_URL}/ingestion/preview/${id}?user_id=${user.uid}`);
+          const data = await res.json();
+          setPreviewData(data);
+          setShowPreview(true);
+      } catch (e) {
+          setToast({ show: true, msg: "Preview failed", type: 'error' });
+      }
+  };
+
+  const handleDelete = async (id: string) => {
+      if (!window.confirm("Delete this file?")) return;
+      try {
+          await deleteDoc(doc(db, "users", user.uid, "configurations", id));
+          setToast({ show: true, msg: "File removed", type: 'success' });
+      } catch (e) {
+          setToast({ show: true, msg: "Delete failed", type: 'error' });
+      }
   };
 
   return (
@@ -59,7 +78,6 @@ export default function Files({ user }: { user: any }) {
         </div>
         <div className="flex gap-4 items-center">
             {loading && <span className="text-[10px] font-bold text-blue-500 animate-pulse uppercase tracking-widest">{step}...</span>}
-            <button onClick={() => setFiles([])} className="text-slate-400 hover:text-red-500 transition-colors"><XCircle className="w-5 h-5" /></button>
         </div>
       </div>
 
@@ -67,7 +85,7 @@ export default function Files({ user }: { user: any }) {
         <div className="col-span-1 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-6 hover:bg-slate-50 cursor-pointer group transition-all" onClick={() => !loading && fileInputRef.current?.click()}>
             <input type="file" ref={fileInputRef} className="hidden" onChange={handleUpload} />
             <Upload className="w-10 h-10 text-slate-300 group-hover:text-blue-500 group-hover:scale-110 transition-all" />
-            <span className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Inyect in RAM</span>
+            <span className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Inject in RAM</span>
         </div>
 
         <div className="col-span-3 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden">
@@ -88,15 +106,14 @@ export default function Files({ user }: { user: any }) {
                         <div className="flex items-center gap-6">
                             <div className="flex flex-col items-end">
                                 <span className={`text-[8px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 ${f.cloud_synced ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600 animate-pulse'}`}>
-                                    {f.cloud_synced ? <CloudCheck className="w-3 h-3"/> : <Zap className="w-3 h-3"/>}
+                                    {f.cloud_synced ? <Cloud className="w-3 h-3"/> : <Zap className="w-3 h-3"/>}
                                     {f.cloud_synced ? 'CLOUD SECURED' : 'RAM BUFFER (5S)'}
                                 </span>
                                 {!cloudEnabled && !f.cloud_synced && <span className="text-[7px] font-bold text-slate-300 mt-1 uppercase">Dev Bypass Active</span>}
                             </div>
                             <div className="flex gap-1 border-l pl-4">
                                 <button onClick={() => handlePreview(f.id)} className="p-2 hover:bg-blue-50 rounded-lg text-slate-400 hover:text-blue-600 transition-all"><Eye className="w-4 h-4"/></button>
-                                <button className="p-2 hover:bg-green-50 rounded-lg text-slate-400 hover:text-green-600 transition-all"><FileSpreadsheet className="w-4 h-4"/></button>
-                                <button onClick={() => deleteDoc(doc(db, "users", user.uid, "configurations", f.id))} className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-all"><Trash2 className="w-4 h-4"/></button>
+                                <button onClick={() => handleDelete(f.id)} className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-all"><Trash2 className="w-4 h-4"/></button>
                             </div>
                         </div>
                     </div>
@@ -109,10 +126,10 @@ export default function Files({ user }: { user: any }) {
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-8">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[80vh] flex flex-col overflow-hidden">
                 <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-                    <span className="text-xs font-black text-slate-800 uppercase italic flex items-center gap-2"><Eye className="w-4 h-4 text-blue-600"/> Inspector : {previewData.source_file}</span>
+                    <span className="text-xs font-black text-slate-800 uppercase italic flex items-center gap-2"><Eye className="w-4 h-4 text-blue-600"/> Inspector : {previewData?.source_file}</span>
                     <button onClick={() => setShowPreview(false)} className="p-2 hover:bg-white rounded-full transition-all"><X className="w-6 h-6 text-slate-400" /></button>
                 </div>
-                <div className="flex-1 overflow-auto bg-slate-950 p-8 font-mono text-green-400 text-[11px] selection:bg-green-500/20">
+                <div className="flex-1 overflow-auto bg-slate-950 p-8 font-mono text-green-400 text-[11px]">
                     <pre>{JSON.stringify(previewData, null, 2)}</pre>
                 </div>
             </div>
