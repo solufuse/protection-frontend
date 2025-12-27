@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck } from 'lucide-react';
+import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck, RefreshCw } from 'lucide-react';
 import Toast from '../components/Toast';
 
 export default function Config({ user }: { user: any }) {
@@ -11,22 +11,65 @@ export default function Config({ user }: { user: any }) {
 
   const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
 
-  useEffect(() => {
-    setConfig({
-      project_name: "NEW_PROJECT",
-      settings: {
-        std_51: { coeff_stab_max: 1.2, coeff_backup_min: 0.8, coeff_sensibilite: 0.8, coeff_inrush_margin: 1.15, selectivity_adder: 0, backup_strategy: "REMOTE_FLOOR" },
-        selectivity: { margin_amperemetric: 300, coeff_amperemetric: 1.2 }
-      },
-      transformers: [],
-      loadflow_settings: { target_mw: 0, tolerance_mw: 0, swing_bus_id: "" },
-      plans: []
-    });
-  }, []);
-
   const notify = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, msg, type });
   };
+
+  // --- INITIALIZATION & SYNC ---
+  useEffect(() => {
+    const initConfig = async () => {
+        // 1. Define Default Config
+        const defaultConfig = {
+          project_name: "NEW_PROJECT",
+          settings: {
+            std_51: { coeff_stab_max: 1.2, coeff_backup_min: 0.8, coeff_sensibilite: 0.8, coeff_inrush_margin: 1.15, selectivity_adder: 0, backup_strategy: "REMOTE_FLOOR" },
+            selectivity: { margin_amperemetric: 300, coeff_amperemetric: 1.2 }
+          },
+          transformers: [],
+          loadflow_settings: { target_mw: 0, tolerance_mw: 0, swing_bus_id: "" },
+          plans: []
+        };
+
+        // 2. Try to fetch existing config.json from Session Storage
+        if (user) {
+            try {
+                const token = await user.getIdToken();
+                // List files in session
+                const listRes = await fetch(`${apiUrl}/session/details`, { 
+                    headers: { 'Authorization': `Bearer ${token}` } 
+                });
+                
+                if (listRes.ok) {
+                    const listData = await listRes.json();
+                    // Check if config.json exists (case insensitive)
+                    const configFile = listData.files?.find((f: any) => f.filename.toLowerCase() === 'config.json');
+                    
+                    if (configFile) {
+                        // Fetch the content
+                        const fileRes = await fetch(`${apiUrl}/ingestion/preview?filename=${configFile.filename}`, {
+                             headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        
+                        if (fileRes.ok) {
+                            const sessionConfig = await fileRes.json();
+                            // Use the session config
+                            setConfig(sessionConfig);
+                            console.log("Loaded config from session storage");
+                            return; // Stop here, don't load default
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to sync with session config:", err);
+            }
+        }
+
+        // 3. Fallback to default if no session config found or error
+        setConfig(defaultConfig);
+    };
+
+    initConfig();
+  }, [user]);
 
   const toggleSection = (s: string) => setOpenSections(p => ({ ...p, [s]: !p[s as keyof typeof p] }));
 
@@ -40,6 +83,7 @@ export default function Config({ user }: { user: any }) {
   };
 
   const handleImportClick = () => fileInputRef.current?.click();
+  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -48,7 +92,7 @@ export default function Config({ user }: { user: any }) {
       try {
         const json = JSON.parse(event.target?.result as string);
         setConfig(json);
-        notify("Config Imported");
+        notify("Config Imported locally");
       } catch (err) { notify("Invalid JSON", "error"); }
     };
     reader.readAsText(file);
@@ -59,12 +103,11 @@ export default function Config({ user }: { user: any }) {
     setLoading(true);
     try {
       const token = await user.getIdToken();
-      // On envoie le JSON comme un fichier nommé 'config.json'
       const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
       const formData = new FormData();
+      // Ensure we save it as 'config.json' so it can be reloaded next time
       formData.append('files', blob, 'config.json');
       
-      // Envoi vers le Backend qui va stocker ça dans Firestore/Storage
       const response = await fetch(`${apiUrl}/session/upload`, { 
           method: 'POST', 
           headers: { 'Authorization': `Bearer ${token}` }, 
@@ -72,18 +115,18 @@ export default function Config({ user }: { user: any }) {
       });
       
       if (!response.ok) throw new Error("Backend error");
-      notify("Sauvegardé en Session (Cloud) !");
+      notify("Saved to Session (config.json) !");
     } catch (e) { 
-        notify("Erreur de sauvegarde", "error"); 
+        notify("Save error", "error"); 
         console.error(e);
     }
     finally { setLoading(false); }
   };
 
-  if (!config) return null;
+  if (!config) return <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Loading Configuration...</div>;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-4 text-[11px]">
+    <div className="max-w-6xl mx-auto px-6 py-4 text-[11px] font-sans">
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <div className="flex flex-col">
           <label className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Project Name</label>
@@ -100,8 +143,7 @@ export default function Config({ user }: { user: any }) {
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12 lg:col-span-8 space-y-4">
           
-          {/* SECTIONS STANDARDS UNIQUEMENT */}
-          
+          {/* INRUSH SECTION */}
           <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('inrush')}>
               <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.inrush ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Activity className="w-3.5 h-3.5 text-orange-500" /> Inrush</h2>
@@ -128,6 +170,7 @@ export default function Config({ user }: { user: any }) {
             )}
           </div>
 
+          {/* LOADFLOW SECTION */}
           <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('loadflow')}>
               <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.loadflow ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Zap className="w-3.5 h-3.5 text-yellow-500" /> Loadflow</h2>
@@ -141,6 +184,7 @@ export default function Config({ user }: { user: any }) {
             )}
           </div>
 
+          {/* PROTECTION SECTION */}
           <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('protection')}>
               <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.protection ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Protection</h2>
@@ -158,6 +202,7 @@ export default function Config({ user }: { user: any }) {
             )}
           </div>
 
+          {/* COORDINATION SECTION */}
           <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('coordination')}>
               <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.coordination ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Settings className="w-3.5 h-3.5 text-indigo-500" /> Coordination</h2>
