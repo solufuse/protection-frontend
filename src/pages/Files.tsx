@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, DragEvent } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
-  FileSpreadsheet, FileDown,
+  FileSpreadsheet, FileJson, FileDown,
   RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, ChevronDown, ChevronRight, Calendar, ExternalLink
 } from 'lucide-react';
 import Toast from '../components/Toast';
@@ -98,15 +98,25 @@ export default function Files({ user }: { user: any }) {
 
   // --- ACTIONS ---
   
-  const handleOpenLink = async (type: 'raw' | 'xlsx' | 'json_tab', filename: string) => {
+  const handleOpenLink = async (type: 'raw' | 'xlsx' | 'json' | 'json_tab', filename: string) => {
       try {
           const t = await getToken();
           let url = "";
-          if (type === 'raw') url = `${API_URL}/session/download?filename=${encodeURIComponent(filename)}&token=${t}`;
-          else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encodeURIComponent(filename)}&token=${t}`;
-          else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}`;
+          
+          if (type === 'raw') {
+              url = `${API_URL}/session/download?filename=${encodeURIComponent(filename)}&token=${t}`;
+          } else if (type === 'xlsx') {
+              url = `${API_URL}/ingestion/download/xlsx?filename=${encodeURIComponent(filename)}&token=${t}`;
+          } else if (type === 'json') {
+              // DOWNLOAD JSON (Attachment)
+              url = `${API_URL}/ingestion/download/json?filename=${encodeURIComponent(filename)}&token=${t}`;
+          } else if (type === 'json_tab') {
+              // VIEW JSON (Inline/Tab)
+              url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}`;
+          }
           
           if (url) window.open(url, '_blank');
+          
       } catch (e) { notify("Link Error", "error"); }
   };
 
@@ -245,7 +255,12 @@ export default function Files({ user }: { user: any }) {
                                     <FileSpreadsheet className="w-3 h-3"/> <span className="text-[9px]">XLSX</span>
                                   </button>
                                   
-                                  {/* BOUTON OPEN LINK (Full JSON Preview) */}
+                                  {/* BOUTON DOWNLOAD JSON */}
+                                  <button onClick={() => handleOpenLink('json', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded border border-yellow-200 transition-colors" title="Download JSON">
+                                    <FileJson className="w-3 h-3"/> <span className="text-[9px]">JSON</span>
+                                  </button>
+
+                                  {/* BOUTON OPEN TAB */}
                                   <button onClick={() => handleOpenLink('json_tab', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200 transition-colors" title="Open in new Tab">
                                     <ExternalLink className="w-3 h-3"/> <span className="text-[9px]">OPEN</span>
                                   </button>
@@ -270,7 +285,7 @@ export default function Files({ user }: { user: any }) {
                                         ) : previewData ? (
                                             <pre>{JSON.stringify(previewData.tables || previewData, null, 2)}</pre>
                                         ) : (
-                                            <span className="text-red-400">Failed to load.</span>
+                                            <span className="text-red-400">Failed to load preview.</span>
                                         )}
                                     </div>
                                 </td>
