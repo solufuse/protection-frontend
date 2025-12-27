@@ -2,11 +2,10 @@ import { useEffect, useState, useRef, DragEvent } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
   FileSpreadsheet, FileJson, FileDown,
-  RefreshCw, Archive, Key, UploadCloud, Eye
+  RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, ChevronDown, ChevronRight
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
-// --- TYPES ---
 interface SessionFile {
   path: string;
   filename: string;
@@ -19,7 +18,12 @@ export default function Files({ user }: { user: any }) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  
+  // Gestion de l'affichage inline (Accordion)
+  const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
   const [token, setToken] = useState<string>("");
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   
@@ -69,6 +73,7 @@ export default function Files({ user }: { user: any }) {
     try {
       await fetch(`${API_URL}/session/file/${path}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       setFiles(p => p.filter(f => f.path !== path));
+      if (expandedFileId === path.split('/').pop()) setExpandedFileId(null);
       notify("Fichier supprimé");
     } catch (e) { notify("Erreur suppression", "error"); }
   };
@@ -78,51 +83,69 @@ export default function Files({ user }: { user: any }) {
     try {
       await fetch(`${API_URL}/session/clear`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       setFiles([]);
-      setPreviewData(null);
+      setExpandedFileId(null);
       notify("Session vidée");
     } catch (e) { notify("Erreur", "error"); }
   };
 
-  // Téléchargement Brut (Raw)
+  // --- DOWNLOAD HANDLERS ---
+
   const handleDownloadRaw = async (filename: string) => {
     try {
         const res = await fetch(`${API_URL}/session/download?filename=${encodeURIComponent(filename)}`, { 
             headers: { 'Authorization': `Bearer ${token}` } 
         });
-        if (!res.ok) throw new Error("Download failed");
+        if (!res.ok) throw new Error("Fichier introuvable");
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = filename; // Nom d'origine
+        a.href = url; a.download = filename;
         a.click();
-        notify("Téléchargement Brut lancé");
-    } catch (e) { notify("Erreur Download", "error"); }
+        notify("Téléchargement RAW lancé");
+    } catch (e) { notify("Erreur Download RAW", "error"); }
   };
 
-  // Téléchargement Converti (XLSX/JSON)
   const handleDownloadConverted = async (filename: string, format: 'xlsx' | 'json') => {
     try {
       const res = await fetch(`${API_URL}/ingestion/download/${format}?filename=${encodeURIComponent(filename)}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error("Conversion impossible");
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      // Nettoyage extension pour le nom de sortie
       const cleanName = filename.replace(/\.(si2s|mdb|lf1s)$/i, "");
       a.download = `${cleanName}.${format}`;
       a.click();
       notify(`Téléchargement ${format.toUpperCase()} lancé`);
-    } catch (e) { notify("Erreur conversion", "error"); }
+    } catch (e) { notify("Erreur Conversion", "error"); }
   };
 
-  const handlePreview = async (filename: string) => {
+  // --- INLINE PREVIEW LOGIC ---
+
+  const togglePreview = async (filename: string) => {
+    // Si déjà ouvert, on ferme
+    if (expandedFileId === filename) {
+        setExpandedFileId(null);
+        setPreviewData(null);
+        return;
+    }
+
+    // Sinon, on ouvre et on charge
+    setExpandedFileId(filename);
+    setPreviewLoading(true);
+    setPreviewData(null);
+
     try {
       const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error("Preview indisponible");
       const data = await res.json();
       setPreviewData(data);
-    } catch (e) { notify("Aperçu non disponible", "error"); }
+    } catch (e) { 
+        notify("Impossible de prévisualiser ce fichier", "error");
+        setExpandedFileId(null); // On referme si erreur
+    } finally {
+        setPreviewLoading(false);
+    }
   };
   
   const handleCopyToken = () => {
@@ -131,7 +154,6 @@ export default function Files({ user }: { user: any }) {
     notify("Token copié !");
   };
 
-  // Drag & Drop
   const onDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
   const onDragLeave = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
   const onDrop = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); };
@@ -188,6 +210,7 @@ export default function Files({ user }: { user: any }) {
               <table className="w-full text-left font-bold border-collapse">
                 <thead className="text-[9px] text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 z-10">
                   <tr>
+                    <th className="py-2 px-3 border-b border-slate-100 font-bold w-8"></th>
                     <th className="py-2 px-3 border-b border-slate-100 font-bold">Filename</th>
                     <th className="py-2 px-3 border-b border-slate-100 w-24 font-bold text-center">Size</th>
                     <th className="py-2 px-3 border-b border-slate-100 text-right w-64 font-bold">Actions</th>
@@ -196,7 +219,7 @@ export default function Files({ user }: { user: any }) {
                 <tbody className="divide-y divide-slate-50">
                   {files.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="py-20 text-center text-slate-300 italic">
+                      <td colSpan={4} className="py-20 text-center text-slate-300 italic">
                         <Archive className="w-10 h-10 mx-auto mb-3 opacity-50" />
                         <span className="block opacity-70">Session is empty</span>
                         <span className="text-[9px] font-normal opacity-50">Drag files here to start</span>
@@ -205,9 +228,18 @@ export default function Files({ user }: { user: any }) {
                   ) : (
                     files.map((file, i) => {
                        const isConvertible = /\.(si2s|lf1s|mdb)$/i.test(file.filename);
-                       const isSelected = previewData?.filename === file.filename;
+                       const isExpanded = expandedFileId === file.filename;
+                       
                        return (
-                        <tr key={i} className={`group transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                        <>
+                        <tr key={i} className={`group transition-colors ${isExpanded ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                          <td className="px-3 py-1 text-center">
+                             {isConvertible && (
+                                <button onClick={() => togglePreview(file.filename)} className="text-slate-400 hover:text-blue-600">
+                                    {isExpanded ? <ChevronDown className="w-3.5 h-3.5"/> : <ChevronRight className="w-3.5 h-3.5"/>}
+                                </button>
+                             )}
+                          </td>
                           <td className="px-3 py-1">
                             <div className="flex items-center gap-2">
                                <FileText className={`w-3.5 h-3.5 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} />
@@ -218,15 +250,12 @@ export default function Files({ user }: { user: any }) {
                           </td>
                           <td className="px-3 py-1 text-slate-400 font-mono text-[9px] text-center">{formatBytes(file.size)}</td>
                           <td className="px-3 py-1 text-right">
-                            {/* BOUTONS ACTIONS VISIBLES */}
                             <div className="flex justify-end gap-1.5 items-center">
                               
-                              {/* 1. DOWNLOAD RAW (Always available) */}
                               <button onClick={() => handleDownloadRaw(file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 transition-colors" title="Download Original">
                                 <FileDown className="w-3 h-3"/> <span className="text-[9px]">RAW</span>
                               </button>
 
-                              {/* 2. CONVERTIBLE ACTIONS */}
                               {isConvertible && (
                                 <>
                                   <button onClick={() => handleDownloadConverted(file.filename, 'xlsx')} className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 hover:bg-green-100 text-green-700 rounded border border-green-200 transition-colors" title="Export to Excel">
@@ -235,9 +264,10 @@ export default function Files({ user }: { user: any }) {
                                   <button onClick={() => handleDownloadConverted(file.filename, 'json')} className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded border border-yellow-200 transition-colors" title="Export to JSON">
                                     <FileJson className="w-3 h-3"/> <span className="text-[9px]">JSON</span>
                                   </button>
-                                  <div className="w-px h-3 bg-slate-300 mx-1"></div>
-                                  <button onClick={() => handlePreview(file.filename)} className="p-1 hover:bg-blue-100 text-blue-600 rounded transition-colors" title="Preview Data">
-                                    <Eye className="w-3.5 h-3.5"/>
+                                  
+                                  {/* Bouton Preview (Oeil) */}
+                                  <button onClick={() => togglePreview(file.filename)} className={`p-1 rounded transition-colors ${isExpanded ? 'text-blue-600 bg-blue-100' : 'hover:bg-blue-100 text-blue-600'}`} title="Preview Data">
+                                    {isExpanded ? <EyeOff className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}
                                   </button>
                                 </>
                               )}
@@ -248,6 +278,26 @@ export default function Files({ user }: { user: any }) {
                             </div>
                           </td>
                         </tr>
+                        
+                        {/* INLINE DATA PREVIEW ROW */}
+                        {isExpanded && (
+                            <tr>
+                                <td colSpan={4} className="bg-slate-900 p-0">
+                                    <div className="max-h-60 overflow-auto custom-scrollbar p-4 text-[10px] font-mono text-green-400">
+                                        {previewLoading ? (
+                                            <div className="flex items-center gap-2 text-slate-400 animate-pulse">
+                                                <RefreshCw className="w-3 h-3 animate-spin"/> Loading data structure...
+                                            </div>
+                                        ) : previewData ? (
+                                            <pre>{JSON.stringify(previewData.tables, null, 2)}</pre>
+                                        ) : (
+                                            <span className="text-red-400">Failed to load preview.</span>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
+                        </>
                       );
                     })
                   )}
@@ -255,19 +305,6 @@ export default function Files({ user }: { user: any }) {
               </table>
             </div>
           </div>
-          
-          {/* PREVIEW PANEL (Si activé) */}
-          {previewData && (
-            <div className="mt-4 bg-slate-900 rounded border border-slate-800 p-4 shadow-xl">
-               <div className="flex justify-between items-center mb-2 border-b border-slate-800 pb-2">
-                  <span className="text-green-400 font-bold text-xs uppercase">{previewData.filename} Preview</span>
-                  <button onClick={() => setPreviewData(null)} className="text-slate-500 hover:text-white text-[10px]">CLOSE</button>
-               </div>
-               <div className="max-h-60 overflow-auto custom-scrollbar">
-                  <pre className="text-[9px] text-slate-300 font-mono">{JSON.stringify(previewData.tables, null, 2).slice(0, 2000)}...</pre>
-               </div>
-            </div>
-          )}
       </div>
 
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
