@@ -4,7 +4,6 @@ import {
   Eye, X, Download, FileJson, FileSpreadsheet, 
   RefreshCw, Archive 
 } from 'lucide-react';
-import { auth } from '../firebase';
 import Toast from '../components/Toast';
 
 // --- TYPES ---
@@ -13,11 +12,6 @@ interface SessionFile {
   filename: string;
   size: number;
   content_type: string;
-}
-
-interface ApiResponse<T> {
-  data: T;
-  message?: string;
 }
 
 export default function Files({ user }: { user: any }) {
