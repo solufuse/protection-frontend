@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { 
-  Upload, Trash2, FileText, HardDrive, 
+  Trash2, FileText, HardDrive, 
   Eye, Download, FileJson, FileSpreadsheet, 
   RefreshCw, Archive, ChevronRight, X, Database 
 } from 'lucide-react';
