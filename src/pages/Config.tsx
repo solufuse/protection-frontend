@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck, RefreshCw, CloudDownload } from 'lucide-react';
+import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck, RefreshCw } from 'lucide-react';
 import Toast from '../components/Toast';
 
 export default function Config({ user }: { user: any }) {
@@ -32,11 +32,9 @@ export default function Config({ user }: { user: any }) {
     if (!user) return;
     setLoading(true);
     try {
-        // Obtenir un token frais
         const token = await user.getIdToken(true);
         
-        // 1. Lister les fichiers pour voir si config.json existe
-        // Note: /details utilise le header Authorization standard
+        // 1. Lister les fichiers
         const listRes = await fetch(`${apiUrl}/session/details`, { 
             headers: { 'Authorization': `Bearer ${token}` } 
         });
@@ -47,13 +45,11 @@ export default function Config({ user }: { user: any }) {
         const configFile = listData.files?.find((f: any) => f.filename.toLowerCase() === 'config.json');
         
         if (configFile) {
-            // 2. CORRECTION : Passer le token dans l'URL (Query Param) pour /download
-            // L'endpoint attend ?filename=...&token=...
+            // 2. Download via URL Token (Fix 401)
             const fileRes = await fetch(`${apiUrl}/session/download?filename=${encodeURIComponent(configFile.filename)}&token=${token}`);
             
             if (!fileRes.ok) throw new Error("Failed to download config.json");
 
-            // 3. Parser le contenu
             const blob = await fileRes.blob();
             const text = await blob.text();
             try {
@@ -65,7 +61,6 @@ export default function Config({ user }: { user: any }) {
                     throw new Error("Invalid config structure");
                 }
             } catch (e) {
-                console.error(e);
                 throw new Error("Config file is not valid JSON");
             }
         } else {
@@ -122,7 +117,6 @@ export default function Config({ user }: { user: any }) {
       const formData = new FormData();
       formData.append('files', blob, 'config.json');
       
-      // Note: L'upload utilise toujours POST + Header, ça c'est correct coté backend
       const response = await fetch(`${apiUrl}/session/upload`, { 
           method: 'POST', 
           headers: { 'Authorization': `Bearer ${token}` }, 
