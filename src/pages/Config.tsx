@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck, CloudDownload } from 'lucide-react';
+import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck, RefreshCw } from 'lucide-react';
 import Toast from '../components/Toast';
 
 export default function Config({ user }: { user: any }) {
@@ -46,7 +46,6 @@ export default function Config({ user }: { user: any }) {
         
         if (configFile) {
             // 2. Fetch CONTENT using download endpoint (safest way to get raw JSON)
-            // Note: We use 'download/json' which typically ensures JSON output, or just passes through .json files
             const fileRes = await fetch(`${apiUrl}/ingestion/download/json?filename=${encodeURIComponent(configFile.filename)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -67,7 +66,7 @@ export default function Config({ user }: { user: any }) {
             }
         } else {
             console.log("No config.json found in session, keeping default.");
-            if (!config) setConfig(defaultConfig); // Only set default if nothing loaded yet
+            if (!config) setConfig(defaultConfig);
         }
     } catch (err: any) {
         console.error("Sync Error:", err);
@@ -147,7 +146,7 @@ export default function Config({ user }: { user: any }) {
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
           
           <button onClick={loadFromSession} className="flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded border border-indigo-200 text-indigo-700 font-bold" title="Force reload from Cloud">
-             <CloudDownload className={`w-3.5 h-3.5 ${loading ? 'animate-bounce' : ''}`} /> LOAD
+             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> LOAD
           </button>
           
           <div className="w-px bg-slate-200 mx-1"></div>
