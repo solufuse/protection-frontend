@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye, FileArchive, FileCode, Key } from 'lucide-react';
-import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, Eye, FileArchive, FileCode, Key, XCircle } from 'lucide-react';
+import { collection, query, orderBy, onSnapshot, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
 import Toast from '../components/Toast';
@@ -54,6 +54,26 @@ export default function Files({ user }: FilesProps) {
       } catch(e) { notify("Erreur suppression", "error"); }
   };
 
+  // --- NEW: BATCH DELETE FUNCTION ---
+  const handleClearAll = async () => {
+      if (files.length === 0) return;
+      if (!confirm("⚠️ ATTENTION : Voulez-vous vraiment supprimer TOUS les fichiers de la liste ?")) return;
+
+      try {
+          const batch = writeBatch(db);
+          files.forEach((file) => {
+              const docRef = doc(db, "users", user.uid, "configurations", file.id);
+              batch.delete(docRef);
+          });
+          
+          await batch.commit();
+          notify("🗑️ Tout a été supprimé avec succès !");
+      } catch (e) {
+          console.error(e);
+          notify("Erreur lors de la suppression générale", "error");
+      }
+  };
+
   const handleDownloadZip = (format: 'xlsx' | 'json') => {
       if (!user) return;
       notify(`Génération du ZIP (${format.toUpperCase()})...`);
@@ -72,7 +92,6 @@ export default function Files({ user }: FilesProps) {
   };
 
   const handlePreview = (file: any) => {
-      // Affiche les infos complètes pour débugger
       alert(`Nom: ${file.original_name}\nType: ${file.source_type}\nID: ${file.id}`);
   };
 
@@ -90,7 +109,7 @@ export default function Files({ user }: FilesProps) {
       <div className="flex justify-between items-center mb-2 border-b border-slate-200 pb-2 flex-shrink-0 text-[11px]">
         <div className="flex items-center gap-2">
             <Cloud className="w-4 h-4 text-blue-600" />
-            <h1 className="text-sm font-bold text-slate-800">Gestion de Session (Cloud)</h1>
+            <h1 className="text-sm font-bold text-slate-800">Gestion de Session</h1>
             <span className="bg-slate-100 text-slate-600 text-[10px] font-mono px-1.5 rounded-full">
                 {files.length}
             </span>
@@ -99,6 +118,13 @@ export default function Files({ user }: FilesProps) {
         <div className="flex gap-2 items-center">
            {loading && <span className="text-blue-600 font-bold animate-pulse uppercase text-[10px] mr-2">Status: {step}...</span>}
            
+           {/* BOUTON CLEAR ALL */}
+           {files.length > 0 && (
+               <button onClick={handleClearAll} className="flex items-center gap-1 bg-red-50 border border-red-200 text-red-600 px-2 py-1 rounded hover:bg-red-100 text-[10px] font-bold transition-colors shadow-sm mr-2">
+                    <XCircle className="w-3.5 h-3.5" /> TOUT EFFACER
+               </button>
+           )}
+
            <button onClick={handleCopyToken} className="flex items-center gap-1 bg-slate-800 text-white px-2 py-1 rounded hover:bg-slate-700 text-[10px] font-bold transition-colors shadow-sm mr-2">
                 <Key className="w-3.5 h-3.5" /> TOKEN
            </button>
@@ -143,7 +169,6 @@ export default function Files({ user }: FilesProps) {
                                         <div className="flex items-center gap-2 overflow-hidden">
                                             {getIcon(file.source_type)}
                                             <div className="flex flex-col min-w-0">
-                                                {/* MISE A JOUR ICI : AFFICHAGE DU NOM REEL */}
                                                 <span className="text-[10px] font-bold text-slate-700 truncate leading-tight" title={file.original_name}>
                                                     {file.original_name || "Fichier sans nom"}
                                                 </span>
