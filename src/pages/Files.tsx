@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef, DragEvent } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
-  Download, FileSpreadsheet, 
-  RefreshCw, Archive, Key, UploadCloud 
+  FileSpreadsheet, FileJson, FileDown,
+  RefreshCw, Archive, Key, UploadCloud, Eye
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -15,18 +15,17 @@ interface SessionFile {
 }
 
 export default function Files({ user }: { user: any }) {
-  // --- STATE ---
   const [files, setFiles] = useState<SessionFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
   const [token, setToken] = useState<string>("");
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
-  // --- HELPERS ---
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
 
   const formatBytes = (bytes: number) => {
@@ -37,7 +36,6 @@ export default function Files({ user }: { user: any }) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // --- AUTH & FETCH ---
   useEffect(() => {
     if (user) user.getIdToken().then((t: string) => { setToken(t); fetchFiles(t); });
   }, [user]);
@@ -52,7 +50,6 @@ export default function Files({ user }: { user: any }) {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  // --- ACTIONS ---
   const handleUpload = async (fileList: FileList | null) => {
     if (!fileList || !token) return;
     setUploading(true);
@@ -62,30 +59,48 @@ export default function Files({ user }: { user: any }) {
     try {
       const res = await fetch(`${API_URL}/session/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
       if (!res.ok) throw new Error();
-      notify(`${fileList.length} File(s) uploaded`);
+      notify(`${fileList.length} Fichier(s) uploadé(s)`);
       fetchFiles(token);
-    } catch (e) { notify("Upload failed", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    } catch (e) { notify("Echec Upload", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
   const handleDelete = async (path: string) => {
-    if (!confirm("Delete this file?")) return;
+    if (!confirm("Supprimer ce fichier ?")) return;
     try {
       await fetch(`${API_URL}/session/file/${path}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       setFiles(p => p.filter(f => f.path !== path));
-      notify("File deleted");
-    } catch (e) { notify("Deletion error", "error"); }
+      notify("Fichier supprimé");
+    } catch (e) { notify("Erreur suppression", "error"); }
   };
 
   const handleClear = async () => {
-    if (!confirm("Clear entire session? This cannot be undone.")) return;
+    if (!confirm("Tout supprimer ?")) return;
     try {
       await fetch(`${API_URL}/session/clear`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       setFiles([]);
-      notify("Session cleared");
-    } catch (e) { notify("Error clearing session", "error"); }
+      setPreviewData(null);
+      notify("Session vidée");
+    } catch (e) { notify("Erreur", "error"); }
   };
 
-  const handleDownload = async (filename: string, format: 'xlsx' | 'json') => {
+  // Téléchargement Brut (Raw)
+  const handleDownloadRaw = async (filename: string) => {
+    try {
+        const res = await fetch(`${API_URL}/session/download?filename=${encodeURIComponent(filename)}`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        if (!res.ok) throw new Error("Download failed");
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; // Nom d'origine
+        a.click();
+        notify("Téléchargement Brut lancé");
+    } catch (e) { notify("Erreur Download", "error"); }
+  };
+
+  // Téléchargement Converti (XLSX/JSON)
+  const handleDownloadConverted = async (filename: string, format: 'xlsx' | 'json') => {
     try {
       const res = await fetch(`${API_URL}/ingestion/download/${format}?filename=${encodeURIComponent(filename)}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (!res.ok) throw new Error();
@@ -93,41 +108,34 @@ export default function Files({ user }: { user: any }) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${filename.replace(/\.(si2s|mdb|lf1s)$/i, "")}.${format}`;
+      // Nettoyage extension pour le nom de sortie
+      const cleanName = filename.replace(/\.(si2s|mdb|lf1s)$/i, "");
+      a.download = `${cleanName}.${format}`;
       a.click();
-      notify("Download started");
-    } catch (e) { notify("Download failed", "error"); }
+      notify(`Téléchargement ${format.toUpperCase()} lancé`);
+    } catch (e) { notify("Erreur conversion", "error"); }
+  };
+
+  const handlePreview = async (filename: string) => {
+    try {
+      const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setPreviewData(data);
+    } catch (e) { notify("Aperçu non disponible", "error"); }
   };
   
   const handleCopyToken = () => {
-    if (!token) return notify("No token available", "error");
+    if (!token) return notify("Token indisponible", "error");
     navigator.clipboard.writeText(token);
-    notify("JWT Token copied");
+    notify("Token copié !");
   };
 
-  // --- DRAG & DROP HANDLERS ---
-  const onDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
+  // Drag & Drop
+  const onDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
+  const onDragLeave = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
+  const onDrop = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); };
 
-  const onDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleUpload(e.dataTransfer.files);
-    }
-  };
-
-  // --- RENDER ---
   return (
     <div className="max-w-6xl mx-auto px-6 py-4 text-[11px] font-sans">
       
@@ -140,7 +148,7 @@ export default function Files({ user }: { user: any }) {
           </h1>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors" title="Copy JWT Token">
+          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors">
             <Key className="w-3.5 h-3.5" /> TOKEN
           </button>
           <button onClick={() => fetchFiles(token)} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold transition-colors">
@@ -155,11 +163,8 @@ export default function Files({ user }: { user: any }) {
       <div className="w-full">
           <div 
             className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold relative transition-all"
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
+            onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
           >
-            {/* DRAG & DROP OVERLAY */}
             {isDragging && (
                 <div className="absolute inset-0 z-50 bg-blue-50/90 border-2 border-dashed border-blue-500 rounded flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-200">
                     <UploadCloud className="w-12 h-12 text-blue-600 mb-2" />
@@ -167,7 +172,6 @@ export default function Files({ user }: { user: any }) {
                 </div>
             )}
 
-            {/* Panel Header */}
             <div className="flex justify-between items-center p-2 bg-slate-50 border-b border-slate-100">
               <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">
                  <HardDrive className="w-3.5 h-3.5 text-blue-600" /> Active Files
@@ -180,14 +184,13 @@ export default function Files({ user }: { user: any }) {
               </div>
             </div>
             
-            {/* List */}
             <div className="p-0 min-h-[300px] max-h-[70vh] overflow-y-auto">
               <table className="w-full text-left font-bold border-collapse">
                 <thead className="text-[9px] text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 z-10">
                   <tr>
                     <th className="py-2 px-3 border-b border-slate-100 font-bold">Filename</th>
                     <th className="py-2 px-3 border-b border-slate-100 w-24 font-bold text-center">Size</th>
-                    <th className="py-2 px-3 border-b border-slate-100 text-right w-32 font-bold">Actions</th>
+                    <th className="py-2 px-3 border-b border-slate-100 text-right w-64 font-bold">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -202,31 +205,45 @@ export default function Files({ user }: { user: any }) {
                   ) : (
                     files.map((file, i) => {
                        const isConvertible = /\.(si2s|lf1s|mdb)$/i.test(file.filename);
+                       const isSelected = previewData?.filename === file.filename;
                        return (
-                        <tr key={i} className="group hover:bg-slate-50 transition-colors">
-                          <td className="px-3 py-0.5">
+                        <tr key={i} className={`group transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                          <td className="px-3 py-1">
                             <div className="flex items-center gap-2">
-                               <FileText className={`w-3 h-3 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} />
-                               <span className="truncate max-w-[400px] text-slate-700 text-[10px]" title={file.filename}>
+                               <FileText className={`w-3.5 h-3.5 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} />
+                               <span className="truncate max-w-[300px] text-slate-700 text-[10px]" title={file.filename}>
                                  {file.filename}
                                </span>
                             </div>
                           </td>
-                          <td className="px-3 py-0.5 text-slate-400 font-mono text-[9px] text-center">{formatBytes(file.size)}</td>
-                          <td className="px-3 py-0.5 text-right">
-                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <td className="px-3 py-1 text-slate-400 font-mono text-[9px] text-center">{formatBytes(file.size)}</td>
+                          <td className="px-3 py-1 text-right">
+                            {/* BOUTONS ACTIONS VISIBLES */}
+                            <div className="flex justify-end gap-1.5 items-center">
+                              
+                              {/* 1. DOWNLOAD RAW (Always available) */}
+                              <button onClick={() => handleDownloadRaw(file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 transition-colors" title="Download Original">
+                                <FileDown className="w-3 h-3"/> <span className="text-[9px]">RAW</span>
+                              </button>
+
+                              {/* 2. CONVERTIBLE ACTIONS */}
                               {isConvertible && (
-                                <button onClick={() => handleDownload(file.filename, 'xlsx')} className="p-0.5 hover:bg-green-100 text-slate-300 hover:text-green-600 rounded transition-colors" title="Export to XLSX">
-                                  <FileSpreadsheet className="w-3 h-3"/>
-                                </button>
+                                <>
+                                  <button onClick={() => handleDownloadConverted(file.filename, 'xlsx')} className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 hover:bg-green-100 text-green-700 rounded border border-green-200 transition-colors" title="Export to Excel">
+                                    <FileSpreadsheet className="w-3 h-3"/> <span className="text-[9px]">XLSX</span>
+                                  </button>
+                                  <button onClick={() => handleDownloadConverted(file.filename, 'json')} className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded border border-yellow-200 transition-colors" title="Export to JSON">
+                                    <FileJson className="w-3 h-3"/> <span className="text-[9px]">JSON</span>
+                                  </button>
+                                  <div className="w-px h-3 bg-slate-300 mx-1"></div>
+                                  <button onClick={() => handlePreview(file.filename)} className="p-1 hover:bg-blue-100 text-blue-600 rounded transition-colors" title="Preview Data">
+                                    <Eye className="w-3.5 h-3.5"/>
+                                  </button>
+                                </>
                               )}
-                              {!isConvertible && (
-                                <button className="p-0.5 hover:bg-slate-200 text-slate-300 hover:text-slate-600 rounded transition-colors" title="Download Raw">
-                                    <Download className="w-3 h-3"/>
-                                </button>
-                              )}
-                              <button onClick={() => handleDelete(file.path)} className="p-0.5 hover:bg-red-100 text-slate-300 hover:text-red-500 rounded transition-colors" title="Delete">
-                                <Trash2 className="w-3 h-3"/>
+                              
+                              <button onClick={() => handleDelete(file.path)} className="p-1 hover:bg-red-100 text-red-500 rounded transition-colors ml-1" title="Delete">
+                                <Trash2 className="w-3.5 h-3.5"/>
                               </button>
                             </div>
                           </td>
@@ -238,6 +255,19 @@ export default function Files({ user }: { user: any }) {
               </table>
             </div>
           </div>
+          
+          {/* PREVIEW PANEL (Si activé) */}
+          {previewData && (
+            <div className="mt-4 bg-slate-900 rounded border border-slate-800 p-4 shadow-xl">
+               <div className="flex justify-between items-center mb-2 border-b border-slate-800 pb-2">
+                  <span className="text-green-400 font-bold text-xs uppercase">{previewData.filename} Preview</span>
+                  <button onClick={() => setPreviewData(null)} className="text-slate-500 hover:text-white text-[10px]">CLOSE</button>
+               </div>
+               <div className="max-h-60 overflow-auto custom-scrollbar">
+                  <pre className="text-[9px] text-slate-300 font-mono">{JSON.stringify(previewData.tables, null, 2).slice(0, 2000)}...</pre>
+               </div>
+            </div>
+          )}
       </div>
 
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
