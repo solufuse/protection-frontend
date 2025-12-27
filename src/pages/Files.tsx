@@ -24,10 +24,9 @@ export default function Files({ user }: { user: any }) {
   const [previewData, setPreviewData] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  const [token, setToken] = useState<string>("");
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
@@ -40,14 +39,21 @@ export default function Files({ user }: { user: any }) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Helper pour obtenir un token frais (évite le 401)
+  const getToken = async () => {
+    if (!user) return null;
+    return await user.getIdToken(true); // Force refresh
+  };
+
   useEffect(() => {
-    if (user) user.getIdToken().then((t: string) => { setToken(t); fetchFiles(t); });
+    if (user) fetchFiles();
   }, [user]);
 
-  const fetchFiles = async (authToken: string) => {
+  const fetchFiles = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/session/details`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/session/details`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setFiles(data.files || []);
@@ -55,58 +61,63 @@ export default function Files({ user }: { user: any }) {
   };
 
   const handleUpload = async (fileList: FileList | null) => {
-    if (!fileList || !token) return;
+    if (!fileList || !user) return;
     setUploading(true);
     const formData = new FormData();
     Array.from(fileList).forEach(f => formData.append('files', f));
 
     try {
+      const token = await getToken();
       const res = await fetch(`${API_URL}/session/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
       if (!res.ok) throw new Error();
-      notify(`${fileList.length} Uploaded`);
-      fetchFiles(token);
-    } catch (e) { notify("Upload Error", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+      notify(`${fileList.length} Fichier(s) uploadé(s)`);
+      fetchFiles();
+    } catch (e) { notify("Echec Upload", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
   const handleDelete = async (path: string) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Supprimer ce fichier ?")) return;
     try {
+      const token = await getToken();
       await fetch(`${API_URL}/session/file/${path}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       setFiles(p => p.filter(f => f.path !== path));
       if (expandedFileId === path.split('/').pop()) setExpandedFileId(null);
-      notify("Deleted");
-    } catch (e) { notify("Error", "error"); }
+      notify("Fichier supprimé");
+    } catch (e) { notify("Erreur suppression", "error"); }
   };
 
   const handleClear = async () => {
-    if (!confirm("Clear all?")) return;
+    if (!confirm("Tout supprimer ?")) return;
     try {
+      const token = await getToken();
       await fetch(`${API_URL}/session/clear`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       setFiles([]);
       setExpandedFileId(null);
-      notify("Session cleared");
-    } catch (e) { notify("Error", "error"); }
+      notify("Session vidée");
+    } catch (e) { notify("Erreur", "error"); }
   };
 
   const handleDownloadRaw = async (filename: string) => {
     try {
+        const token = await getToken();
         const res = await fetch(`${API_URL}/session/download?filename=${encodeURIComponent(filename)}`, { 
             headers: { 'Authorization': `Bearer ${token}` } 
         });
-        if (!res.ok) throw new Error("File not found");
+        if (!res.ok) throw new Error("Fichier introuvable");
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = filename;
         a.click();
-        notify("Downloading RAW");
-    } catch (e) { notify("Download Error", "error"); }
+        notify("Téléchargement RAW lancé");
+    } catch (e) { notify("Erreur Download RAW", "error"); }
   };
 
   const handleDownloadConverted = async (filename: string, format: 'xlsx' | 'json') => {
     try {
+      const token = await getToken();
       const res = await fetch(`${API_URL}/ingestion/download/${format}?filename=${encodeURIComponent(filename)}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (!res.ok) throw new Error("Conversion failed");
+      if (!res.ok) throw new Error("Conversion impossible");
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -114,8 +125,8 @@ export default function Files({ user }: { user: any }) {
       const cleanName = filename.replace(/\.(si2s|mdb|lf1s)$/i, "");
       a.download = `${cleanName}.${format}`;
       a.click();
-      notify(`Downloading ${format.toUpperCase()}`);
-    } catch (e) { notify("Conversion Error", "error"); }
+      notify(`Téléchargement ${format.toUpperCase()} lancé`);
+    } catch (e) { notify("Erreur Conversion", "error"); }
   };
 
   const togglePreview = async (filename: string) => {
@@ -129,22 +140,24 @@ export default function Files({ user }: { user: any }) {
     setPreviewData(null);
 
     try {
+      const token = await getToken();
       const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (!res.ok) throw new Error("Preview unavailable");
+      if (!res.ok) throw new Error("Preview indisponible");
       const data = await res.json();
       setPreviewData(data);
     } catch (e) { 
-        notify("Preview Error", "error");
+        notify("Preview indisponible", "error");
         setExpandedFileId(null);
     } finally {
         setPreviewLoading(false);
     }
   };
   
-  const handleCopyToken = () => {
-    if (!token) return notify("No Token", "error");
+  const handleCopyToken = async () => {
+    const token = await getToken();
+    if (!token) return notify("Token indisponible", "error");
     navigator.clipboard.writeText(token);
-    notify("Token Copied");
+    notify("Token copié !");
   };
 
   const onDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
@@ -153,6 +166,8 @@ export default function Files({ user }: { user: any }) {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-4 text-[11px] font-sans">
+      
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-2">
         <div className="flex flex-col">
           <label className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Session Manager</label>
@@ -164,7 +179,7 @@ export default function Files({ user }: { user: any }) {
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors">
             <Key className="w-3.5 h-3.5" /> TOKEN
           </button>
-          <button onClick={() => fetchFiles(token)} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold transition-colors">
+          <button onClick={() => fetchFiles()} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> REFRESH
           </button>
           <button onClick={handleClear} className="flex items-center gap-1 bg-white hover:bg-red-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-red-600 font-bold transition-colors">
@@ -174,7 +189,8 @@ export default function Files({ user }: { user: any }) {
       </div>
 
       <div className="w-full">
-          <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold relative transition-all"
+          <div 
+            className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold relative transition-all"
             onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
           >
             {isDragging && (
@@ -185,7 +201,9 @@ export default function Files({ user }: { user: any }) {
             )}
 
             <div className="flex justify-between items-center p-2 bg-slate-50 border-b border-slate-100">
-              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase"><HardDrive className="w-3.5 h-3.5 text-blue-600" /> Active Files</h2>
+              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">
+                 <HardDrive className="w-3.5 h-3.5 text-blue-600" /> Active Files
+              </h2>
               <div className="flex gap-2">
                  <input type="file" ref={fileInputRef} className="hidden" multiple onChange={(e) => handleUpload(e.target.files)} />
                  <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="text-[9px] font-bold bg-white text-blue-600 px-2 py-0.5 rounded border border-blue-200 hover:bg-blue-50 transition-colors">
