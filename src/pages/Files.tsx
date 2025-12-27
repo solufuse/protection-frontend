@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, Trash2, FileSpreadsheet, FileCode, Key, XCircle, HardDrive, Eye, X, ToggleLeft, ToggleRight, Zap } from 'lucide-react';
+// Nettoyage de 'Key' qui causait l'erreur de build
+import { RefreshCw, Upload, Trash2, FileSpreadsheet, FileCode, XCircle, HardDrive, Eye, X, ToggleLeft, ToggleRight, Zap } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -18,7 +19,6 @@ export default function Files({ user }: { user: any }) {
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
 
-  // 1. Monitor Session (Real-time from Firebase)
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "users", user.uid, "configurations"), orderBy("created_at", "desc"));
@@ -28,7 +28,6 @@ export default function Files({ user }: { user: any }) {
     return () => unsubscribe();
   }, [user]);
 
-  // 2. Actions
   const toggleCloud = async () => {
     const newState = !cloudEnabled;
     setCloudEnabled(newState);
@@ -76,7 +75,6 @@ export default function Files({ user }: { user: any }) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-4 h-[calc(100vh-80px)] flex flex-col font-sans relative">
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-4 border-b pb-2">
         <div className="flex items-center gap-4">
             <h1 className="text-lg font-black text-slate-800 tracking-tighter flex items-center gap-2">
@@ -96,7 +94,6 @@ export default function Files({ user }: { user: any }) {
       </div>
 
       <div className="grid grid-cols-4 gap-4 flex-1 overflow-hidden">
-        {/* UPLOAD BOX */}
         <div className="col-span-1 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center p-6 hover:bg-slate-50 cursor-pointer group transition-all" onClick={() => !loading && fileInputRef.current?.click()}>
             <input type="file" ref={fileInputRef} className="hidden" onChange={handleUpload} />
             {loading ? <RefreshCw className="w-10 h-10 text-blue-500 animate-spin" /> : <Upload className="w-10 h-10 text-slate-300 group-hover:text-blue-500 group-hover:scale-110 transition-all" />}
@@ -105,7 +102,6 @@ export default function Files({ user }: { user: any }) {
             </span>
         </div>
 
-        {/* LIST BOX */}
         <div className="col-span-3 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
             <div className="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Files ({files.length})</span>
@@ -123,7 +119,7 @@ export default function Files({ user }: { user: any }) {
                             <div className="flex items-center gap-3 min-w-0">
                                 <FileCode className="w-5 h-5 text-blue-500" />
                                 <div className="flex flex-col min-w-0">
-                                    <span className="text-xs font-bold text-slate-700 truncate" title={f.original_name}>{f.original_name}</span>
+                                    <span className="text-xs font-bold text-slate-700 truncate">{f.original_name}</span>
                                     <span className="text-[9px] text-slate-400 uppercase font-mono">{f.source_type} • {f.id.substring(0,8)}</span>
                                 </div>
                             </div>
@@ -145,7 +141,6 @@ export default function Files({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* PREVIEW MODAL */}
       {showPreview && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-8">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[80vh] flex flex-col overflow-hidden border border-white/20">
@@ -156,7 +151,7 @@ export default function Files({ user }: { user: any }) {
                     </div>
                     <button onClick={() => setShowPreview(false)} className="hover:rotate-90 transition-transform p-1"><X className="w-6 h-6 text-slate-400" /></button>
                 </div>
-                <div className="flex-1 overflow-auto bg-slate-900 p-6 font-mono text-blue-300 text-[11px] selection:bg-blue-500/30">
+                <div className="flex-1 overflow-auto bg-slate-900 p-6 font-mono text-blue-300 text-[11px]">
                     <pre>{JSON.stringify(previewData, null, 2)}</pre>
                 </div>
                 <div className="p-4 bg-white border-t flex justify-end">
