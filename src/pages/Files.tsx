@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, DragEvent } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
-  Download, FileJson, FileSpreadsheet, 
+  Download, FileSpreadsheet, 
   RefreshCw, Archive, Key, UploadCloud 
 } from 'lucide-react';
 import Toast from '../components/Toast';
@@ -19,7 +19,7 @@ export default function Files({ user }: { user: any }) {
   const [files, setFiles] = useState<SessionFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false); // New state for Drag & Drop
+  const [isDragging, setIsDragging] = useState(false);
   const [token, setToken] = useState<string>("");
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   
@@ -170,7 +170,7 @@ export default function Files({ user }: { user: any }) {
             {/* Panel Header */}
             <div className="flex justify-between items-center p-2 bg-slate-50 border-b border-slate-100">
               <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">
-                 <HardDrive className="w-3.5 h-3.5 text-blue-600" /> Active Files (Drag & Drop Supported)
+                 <HardDrive className="w-3.5 h-3.5 text-blue-600" /> Active Files
               </h2>
               <div className="flex gap-2">
                  <input type="file" ref={fileInputRef} className="hidden" multiple onChange={(e) => handleUpload(e.target.files)} />
@@ -181,7 +181,7 @@ export default function Files({ user }: { user: any }) {
             </div>
             
             {/* List */}
-            <div className="p-0 min-h-[300px] max-h-[600px] overflow-y-auto">
+            <div className="p-0 min-h-[300px] max-h-[70vh] overflow-y-auto">
               <table className="w-full text-left font-bold border-collapse">
                 <thead className="text-[9px] text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 z-10">
                   <tr>
@@ -204,31 +204,29 @@ export default function Files({ user }: { user: any }) {
                        const isConvertible = /\.(si2s|lf1s|mdb)$/i.test(file.filename);
                        return (
                         <tr key={i} className="group hover:bg-slate-50 transition-colors">
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-0.5">
                             <div className="flex items-center gap-2">
-                               <FileText className={`w-3.5 h-3.5 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} />
-                               <span className="truncate max-w-[400px] text-slate-700" title={file.filename}>
+                               <FileText className={`w-3 h-3 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} />
+                               <span className="truncate max-w-[400px] text-slate-700 text-[10px]" title={file.filename}>
                                  {file.filename}
                                </span>
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-slate-400 font-mono text-[10px] text-center">{formatBytes(file.size)}</td>
-                          <td className="px-3 py-2 text-right">
+                          <td className="px-3 py-0.5 text-slate-400 font-mono text-[9px] text-center">{formatBytes(file.size)}</td>
+                          <td className="px-3 py-0.5 text-right">
                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               {isConvertible && (
-                                <>
-                                  <button onClick={() => handleDownload(file.filename, 'xlsx')} className="p-1 hover:bg-green-100 text-slate-300 hover:text-green-600 rounded transition-colors" title="Export to XLSX">
-                                    <FileSpreadsheet className="w-3.5 h-3.5"/>
-                                  </button>
-                                </>
-                              )}
-                              {!isConvertible && (
-                                <button className="p-1 hover:bg-slate-200 text-slate-300 hover:text-slate-600 rounded transition-colors" title="Download Raw">
-                                    <Download className="w-3.5 h-3.5"/>
+                                <button onClick={() => handleDownload(file.filename, 'xlsx')} className="p-0.5 hover:bg-green-100 text-slate-300 hover:text-green-600 rounded transition-colors" title="Export to XLSX">
+                                  <FileSpreadsheet className="w-3 h-3"/>
                                 </button>
                               )}
-                              <button onClick={() => handleDelete(file.path)} className="p-1 hover:bg-red-100 text-slate-300 hover:text-red-500 rounded transition-colors" title="Delete">
-                                <Trash2 className="w-3.5 h-3.5"/>
+                              {!isConvertible && (
+                                <button className="p-0.5 hover:bg-slate-200 text-slate-300 hover:text-slate-600 rounded transition-colors" title="Download Raw">
+                                    <Download className="w-3 h-3"/>
+                                </button>
+                              )}
+                              <button onClick={() => handleDelete(file.path)} className="p-0.5 hover:bg-red-100 text-slate-300 hover:text-red-500 rounded transition-colors" title="Delete">
+                                <Trash2 className="w-3 h-3"/>
                               </button>
                             </div>
                           </td>
