@@ -45,8 +45,8 @@ export default function Config({ user }: { user: any }) {
         const configFile = listData.files?.find((f: any) => f.filename.toLowerCase() === 'config.json');
         
         if (configFile) {
-            // 2. Fetch CONTENT using download endpoint (safest way to get raw JSON)
-            const fileRes = await fetch(`${apiUrl}/ingestion/download/json?filename=${encodeURIComponent(configFile.filename)}`, {
+            // 2. Fetch CONTENT using RAW SESSION DOWNLOAD (NEW ENDPOINT)
+            const fileRes = await fetch(`${apiUrl}/session/download?filename=${encodeURIComponent(configFile.filename)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
             });
             
@@ -55,14 +55,16 @@ export default function Config({ user }: { user: any }) {
             // 3. Parse Blob -> Text -> JSON
             const blob = await fileRes.blob();
             const text = await blob.text();
-            const sessionConfig = JSON.parse(text);
-            
-            // 4. Validate and Set
-            if (sessionConfig && (sessionConfig.project_name || sessionConfig.settings)) {
-                setConfig(sessionConfig);
-                notify("Config loaded from Session!");
-            } else {
-                throw new Error("Invalid config structure");
+            try {
+                const sessionConfig = JSON.parse(text);
+                if (sessionConfig && (sessionConfig.project_name || sessionConfig.settings)) {
+                    setConfig(sessionConfig);
+                    notify("Config loaded from Session!");
+                } else {
+                    throw new Error("Invalid config structure");
+                }
+            } catch (e) {
+                throw new Error("Config file is not valid JSON");
             }
         } else {
             console.log("No config.json found in session, keeping default.");
