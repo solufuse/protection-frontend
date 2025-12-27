@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck } from 'lucide-react';
+import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck, CloudDownload } from 'lucide-react';
 import Toast from '../components/Toast';
 
 export default function Config({ user }: { user: any }) {
@@ -15,59 +15,72 @@ export default function Config({ user }: { user: any }) {
     setToast({ show: true, msg, type });
   };
 
-  // --- INITIALIZATION & SYNC (UID DEPENDENT) ---
-  useEffect(() => {
-    const initConfig = async () => {
-        // 1. Define Default Config
-        const defaultConfig = {
-          project_name: "NEW_PROJECT",
-          settings: {
-            std_51: { coeff_stab_max: 1.2, coeff_backup_min: 0.8, coeff_sensibilite: 0.8, coeff_inrush_margin: 1.15, selectivity_adder: 0, backup_strategy: "REMOTE_FLOOR" },
-            selectivity: { margin_amperemetric: 300, coeff_amperemetric: 1.2 }
-          },
-          transformers: [],
-          loadflow_settings: { target_mw: 0, tolerance_mw: 0, swing_bus_id: "" },
-          plans: []
-        };
+  // --- DEFAULT CONFIGURATION ---
+  const defaultConfig = {
+    project_name: "NEW_PROJECT",
+    settings: {
+      std_51: { coeff_stab_max: 1.2, coeff_backup_min: 0.8, coeff_sensibilite: 0.8, coeff_inrush_margin: 1.15, selectivity_adder: 0, backup_strategy: "REMOTE_FLOOR" },
+      selectivity: { margin_amperemetric: 300, coeff_amperemetric: 1.2 }
+    },
+    transformers: [],
+    loadflow_settings: { target_mw: 0, tolerance_mw: 0, swing_bus_id: "" },
+    plans: []
+  };
 
-        // 2. Try to fetch existing config.json from Session Storage using Token (UID)
-        if (user) {
-            try {
-                const token = await user.getIdToken();
-                // List files in user's session
-                const listRes = await fetch(`${apiUrl}/session/details`, { 
-                    headers: { 'Authorization': `Bearer ${token}` } 
-                });
-                
-                if (listRes.ok) {
-                    const listData = await listRes.json();
-                    // Check if config.json exists (case insensitive)
-                    const configFile = listData.files?.find((f: any) => f.filename.toLowerCase() === 'config.json');
-                    
-                    if (configFile) {
-                        // Fetch the content securely
-                        const fileRes = await fetch(`${apiUrl}/ingestion/preview?filename=${configFile.filename}`, {
-                             headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        
-                        if (fileRes.ok) {
-                            const sessionConfig = await fileRes.json();
-                            setConfig(sessionConfig);
-                            console.log("✅ Configuration loaded from user storage (UID based)");
-                            return; 
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to sync with session config:", err);
+  // --- SYNC FUNCTION ---
+  const loadFromSession = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+        const token = await user.getIdToken();
+        
+        // 1. List files
+        const listRes = await fetch(`${apiUrl}/session/details`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        
+        if (!listRes.ok) throw new Error("Failed to list files");
+        
+        const listData = await listRes.json();
+        const configFile = listData.files?.find((f: any) => f.filename.toLowerCase() === 'config.json');
+        
+        if (configFile) {
+            // 2. Fetch CONTENT using download endpoint (safest way to get raw JSON)
+            // Note: We use 'download/json' which typically ensures JSON output, or just passes through .json files
+            const fileRes = await fetch(`${apiUrl}/ingestion/download/json?filename=${encodeURIComponent(configFile.filename)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (!fileRes.ok) throw new Error("Failed to download config.json");
+
+            // 3. Parse Blob -> Text -> JSON
+            const blob = await fileRes.blob();
+            const text = await blob.text();
+            const sessionConfig = JSON.parse(text);
+            
+            // 4. Validate and Set
+            if (sessionConfig && (sessionConfig.project_name || sessionConfig.settings)) {
+                setConfig(sessionConfig);
+                notify("Config loaded from Session!");
+            } else {
+                throw new Error("Invalid config structure");
             }
+        } else {
+            console.log("No config.json found in session, keeping default.");
+            if (!config) setConfig(defaultConfig); // Only set default if nothing loaded yet
         }
+    } catch (err: any) {
+        console.error("Sync Error:", err);
+        notify(`Sync Failed: ${err.message}`, "error");
+        if (!config) setConfig(defaultConfig);
+    } finally {
+        setLoading(false);
+    }
+  };
 
-        // 3. Fallback to default if no remote config found
-        setConfig(defaultConfig);
-    };
-
-    initConfig();
+  // --- INITIALIZATION ---
+  useEffect(() => {
+    loadFromSession();
   }, [user]);
 
   const toggleSection = (s: string) => setOpenSections(p => ({ ...p, [s]: !p[s as keyof typeof p] }));
@@ -104,7 +117,6 @@ export default function Config({ user }: { user: any }) {
       const token = await user.getIdToken();
       const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
       const formData = new FormData();
-      // We force the name 'config.json' so it persists as the main config
       formData.append('files', blob, 'config.json');
       
       const response = await fetch(`${apiUrl}/session/upload`, { 
@@ -114,7 +126,7 @@ export default function Config({ user }: { user: any }) {
       });
       
       if (!response.ok) throw new Error("Backend error");
-      notify("Saved to User Session !");
+      notify("Saved to Session (config.json) !");
     } catch (e) { 
         notify("Save error", "error"); 
         console.error(e);
@@ -133,6 +145,13 @@ export default function Config({ user }: { user: any }) {
         </div>
         <div className="flex gap-2">
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
+          
+          <button onClick={loadFromSession} className="flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded border border-indigo-200 text-indigo-700 font-bold" title="Force reload from Cloud">
+             <CloudDownload className={`w-3.5 h-3.5 ${loading ? 'animate-bounce' : ''}`} /> LOAD
+          </button>
+          
+          <div className="w-px bg-slate-200 mx-1"></div>
+
           <button onClick={handleImportClick} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold"><Upload className="w-3.5 h-3.5" /> IMPORT</button>
           <button onClick={handleDownload} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold"><Download className="w-3.5 h-3.5" /> DOWNLOAD</button>
           <button onClick={handleSaveToSession} disabled={loading} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow-sm disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {loading ? "SAVING..." : "SAVE SESSION"}</button>
