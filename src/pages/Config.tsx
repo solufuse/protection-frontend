@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Save, Trash2, Settings, Zap, Download, Activity, ChevronDown, ChevronRight, Upload, ShieldCheck } from 'lucide-react';
 import Toast from '../components/Toast';
 
 export default function Config({ user }: { user: any }) {
