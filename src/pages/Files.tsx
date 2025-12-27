@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
   Eye, Download, FileJson, FileSpreadsheet, 
-  RefreshCw, Archive, ChevronRight, X, Database 
+  RefreshCw, Archive, ChevronRight, X, Database, Key 
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -109,6 +109,13 @@ export default function Files({ user }: { user: any }) {
       setPreviewData(data);
     } catch (e) { notify("Preview unavailable", "error"); }
   };
+  
+  // New Action: Copy Token
+  const handleCopyToken = () => {
+    if (!token) return notify("No token available", "error");
+    navigator.clipboard.writeText(token);
+    notify("JWT Token copied to clipboard");
+  };
 
   // --- RENDER ---
   return (
@@ -123,6 +130,9 @@ export default function Files({ user }: { user: any }) {
           </h1>
         </div>
         <div className="flex gap-2">
+          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors" title="Copy JWT Token">
+            <Key className="w-3.5 h-3.5" /> TOKEN
+          </button>
           <button onClick={() => fetchFiles(token)} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> REFRESH
           </button>
@@ -150,7 +160,7 @@ export default function Files({ user }: { user: any }) {
               </div>
             </div>
             
-            {/* Scrollable List Container (Simulating "Pagination" / Viewport) */}
+            {/* Scrollable List Container */}
             <div className="p-0 max-h-[500px] overflow-y-auto">
               <table className="w-full text-left font-bold border-collapse">
                 <thead className="text-[9px] text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 z-10">
