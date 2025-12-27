@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, DragEvent } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
   FileSpreadsheet, FileJson, FileDown,
-  RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, ChevronDown, ChevronRight, Calendar, ExternalLink
+  RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, ChevronDown, ChevronRight, Calendar
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -99,8 +99,7 @@ export default function Files({ user }: { user: any }) {
     } catch (e) { notify("Error", "error"); }
   };
 
-  // --- NEW: OPEN LINK WITH FRESH TOKEN ---
-  // Cette fonction remplace les balises <a> statiques
+  // --- ACTIONS (Links with fresh tokens) ---
   const handleOpenLink = async (type: 'raw' | 'xlsx' | 'json_tab', filename: string) => {
       try {
           const t = await getToken();
@@ -117,11 +116,9 @@ export default function Files({ user }: { user: any }) {
           if (url) window.open(url, '_blank');
           
       } catch (e) {
-          notify("Impossible de générer le lien sécurisé", "error");
+          notify("Link Error", "error");
       }
   };
-
-  // --- ACTIONS (Inline Preview) ---
 
   const togglePreview = async (filename: string) => {
     if (expandedFileId === filename) {
@@ -134,7 +131,6 @@ export default function Files({ user }: { user: any }) {
 
     try {
       const t = await getToken();
-      // On garde fetch ici pour l'affichage inline
       const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}`);
       if (!res.ok) throw new Error("Preview unavailable");
       const data = await res.json();
@@ -151,7 +147,7 @@ export default function Files({ user }: { user: any }) {
     const t = await getToken();
     if (!t) return notify("No Token", "error");
     navigator.clipboard.writeText(t);
-    notify("Fresh Token Copied");
+    notify("Token Copied");
   };
 
   const onDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
@@ -249,7 +245,6 @@ export default function Files({ user }: { user: any }) {
                           <td className="px-3 py-1 text-right">
                             <div className="flex justify-end gap-1.5 items-center">
                               
-                              {/* BOUTONS DYNAMIQUES */}
                               <button onClick={() => handleOpenLink('raw', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 transition-colors" title="Download Raw">
                                 <FileDown className="w-3 h-3"/> <span className="text-[9px]">RAW</span>
                               </button>
