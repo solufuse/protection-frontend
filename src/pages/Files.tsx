@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, FileArchive, FileCode, Key, XCircle, HardDrive, Eye, X } from 'lucide-react';
+import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, FileArchive, FileCode, Key, XCircle, HardDrive, Eye, X, Save } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
@@ -11,7 +11,7 @@ interface FilesProps {
 
 export default function Files({ user }: FilesProps) {
   const [files, setFiles] = useState<any[]>([]);
-  const [previewData, setPreviewData] = useState<any>(null); // Pour stocker les données à voir
+  const [previewData, setPreviewData] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success'|'error'}>({ show: false, msg: '', type: 'success' });
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,13 +63,13 @@ export default function Files({ user }: FilesProps) {
       } catch (e) { notify("Error clearing session", "error"); }
   };
 
-  const handleDownloadGlobal = (format: 'xlsx' | 'json') => {
+  const handleDownloadGlobal = (format: 'xlsx' | 'json' | 'raw') => {
       if (!user) return;
       notify(`Generating ZIP (${format.toUpperCase()})...`);
       window.location.href = `${API_URL}/ingestion/download-all/${format}?user_id=${user.uid}`;
   };
 
-  const handleDownloadSingle = (fileId: string, format: 'xlsx' | 'json') => {
+  const handleDownloadSingle = (fileId: string, format: 'xlsx' | 'json' | 'raw') => {
       if (!user) return;
       window.open(`${API_URL}/ingestion/download/${fileId}/${format}?user_id=${user.uid}`, '_blank');
   };
@@ -83,9 +83,7 @@ export default function Files({ user }: FilesProps) {
           const data = await response.json();
           setPreviewData(data);
           setShowPreview(true);
-      } catch (e) {
-          notify("Could not load preview", "error");
-      }
+      } catch (e) { notify("Could not load preview", "error"); }
   };
 
   const handleCopyToken = async () => {
@@ -93,7 +91,7 @@ export default function Files({ user }: FilesProps) {
     try {
         const token = await user.getIdToken(true);
         await navigator.clipboard.writeText(token);
-        notify("🔑 Token copied to clipboard!");
+        notify("🔑 Token copied!");
     } catch (e) { notify("Token error", "error"); }
   };
 
@@ -124,15 +122,19 @@ export default function Files({ user }: FilesProps) {
                </button>
            )}
            <button onClick={handleCopyToken} className="flex items-center gap-1 bg-slate-800 text-white px-2 py-1 rounded hover:bg-slate-700 text-[10px] font-bold transition-colors shadow-sm mr-2">
-                <Key className="w-3.5 h-3.5" /> API TOKEN
+                <Key className="w-3.5 h-3.5" /> TOKEN
            </button>
            <div className="h-4 w-[1px] bg-slate-300 mx-1"></div>
            <span className="text-[9px] font-bold text-slate-400 uppercase mr-1">Export All:</span>
+           
+           <button onClick={() => handleDownloadGlobal('raw')} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 text-[10px] font-bold transition-colors shadow-sm">
+                <HardDrive className="w-3.5 h-3.5" /> ZIP RAW
+           </button>
            <button onClick={() => handleDownloadGlobal('json')} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded hover:bg-slate-50 text-[10px] font-bold transition-colors shadow-sm">
-                <FileJson className="w-3.5 h-3.5" /> ZIP
+                <FileJson className="w-3.5 h-3.5" /> ZIP JSON
            </button>
            <button onClick={() => handleDownloadGlobal('xlsx')} className="flex items-center gap-1 bg-green-600 border border-green-700 text-white px-2 py-1 rounded hover:bg-green-700 text-[10px] font-bold transition-colors shadow-sm">
-                <Download className="w-3.5 h-3.5" /> ZIP
+                <Download className="w-3.5 h-3.5" /> ZIP XL
            </button>
         </div>
       </div>
@@ -154,7 +156,7 @@ export default function Files({ user }: FilesProps) {
         {/* FILE LIST */}
         <div className="md:col-span-3 bg-white border border-slate-200 rounded flex flex-col overflow-hidden h-full shadow-sm text-[11px]">
             <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase flex-shrink-0">
-                <span className="pl-1">Filename</span><span className="pr-8">Options</span>
+                <span className="pl-1">Filename</span><span className="pr-8">Actions (View / Raw / JSON / Excel)</span>
             </div>
             <div className="overflow-y-auto flex-1 p-0 custom-scrollbar bg-white">
                 {files.length > 0 ? (
@@ -174,16 +176,26 @@ export default function Files({ user }: FilesProps) {
                                     {/* ACTIONS ZONE */}
                                     <td className="px-3 py-0 align-middle w-auto text-right whitespace-nowrap">
                                         <div className="flex items-center justify-end gap-1">
-                                            <button onClick={() => handlePreview(file)} className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors" title="View Data">
+                                            <button onClick={() => handlePreview(file)} className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors" title="Preview Data">
                                                 <Eye className="w-3.5 h-3.5"/>
                                             </button>
+                                            
                                             <div className="h-4 w-[1px] bg-slate-200 mx-1"></div>
+
+                                            {/* NEW: RAW DOWNLOAD BUTTON */}
+                                            {file.raw_file_path && (
+                                                <button onClick={() => handleDownloadSingle(file.id, 'raw')} className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors" title="Download ORIGINAL File">
+                                                    <HardDrive className="w-3.5 h-3.5"/>
+                                                </button>
+                                            )}
+
                                             <button onClick={() => handleDownloadSingle(file.id, 'json')} className="text-slate-400 hover:text-yellow-600 hover:bg-yellow-50 rounded p-1 transition-colors" title="Download JSON">
                                                 <FileJson className="w-3.5 h-3.5"/>
                                             </button>
                                             <button onClick={() => handleDownloadSingle(file.id, 'xlsx')} className="text-slate-400 hover:text-green-600 hover:bg-green-50 rounded p-1 transition-colors" title="Download Excel">
                                                 <FileSpreadsheet className="w-3.5 h-3.5"/>
                                             </button>
+                                            
                                             <div className="h-4 w-[1px] bg-slate-200 mx-1"></div>
                                             <button onClick={() => handleDelete(file.id)} className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors" title="Delete">
                                                 <Trash2 className="w-3.5 h-3.5"/>
