@@ -63,7 +63,7 @@ export default function Files({ user }: { user: any }) {
   const handleDelete = async (fileId: string) => {
       if (!confirm("Supprimer ce fichier ?")) return;
       try {
-          await deleteDoc(doc(db, "users", user.uid, "configurations", fileId));
+          const token = await user.getIdToken(); await fetch(`${API_URL}/session/file/${fileId}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } }); await deleteDoc(doc(db, "users", user.uid, "configurations", fileId));
           notify("Fichier supprimé");
       } catch (e) { notify("Erreur suppression", "error"); }
   };
