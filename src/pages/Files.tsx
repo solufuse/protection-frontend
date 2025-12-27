@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, DragEvent } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
-  Eye, Download, FileJson, FileSpreadsheet, 
-  RefreshCw, Archive, ChevronRight, X, Database, Key 
+  Download, FileJson, FileSpreadsheet, 
+  RefreshCw, Archive, Key, UploadCloud 
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -19,7 +19,7 @@ export default function Files({ user }: { user: any }) {
   const [files, setFiles] = useState<SessionFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [previewData, setPreviewData] = useState<any>(null);
+  const [isDragging, setIsDragging] = useState(false); // New state for Drag & Drop
   const [token, setToken] = useState<string>("");
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   
@@ -62,7 +62,7 @@ export default function Files({ user }: { user: any }) {
     try {
       const res = await fetch(`${API_URL}/session/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
       if (!res.ok) throw new Error();
-      notify("Files uploaded successfully");
+      notify(`${fileList.length} File(s) uploaded`);
       fetchFiles(token);
     } catch (e) { notify("Upload failed", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
@@ -72,7 +72,6 @@ export default function Files({ user }: { user: any }) {
     try {
       await fetch(`${API_URL}/session/file/${path}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       setFiles(p => p.filter(f => f.path !== path));
-      if (previewData?.filename === path.split('/').pop()) setPreviewData(null); // Clear preview if deleted
       notify("File deleted");
     } catch (e) { notify("Deletion error", "error"); }
   };
@@ -82,7 +81,6 @@ export default function Files({ user }: { user: any }) {
     try {
       await fetch(`${API_URL}/session/clear`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       setFiles([]);
-      setPreviewData(null);
       notify("Session cleared");
     } catch (e) { notify("Error clearing session", "error"); }
   };
@@ -100,21 +98,33 @@ export default function Files({ user }: { user: any }) {
       notify("Download started");
     } catch (e) { notify("Download failed", "error"); }
   };
-
-  const handlePreview = async (filename: string) => {
-    try {
-      const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setPreviewData(data);
-    } catch (e) { notify("Preview unavailable", "error"); }
-  };
   
-  // New Action: Copy Token
   const handleCopyToken = () => {
     if (!token) return notify("No token available", "error");
     navigator.clipboard.writeText(token);
-    notify("JWT Token copied to clipboard");
+    notify("JWT Token copied");
+  };
+
+  // --- DRAG & DROP HANDLERS ---
+  const onDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleUpload(e.dataTransfer.files);
+    }
   };
 
   // --- RENDER ---
@@ -142,15 +152,25 @@ export default function Files({ user }: { user: any }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
-        
-        {/* LEFT COLUMN: LIST (8 COLS) */}
-        <div className="col-span-12 lg:col-span-8 space-y-4">
-          <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
+      <div className="w-full">
+          <div 
+            className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold relative transition-all"
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+          >
+            {/* DRAG & DROP OVERLAY */}
+            {isDragging && (
+                <div className="absolute inset-0 z-50 bg-blue-50/90 border-2 border-dashed border-blue-500 rounded flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-200">
+                    <UploadCloud className="w-12 h-12 text-blue-600 mb-2" />
+                    <span className="text-lg font-black text-blue-700 uppercase tracking-widest">Drop files here to upload</span>
+                </div>
+            )}
+
             {/* Panel Header */}
             <div className="flex justify-between items-center p-2 bg-slate-50 border-b border-slate-100">
               <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">
-                 <HardDrive className="w-3.5 h-3.5 text-blue-600" /> Active Files
+                 <HardDrive className="w-3.5 h-3.5 text-blue-600" /> Active Files (Drag & Drop Supported)
               </h2>
               <div className="flex gap-2">
                  <input type="file" ref={fileInputRef} className="hidden" multiple onChange={(e) => handleUpload(e.target.files)} />
@@ -160,8 +180,8 @@ export default function Files({ user }: { user: any }) {
               </div>
             </div>
             
-            {/* Scrollable List Container */}
-            <div className="p-0 max-h-[500px] overflow-y-auto">
+            {/* List */}
+            <div className="p-0 min-h-[300px] max-h-[600px] overflow-y-auto">
               <table className="w-full text-left font-bold border-collapse">
                 <thead className="text-[9px] text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 z-10">
                   <tr>
@@ -173,21 +193,21 @@ export default function Files({ user }: { user: any }) {
                 <tbody className="divide-y divide-slate-50">
                   {files.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="py-8 text-center text-slate-300 italic">
-                        <Archive className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        No files in session
+                      <td colSpan={3} className="py-20 text-center text-slate-300 italic">
+                        <Archive className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                        <span className="block opacity-70">Session is empty</span>
+                        <span className="text-[9px] font-normal opacity-50">Drag files here to start</span>
                       </td>
                     </tr>
                   ) : (
                     files.map((file, i) => {
                        const isConvertible = /\.(si2s|lf1s|mdb)$/i.test(file.filename);
-                       const isSelected = previewData?.filename === file.filename;
                        return (
-                        <tr key={i} className={`group transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
+                        <tr key={i} className="group hover:bg-slate-50 transition-colors">
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-2">
                                <FileText className={`w-3.5 h-3.5 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} />
-                               <span className={`truncate max-w-[300px] ${isSelected ? 'text-blue-700' : 'text-slate-700'}`} title={file.filename}>
+                               <span className="truncate max-w-[400px] text-slate-700" title={file.filename}>
                                  {file.filename}
                                </span>
                             </div>
@@ -199,9 +219,6 @@ export default function Files({ user }: { user: any }) {
                                 <>
                                   <button onClick={() => handleDownload(file.filename, 'xlsx')} className="p-1 hover:bg-green-100 text-slate-300 hover:text-green-600 rounded transition-colors" title="Export to XLSX">
                                     <FileSpreadsheet className="w-3.5 h-3.5"/>
-                                  </button>
-                                  <button onClick={() => handlePreview(file.filename)} className="p-1 hover:bg-blue-100 text-slate-300 hover:text-blue-600 rounded transition-colors" title="Preview Data">
-                                    <Eye className="w-3.5 h-3.5"/>
                                   </button>
                                 </>
                               )}
@@ -223,59 +240,6 @@ export default function Files({ user }: { user: any }) {
               </table>
             </div>
           </div>
-        </div>
-
-        {/* RIGHT COLUMN: PREVIEW (4 COLS) */}
-        <div className="col-span-12 lg:col-span-4">
-          <div className="bg-slate-900 border border-slate-800 rounded shadow-xl h-full sticky top-4 flex flex-col overflow-hidden max-h-[600px]">
-            <div className="flex justify-between items-center p-3 border-b border-slate-800 bg-slate-950">
-               <h2 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                 <Database className="w-3 h-3 text-green-500" /> Data Inspector
-               </h2>
-               {previewData && (
-                 <button onClick={() => setPreviewData(null)} className="text-slate-500 hover:text-white transition-colors"><X className="w-3 h-3"/></button>
-               )}
-            </div>
-            
-            <div className="flex-1 overflow-auto p-3 custom-scrollbar bg-slate-900">
-               {previewData ? (
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-end border-b border-slate-800 pb-2">
-                        <span className="text-green-400 font-bold text-xs truncate max-w-[150px]">{previewData.filename}</span>
-                        <span className="text-slate-500 text-[9px] uppercase font-bold">{Object.keys(previewData.tables || {}).length} TABLES</span>
-                    </div>
-                    
-                    {Object.entries(previewData.tables || {}).map(([tableName, rows]: [string, any]) => (
-                        <div key={tableName} className="space-y-1">
-                            <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
-                                <ChevronRight className="w-3 h-3"/> {tableName}
-                            </div>
-                            <pre className="text-[9px] text-slate-400 font-mono bg-slate-950 p-2 rounded border border-slate-800 overflow-x-auto">
-                                {JSON.stringify(rows, null, 2).slice(0, 300)}...
-                            </pre>
-                        </div>
-                    ))}
-                 </div>
-               ) : (
-                 <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-3">
-                    <Eye className="w-10 h-10 opacity-20" />
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-center opacity-50">
-                        Select a file <br/> to preview content
-                    </p>
-                 </div>
-               )}
-            </div>
-
-            {previewData && (
-                <div className="p-3 bg-slate-950 border-t border-slate-800">
-                    <button onClick={() => handleDownload(previewData.filename, 'json')} className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded text-[10px] font-bold transition-colors">
-                        <FileJson className="w-3.5 h-3.5" /> EXPORT FULL JSON
-                    </button>
-                </div>
-            )}
-          </div>
-        </div>
-
       </div>
 
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
