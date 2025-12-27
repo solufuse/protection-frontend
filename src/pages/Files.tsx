@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+// On n'importe QUE ce qu'on utilise vraiment dans le JSX ci-dessous
 import { RefreshCw, Upload, Cloud, Trash2, Download, FileJson, FileSpreadsheet, FileArchive, FileCode, Key, XCircle, HardDrive, Eye, X } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -23,6 +24,7 @@ export default function Files({ user }: FilesProps) {
     setToast({ show: true, msg, type });
   };
 
+  // --- 1. CHARGEMENT DES FICHIERS ---
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "users", user.uid, "configurations"), orderBy("created_at", "desc"));
@@ -32,11 +34,13 @@ export default function Files({ user }: FilesProps) {
     return () => unsubscribe();
   }, [user]);
 
+  // --- 2. NOTIFICATIONS ---
   useEffect(() => {
       if (error) notify(error, 'error');
       if (step === 'done') notify("Processing complete!");
   }, [error, step]);
 
+  // --- 3. ACTIONS ---
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       processFile(e.target.files[0]);
@@ -95,9 +99,12 @@ export default function Files({ user }: FilesProps) {
     } catch (e) { notify("Token error", "error"); }
   };
 
+  // --- 4. HELPER ICONES ---
   const getIcon = (type: string) => {
       const lower = type?.toLowerCase() || "";
-      if (lower.includes('mdb') || lower.includes('si2s')) return <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
+      if (lower.includes('mdb') || lower.includes('si2s') || lower.includes('sqlite') || lower.includes('lf1s')) {
+          return <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
+      }
       if (lower.includes('zip')) return <FileArchive className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />;
       return <FileCode className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />;
   };
@@ -182,7 +189,7 @@ export default function Files({ user }: FilesProps) {
                                             
                                             <div className="h-4 w-[1px] bg-slate-200 mx-1"></div>
 
-                                            {/* NEW: RAW DOWNLOAD BUTTON */}
+                                            {/* RAW DOWNLOAD */}
                                             {file.raw_file_path && (
                                                 <button onClick={() => handleDownloadSingle(file.id, 'raw')} className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors" title="Download ORIGINAL File">
                                                     <HardDrive className="w-3.5 h-3.5"/>
