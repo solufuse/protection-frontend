@@ -15,7 +15,7 @@ export default function Config({ user }: { user: any }) {
     setToast({ show: true, msg, type });
   };
 
-  // --- INITIALIZATION & SYNC ---
+  // --- INITIALIZATION & SYNC (UID DEPENDENT) ---
   useEffect(() => {
     const initConfig = async () => {
         // 1. Define Default Config
@@ -30,11 +30,11 @@ export default function Config({ user }: { user: any }) {
           plans: []
         };
 
-        // 2. Try to fetch existing config.json from Session Storage
+        // 2. Try to fetch existing config.json from Session Storage using Token (UID)
         if (user) {
             try {
                 const token = await user.getIdToken();
-                // List files in session
+                // List files in user's session
                 const listRes = await fetch(`${apiUrl}/session/details`, { 
                     headers: { 'Authorization': `Bearer ${token}` } 
                 });
@@ -45,17 +45,16 @@ export default function Config({ user }: { user: any }) {
                     const configFile = listData.files?.find((f: any) => f.filename.toLowerCase() === 'config.json');
                     
                     if (configFile) {
-                        // Fetch the content
+                        // Fetch the content securely
                         const fileRes = await fetch(`${apiUrl}/ingestion/preview?filename=${configFile.filename}`, {
                              headers: { 'Authorization': `Bearer ${token}` }
                         });
                         
                         if (fileRes.ok) {
                             const sessionConfig = await fileRes.json();
-                            // Use the session config
                             setConfig(sessionConfig);
-                            console.log("Loaded config from session storage");
-                            return; // Stop here, don't load default
+                            console.log("✅ Configuration loaded from user storage (UID based)");
+                            return; 
                         }
                     }
                 }
@@ -64,7 +63,7 @@ export default function Config({ user }: { user: any }) {
             }
         }
 
-        // 3. Fallback to default if no session config found or error
+        // 3. Fallback to default if no remote config found
         setConfig(defaultConfig);
     };
 
@@ -105,7 +104,7 @@ export default function Config({ user }: { user: any }) {
       const token = await user.getIdToken();
       const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
       const formData = new FormData();
-      // Ensure we save it as 'config.json' so it can be reloaded next time
+      // We force the name 'config.json' so it persists as the main config
       formData.append('files', blob, 'config.json');
       
       const response = await fetch(`${apiUrl}/session/upload`, { 
@@ -115,7 +114,7 @@ export default function Config({ user }: { user: any }) {
       });
       
       if (!response.ok) throw new Error("Backend error");
-      notify("Saved to Session (config.json) !");
+      notify("Saved to User Session !");
     } catch (e) { 
         notify("Save error", "error"); 
         console.error(e);
