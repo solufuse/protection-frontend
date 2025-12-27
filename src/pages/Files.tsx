@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-// Nettoyage des imports inutilisés et correction de CloudCheck -> Cloud
-import { Upload, Trash2, FileSpreadsheet, FileCode, Eye, X, ToggleLeft, ToggleRight, Zap, Cloud } from 'lucide-react';
+// Nettoyage : Suppression de FileSpreadsheet qui bloquait le build
+import { Upload, Trash2, FileCode, Eye, X, ToggleLeft, ToggleRight, Zap, Cloud } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useIngestion } from '../hooks/useIngestion';
