@@ -5,7 +5,7 @@ import {
   FileSpreadsheet, FileJson, FileDown,
   RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, 
   ChevronDown, ChevronRight, Calendar, ExternalLink,
-  Folder, Plus, Search, ArrowUpDown, Layers
+  Folder, Plus, Search, ArrowUpDown
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
