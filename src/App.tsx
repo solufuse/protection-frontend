@@ -29,19 +29,15 @@ function App() {
         setUser(currentUser);
         setLoading(false);
       } else {
-        // [!] AUTO-GUEST LOGIN
         console.log("[Auto-Login] No user found, creating Guest session...");
         signInAnonymously(auth)
-          .then(() => {
-            // Success
-          })
+          .then(() => {})
           .catch((error) => {
             console.error("[Auto-Login Error]", error);
             setLoading(false);
           });
       }
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -53,7 +49,6 @@ function App() {
     <Router>
       <div className="min-h-screen bg-slate-50">
         {user && <Navbar user={user} onLogout={handleLogout} />}
-        
         <main>
           <Routes>
             <Route path="/" element={<Navigate to="/files" replace />} />
@@ -62,7 +57,7 @@ function App() {
             <Route path="/files" element={<Files user={user} />} />
             <Route path="/config" element={<Config user={user} />} />
             
-            {/* Protection DOES NOT receive user prop */}
+            {/* [CRITICAL] Protection page does NOT accept 'user' prop */}
             <Route path="/protection" element={<Protection />} />
             
             <Route path="*" element={<Navigate to="/files" replace />} />
@@ -72,5 +67,4 @@ function App() {
     </Router>
   );
 }
-
 export default App;

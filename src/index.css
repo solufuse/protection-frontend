@@ -3,17 +3,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* [CRITICAL] Prevent Layout Shift (Page jumping) */
+/* [CRITICAL] Prevent Layout Shift */
 html {
   overflow-y: scroll;
 }
-
 body {
   @apply bg-slate-50 text-slate-900;
-  padding-right: 0 !important; /* Fix pour certains modales */
+  padding-right: 0 !important;
 }
 
-/* Custom Scrollbar Styling */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

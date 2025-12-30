@@ -41,8 +41,8 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
 
   return (
     <>
-      {/* Styles locaux pour l'animation du logo uniquement */}
       <style>{`
+        /* Animation Logo */
         .brand-container:hover .brand-logo {
           transform: scale(1.1) rotate(-5deg);
           filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.3));
@@ -53,13 +53,16 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
         }
       `}</style>
 
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 backdrop-blur-sm bg-white/95 shadow-sm">
+      {/* NAVBAR BACKGROUND */}
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 backdrop-blur-sm bg-white/90 shadow-sm">
+        
+        {/* CONTAINER CENTRÉ (C'est ça qui fait le bon alignement) */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             
-            {/* GAUCHE : LOGO */}
-            <div className="flex items-center w-64">
-              <Link to="/loadflow" className="brand-container flex items-center gap-3 transition-all duration-300">
+            {/* GAUCHE : LOGO + NAVIGATION */}
+            <div className="flex items-center gap-8">
+              <Link to="/loadflow" className="brand-container flex items-center gap-2 transition-all duration-300">
                   <img 
                     src="/logo.svg" 
                     alt="Solufuse Logo" 
@@ -69,30 +72,29 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                     SOLUFUSE
                   </span>
               </Link>
+
+              <div className="hidden lg:flex items-center gap-1">
+                <Link to="/files" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/files')}`}>
+                  <Icons.Folder className="w-3.5 h-3.5" /> FILES
+                </Link>
+                <Link to="/loadflow" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/loadflow')}`}>
+                  <Icons.Activity className="w-3.5 h-3.5" /> LOADFLOW
+                </Link>
+                <Link to="/protection" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/protection')}`}>
+                  <Icons.Shield className="w-3.5 h-3.5" /> PROTECTION
+                </Link>
+                <Link to="/config" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/config')}`}>
+                  <Icons.Settings className="w-3.5 h-3.5" /> CONFIG
+                </Link>
+              </div>
             </div>
 
-            {/* CENTRE : NAVIGATION PRINCIPALE */}
-            <div className="hidden lg:flex items-center justify-center gap-1 flex-1">
-              <Link to="/files" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isActive('/files')}`}>
-                 <Icons.Folder className="w-4 h-4" /> FILES
-              </Link>
-              <Link to="/loadflow" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isActive('/loadflow')}`}>
-                 <Icons.Activity className="w-4 h-4" /> LOADFLOW
-              </Link>
-              <Link to="/protection" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isActive('/protection')}`}>
-                 <Icons.Shield className="w-4 h-4" /> PROTECTION
-              </Link>
-              <Link to="/config" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isActive('/config')}`}>
-                 <Icons.Settings className="w-4 h-4" /> CONFIG
-              </Link>
-            </div>
-
-            {/* DROITE : LIENS EXTERNES & PROFIL */}
-            <div className="flex items-center justify-end gap-3 w-64">
+            {/* DROITE : LIENS + PROFIL */}
+            <div className="flex items-center gap-3">
               
               <div className="hidden xl:flex items-center gap-1 mr-2">
                 <a href="https://api.solufuse.com/docs" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1.5 transition-colors">
-                  <Icons.FileText className="w-3.5 h-3.5" /> API
+                  <Icons.FileText className="w-3.5 h-3.5" /> API DOCS
                 </a>
                 <a href="https://solufuse.com" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-orange-600 flex items-center gap-1.5 transition-colors">
                   <Icons.Search className="w-3.5 h-3.5" /> ABOUT
@@ -101,13 +103,12 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
 
               <div className="w-px h-6 bg-slate-200 hidden xl:block"></div>
 
-              {/* DROPDOWN MENU */}
               <div className="relative" ref={menuRef}>
                 <button 
                   onClick={() => setShowMenu(!showMenu)}
                   className={`flex items-center gap-3 pl-3 pr-2 py-1.5 rounded-full border transition-all ${user.isAnonymous ? 'bg-slate-50 border-slate-200 hover:border-blue-300' : 'bg-blue-50 border-blue-200 hover:border-blue-300'}`}
                 >
-                  <div className="text-right hidden xl:block">
+                  <div className="text-right hidden md:block">
                     <div className="text-[10px] font-black text-slate-700 leading-tight">
                       {user.isAnonymous ? "GUEST USER" : user.displayName || "PRO MEMBER"}
                     </div>
