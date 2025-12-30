@@ -20,55 +20,55 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
       <style>{`
         html { overflow-y: scroll; } 
         body { padding-right: 0 !important; }
+        
+        /* Animation reactive pour le logo et le texte */
+        .brand-hover:hover img {
+          transform: scale(1.1) rotate(5deg);
+        }
+        .brand-hover:hover span {
+          letter-spacing: 0.05em;
+          color: #f97316; /* orange-500 */
+        }
       `}</style>
 
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50 backdrop-blur-sm bg-white/90">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             
+            {/* LOGO & NOM REACTIFS */}
             <div className="flex items-center gap-2">
-              <Link to="/loadflow" className="flex items-center gap-3">
+              <Link to="/loadflow" className="flex items-center gap-3 brand-hover group transition-all duration-300">
                   <img 
                     src="/favicon.ico" 
                     alt="Logo" 
-                    className="w-9 h-9 object-contain"
+                    className="w-9 h-9 object-contain transition-transform duration-300 ease-out"
                   />
-                  <span className="font-black text-xl tracking-tighter text-slate-800 uppercase">SOLUFUSE</span>
+                  <span className="font-black text-xl tracking-tighter text-slate-800 uppercase transition-all duration-300 ease-out">
+                    SOLUFUSE
+                  </span>
               </Link>
             </div>
 
-            {/* NAVIGATION PRINCIPALE (Interne) */}
+            {/* NAVIGATION PRINCIPALE */}
             <nav className="hidden lg:flex items-center gap-1">
               <Link to="/loadflow" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/loadflow')}`}>Loadflow</Link>
               <Link to="/protection" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/protection')}`}>Protection</Link>
               <Link to="/files" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/files')}`}>Files</Link>
               <Link to="/config" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/config')}`}>Config</Link>
               
-              {/* Séparateur visuel discret */}
               <div className="w-px h-4 bg-slate-200 mx-2"></div>
 
-              {/* LIENS EXTERNES */}
-              <a 
-                href="https://api.solufuse.com/docs" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1.5 transition-colors"
-              >
+              <a href="https://api.solufuse.com/docs" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1.5 transition-colors">
                 <Icons.FileText className="w-3.5 h-3.5" /> API DOCS
               </a>
-              <a 
-                href="https://solufuse.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-orange-600 flex items-center gap-1.5 transition-colors"
-              >
+              <a href="https://solufuse.com" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-orange-600 flex items-center gap-1.5 transition-colors">
                 <Icons.Search className="w-3.5 h-3.5" /> ABOUT
               </a>
             </nav>
 
             {/* SECTION UTILISATEUR */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-full border border-slate-200 pr-4">
+              <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-full border border-slate-200 pr-4 hover:border-orange-200 transition-colors">
                 {user?.photoURL ? (
                   <img 
                     src={user.photoURL} 
