@@ -20,29 +20,25 @@ import Loadflow from './pages/Loadflow';
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'files' | 'config' | 'loadflow'>('loadflow'); // Default to Loadflow
+  const [activeTab, setActiveTab] = useState<'files' | 'config' | 'loadflow'>('loadflow'); 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // --- 1. SAFE INITIALIZATION & AUTH ---
   useEffect(() => {
     const initApp = async () => {
       try {
+        // [FIX] UTILISATION DES CLES EN DUR (Directement issues de firebase.ts)
         const firebaseConfig = {
-          apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-          authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-          projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-          storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-          messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-          appId: import.meta.env.VITE_FIREBASE_APP_ID,
-          measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+          apiKey: "AIzaSyAZ-Zi6fOKCH7duGgCnnHX_qB4TI5wTC5g",
+          authDomain: "solufuse-5647c.firebaseapp.com",
+          projectId: "solufuse-5647c",
+          storageBucket: "solufuse-5647c.firebasestorage.app",
+          messagingSenderId: "718299136180",
+          appId: "1:718299136180:web:fb893609b7f0283c55d7e1",
+          measurementId: "G-B1FVSFY4S2"
         };
 
-        // Check if config exists
-        if (!firebaseConfig.apiKey) {
-          throw new Error("Missing Firebase Configuration. Check Dokploy Environment Variables.");
-        }
-
-        // Initialize Firebase (Singleton pattern)
+        // Initialize Firebase (Singleton pattern to avoid "App already exists")
         const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
         const auth = getAuth(app);
 
@@ -111,7 +107,7 @@ export default function App() {
           <div className="bg-slate-900 text-red-400 p-4 rounded text-xs font-mono overflow-auto mb-4">
             {errorMsg}
           </div>
-          <p className="text-xs text-slate-500">Please check your environment variables in Dokploy.</p>
+          <p className="text-xs text-slate-500">Please check your Firebase configuration.</p>
         </div>
       </div>
     );
