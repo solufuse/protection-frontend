@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Play, Activity, Folder, HardDrive, 
-  Plus, Key, Trash2, CheckCircle, AlertTriangle, BarChart3, TrendingUp
+  Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -12,6 +12,13 @@ interface Project {
   role: 'owner' | 'member';
 }
 
+interface TransformerResult {
+  Tap: number;
+  LFMW: number;
+  LFMvar: number;
+  kV: number;
+}
+
 interface LoadflowResult {
   filename: string;
   is_valid: boolean;
@@ -19,12 +26,11 @@ interface LoadflowResult {
   mvar_flow: number;
   delta_target: number;
   is_winner: boolean;
-  transformers: Record<string, any>;
+  transformers: Record<string, TransformerResult>;
 }
 
 interface LoadflowResponse {
   status: string;
-  best_file: string | null;
   results: LoadflowResult[];
 }
 
@@ -47,13 +53,12 @@ export default function Loadflow({ user }: { user: any }) {
     setToast({ show: true, msg, type });
   };
 
-  // --- API HELPER ---
   const getToken = async () => {
     if (!user) return null;
     return await user.getIdToken(true); 
   };
 
-  // --- NAVIGATION LOGIC ---
+  // --- NAVIGATION ---
   const fetchProjects = async () => {
     try {
       const t = await getToken();
@@ -100,16 +105,14 @@ export default function Loadflow({ user }: { user: any }) {
   }, [user]);
 
   // --- LOADFLOW LOGIC ---
-
   const handleRunAnalysis = async () => {
     if (!user) return;
     setLoading(true);
-    setResults(null); // Clear previous results
+    setResults(null); 
     try {
       const t = await getToken();
       const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
       
-      // 1. RUN AND SAVE
       const runRes = await fetch(`${apiUrl}/loadflow/run-and-save?basename=${baseName}${pParam}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${t}` }
@@ -117,8 +120,6 @@ export default function Loadflow({ user }: { user: any }) {
 
       if (!runRes.ok) throw new Error("Calculation Failed");
       
-      // 2. FETCH THE SAVED JSON DATA
-      // We look for the file we just saved to display it
       const jsonFilename = `${baseName}.json`;
       const dataRes = await fetch(`${apiUrl}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
       
@@ -126,11 +127,11 @@ export default function Loadflow({ user }: { user: any }) {
       
       const jsonData: LoadflowResponse = await dataRes.json();
       
-      // Sort by MW Flow for the ramp-up visualization
+      // SORT FOR THE RAMP-UP CURVE (Ascending MW Flow)
       jsonData.results.sort((a, b) => Math.abs(a.mw_flow) - Math.abs(b.mw_flow));
       
       setResults(jsonData);
-      notify(`Analysis Complete: ${jsonData.results.length} scenarios processed`);
+      notify(`Analysis Complete: ${jsonData.results.length} scenarios`);
 
     } catch (e) { 
       notify("Error during analysis cycle", "error"); 
@@ -145,30 +146,51 @@ export default function Loadflow({ user }: { user: any }) {
     if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); }
   };
 
-  // --- CHART COMPONENT (Natif Tailwind) ---
-  const ResultsChart = ({ data }: { data: LoadflowResult[] }) => {
+  // --- CHART COMPONENT (RAMP UP CURVE) ---
+  const RampUpChart = ({ data }: { data: LoadflowResult[] }) => {
     if (!data || data.length === 0) return null;
-    const maxFlow = Math.max(...data.map(d => Math.abs(d.mw_flow)));
+    
+    // Calculate scale
+    const maxVal = Math.max(...data.map(d => Math.abs(d.mw_flow)));
     
     return (
-      <div className="w-full h-48 flex items-end gap-1 pt-6 pb-2">
+      <div className="w-full h-64 flex items-end gap-[2px] pt-8 pb-4 px-2 bg-white rounded border border-slate-200 shadow-sm relative overflow-hidden">
+        {/* Background Grid Lines (Simplified) */}
+        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none p-4 opacity-10">
+            <div className="border-t border-slate-400 w-full h-0"></div>
+            <div className="border-t border-slate-400 w-full h-0"></div>
+            <div className="border-t border-slate-400 w-full h-0"></div>
+        </div>
+
         {data.map((r, i) => {
-          const height = (Math.abs(r.mw_flow) / (maxFlow || 1)) * 100;
+          const height = (Math.abs(r.mw_flow) / (maxVal || 1)) * 100;
           return (
-            <div key={i} className="flex-1 flex flex-col items-center group relative">
-              {/* Tooltip */}
-              <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 bg-slate-800 text-white text-[9px] p-1 rounded whitespace-nowrap z-10 pointer-events-none transition-opacity">
-                {r.filename} | {r.mw_flow.toFixed(1)} MW
+            <div key={i} className="flex-1 flex flex-col justify-end group relative h-full">
+              {/* Tooltip on Hover */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center bg-slate-800 text-white text-[9px] p-2 rounded shadow-xl z-20 whitespace-nowrap">
+                <span className="font-bold">{r.filename}</span>
+                <span className="text-blue-300">{r.mw_flow.toFixed(2)} MW</span>
               </div>
               
               {/* Bar */}
               <div 
                 style={{ height: `${height}%` }} 
-                className={`w-full rounded-t transition-all duration-500 ${r.is_winner ? 'bg-green-500 hover:bg-green-400' : 'bg-slate-300 hover:bg-blue-400'}`}
-              ></div>
+                className={`w-full min-w-[4px] rounded-t-sm transition-all duration-300 relative ${
+                    r.is_valid ? 'bg-blue-500 hover:bg-blue-400' : 'bg-red-300 hover:bg-red-400'
+                }`}
+              >
+                {/* Winner Marker */}
+                {r.is_winner && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-500 rounded-full shadow-sm ring-2 ring-white"></div>
+                )}
+              </div>
             </div>
           );
         })}
+        
+        {/* Axis Label */}
+        <div className="absolute bottom-1 right-2 text-[9px] font-bold text-slate-400 uppercase">Scenarios (Sorted by MW Flow)</div>
+        <div className="absolute top-2 left-2 text-[9px] font-bold text-slate-400 uppercase">MW Flow (Max: {maxVal.toFixed(1)})</div>
       </div>
     );
   };
@@ -217,12 +239,11 @@ export default function Loadflow({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* MAIN CONTENT SPLIT */}
+      {/* MAIN CONTENT */}
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
         
-        {/* SIDEBAR (Navigation) */}
+        {/* SIDEBAR */}
         <div className="w-60 flex flex-col gap-4 flex-shrink-0 overflow-y-auto custom-scrollbar">
-            {/* User Session */}
             <div 
                 onClick={() => setActiveProjectId(null)}
                 className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null 
@@ -235,10 +256,7 @@ export default function Loadflow({ user }: { user: any }) {
                     <span className={`text-[9px] ${activeProjectId === null ? 'text-slate-400' : 'text-slate-400'}`}>Private Sandbox</span>
                 </div>
             </div>
-
             <div className="border-t border-slate-200 my-1"></div>
-
-            {/* Projects Header */}
             <div className="flex justify-between items-center px-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span>
                 <button 
@@ -248,8 +266,6 @@ export default function Loadflow({ user }: { user: any }) {
                     <Plus className="w-3.5 h-3.5" />
                 </button>
             </div>
-
-            {/* Create Input */}
             {isCreatingProject && (
                 <div className="flex gap-1">
                     <input 
@@ -263,8 +279,6 @@ export default function Loadflow({ user }: { user: any }) {
                     <button onClick={createProject} className="bg-blue-600 text-white px-2 rounded font-bold text-[9px]">OK</button>
                 </div>
             )}
-
-            {/* Project List */}
             <div className="flex-1 flex flex-col gap-1">
                 {projects.map(p => (
                     <div 
@@ -302,84 +316,90 @@ export default function Loadflow({ user }: { user: any }) {
                     </span>
                 </div>
             ) : (
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-6 pb-10">
                     
-                    {/* TOP METRICS */}
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Scenarios</div>
-                            <div className="text-2xl font-black text-slate-700">{results.results.length}</div>
-                        </div>
-                        <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Valid Solutions</div>
-                            <div className="text-2xl font-black text-green-600">
-                                {results.results.filter(r => r.is_winner).length}
+                    {/* METRICS */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded border border-slate-200 shadow-sm flex justify-between items-center">
+                            <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Scenarios</div>
+                                <div className="text-2xl font-black text-slate-700">{results.results.length}</div>
                             </div>
+                            <Activity className="w-8 h-8 text-slate-200" />
                         </div>
-                        <div className="bg-white p-4 rounded border border-slate-200 shadow-sm">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Best Candidate</div>
-                            <div className="text-sm font-bold text-blue-600 truncate" title={results.best_file || "-"}>
-                                {results.best_file || "None"}
+                        <div className="bg-white p-4 rounded border border-slate-200 shadow-sm flex justify-between items-center">
+                            <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Valid Solutions</div>
+                                <div className="text-2xl font-black text-green-600">
+                                    {results.results.filter(r => r.is_valid).length}
+                                </div>
                             </div>
+                            <CheckCircle className="w-8 h-8 text-green-100" />
                         </div>
                     </div>
 
-                    {/* CHART SECTION */}
-                    <div className="bg-white border border-slate-200 rounded shadow-sm p-4">
-                        <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2">
+                    {/* CHART */}
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
                             <h2 className="font-black text-slate-700 uppercase flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-blue-500" /> Load Ramp-up Analysis (MW Flow)
+                                <TrendingUp className="w-4 h-4 text-blue-500" /> Load Ramp-up Curve
                             </h2>
-                            <div className="flex items-center gap-2 text-[9px]">
-                                <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-500 rounded-full"></div> Winner</span>
-                                <span className="flex items-center gap-1"><div className="w-2 h-2 bg-slate-300 rounded-full"></div> Valid</span>
-                            </div>
                         </div>
-                        <ResultsChart data={results.results} />
+                        <RampUpChart data={results.results} />
                     </div>
 
                     {/* DETAILED TABLE */}
                     <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-black text-slate-700 uppercase flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4 text-slate-400" /> Detailed Results
+                            <Zap className="w-4 h-4 text-yellow-500" /> Detailed Results
                         </div>
-                        <table className="w-full text-left font-bold">
-                            <thead className="bg-slate-50 text-[9px] text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                                <tr>
-                                    <th className="px-4 py-2">Status</th>
-                                    <th className="px-4 py-2">Filename / Scenario</th>
-                                    <th className="px-4 py-2 text-right">MW Flow</th>
-                                    <th className="px-4 py-2 text-right">MVar Flow</th>
-                                    <th className="px-4 py-2 text-right">Delta Target</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {results.results.map((r, i) => (
-                                    <tr key={i} className={`hover:bg-slate-50 ${r.is_winner ? 'bg-green-50/50' : ''}`}>
-                                        <td className="px-4 py-2">
-                                            {r.is_winner ? 
-                                                <CheckCircle className="w-3.5 h-3.5 text-green-500" /> : 
-                                                <AlertTriangle className="w-3.5 h-3.5 text-slate-300" />
-                                            }
-                                        </td>
-                                        <td className="px-4 py-2 font-mono text-[10px] text-slate-600 truncate max-w-xs" title={r.filename}>
-                                            {r.filename}
-                                        </td>
-                                        <td className="px-4 py-2 text-right font-mono text-blue-600">
-                                            {r.mw_flow.toFixed(2)} MW
-                                        </td>
-                                        <td className="px-4 py-2 text-right font-mono text-slate-400">
-                                            {r.mvar_flow.toFixed(2)}
-                                        </td>
-                                        <td className="px-4 py-2 text-right font-mono">
-                                            <span className={`px-1.5 py-0.5 rounded ${Math.abs(r.delta_target) < 0.5 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                {r.delta_target.toFixed(3)}
-                                            </span>
-                                        </td>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left font-bold min-w-[800px]">
+                                <thead className="bg-slate-50 text-[9px] text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                    <tr>
+                                        <th className="px-4 py-2 w-10">St</th>
+                                        <th className="px-4 py-2 w-64">Scenario</th>
+                                        <th className="px-4 py-2 text-right">Global MW</th>
+                                        <th className="px-4 py-2 text-right">Global MVar</th>
+                                        <th className="px-4 py-2">Transformers Detail (Tap | MW | MVar)</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {results.results.map((r, i) => (
+                                        <tr key={i} className={`hover:bg-slate-50 ${r.is_winner ? 'bg-green-50/30' : ''}`}>
+                                            <td className="px-4 py-3">
+                                                {r.is_valid ? 
+                                                    <CheckCircle className="w-4 h-4 text-green-500" /> : 
+                                                    <AlertTriangle className="w-4 h-4 text-slate-300" />
+                                                }
+                                            </td>
+                                            <td className="px-4 py-3 font-mono text-[10px] text-slate-600 truncate max-w-xs" title={r.filename}>
+                                                {r.filename}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-blue-600 text-[10px]">
+                                                {Math.abs(r.mw_flow).toFixed(2)}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-slate-400 text-[10px]">
+                                                {Math.abs(r.mvar_flow).toFixed(2)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {Object.entries(r.transformers || {}).map(([name, data]) => (
+                                                        <div key={name} className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded px-2 py-1 text-[9px]">
+                                                            <span className="font-black text-slate-700">{name}</span>
+                                                            <div className="h-3 w-px bg-slate-300"></div>
+                                                            <span className="text-slate-500">Tap: <b className="text-slate-700">{data.Tap}</b></span>
+                                                            <span className="text-blue-600">{data.LFMW.toFixed(1)} MW</span>
+                                                            <span className="text-slate-400">{data.LFMvar.toFixed(1)} MVar</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                 </div>
