@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Play, Download, Zap, Activity, Folder, HardDrive, 
+  Play, Activity, Folder, HardDrive, 
   Plus, Key, Trash2, CheckCircle, AlertTriangle, BarChart3, TrendingUp
 } from 'lucide-react';
 import Toast from '../components/Toast';
