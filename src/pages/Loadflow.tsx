@@ -2,8 +2,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Play, Activity, Folder, HardDrive, 
-  Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap, Search,
-  GitCommit
+  Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap, Search
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -33,7 +32,7 @@ interface LoadflowResult {
   mvar_flow: number;
   delta_target: number;
   is_winner: boolean;
-  study_case?: StudyCase; // Added study_case support
+  study_case?: StudyCase;
   transformers: Record<string, TransformerResult>;
 }
 
@@ -111,7 +110,6 @@ export default function Loadflow({ user }: { user: any }) {
 
   // --- LOADFLOW ACTIONS ---
 
-  // Helper to extract number from "CH195" for sorting
   const extractLoadNumber = (rev: string | undefined) => {
       if (!rev) return 999999;
       const match = rev.match(/(\d+)/);
@@ -120,8 +118,6 @@ export default function Loadflow({ user }: { user: any }) {
 
   const processAndSetResults = (data: LoadflowResponse) => {
       if (data.results) {
-          // SORT BY LOAD REVISION (Montée en charge)
-          // CH195 -> CH200 -> CH208
           data.results.sort((a, b) => {
               const valA = extractLoadNumber(a.study_case?.revision);
               const valB = extractLoadNumber(b.study_case?.revision);
@@ -183,14 +179,12 @@ export default function Loadflow({ user }: { user: any }) {
   const LineChart = ({ data }: { data: LoadflowResult[] }) => {
     if (!data || data.length === 0) return null;
 
-    // 1. Calculate Scales
     const flows = data.map(d => Math.abs(d.mw_flow));
-    const minVal = Math.min(...flows) * 0.95; // 5% padding bottom
-    const maxVal = Math.max(...flows) * 1.05; // 5% padding top
+    const minVal = Math.min(...flows) * 0.95;
+    const maxVal = Math.max(...flows) * 1.05;
     const range = maxVal - minVal;
     
-    // 2. Generate SVG Points
-    const width = 800; // arbitrary internal SVG units
+    const width = 800;
     const height = 200;
     const stepX = width / (data.length > 1 ? data.length - 1 : 1);
 
@@ -206,12 +200,10 @@ export default function Loadflow({ user }: { user: any }) {
       <div className="w-full h-72 bg-white rounded border border-slate-200 shadow-sm p-4 flex flex-col">
         <div className="flex-1 relative">
             <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-                {/* Grid Lines (Horizontal) */}
                 <line x1="0" y1="0" x2={width} y2="0" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
                 <line x1="0" y1={height/2} x2={width} y2={height/2} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
                 <line x1="0" y1={height} x2={width} y2={height} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
 
-                {/* The Line */}
                 <polyline 
                     points={polylinePoints} 
                     fill="none" 
@@ -221,38 +213,17 @@ export default function Loadflow({ user }: { user: any }) {
                     strokeLinejoin="round" 
                 />
 
-                {/* The Points (Dots) */}
                 {points.map((p, i) => {
-                    // Color Logic: Winner=Green, Valid=Red, Invalid=Grey
-                    let fillColor = "#94a3b8"; // Grey (Default/Invalid)
+                    let fillColor = "#94a3b8";
                     let radius = 4;
-                    
-                    if (p.data.is_winner) {
-                        fillColor = "#22c55e"; // Green
-                        radius = 6; // Bigger for winner
-                    } else if (p.data.is_valid) {
-                        fillColor = "#ef4444"; // Red (Valid but rejected)
-                    }
+                    if (p.data.is_winner) { fillColor = "#22c55e"; radius = 6; } 
+                    else if (p.data.is_valid) { fillColor = "#ef4444"; }
 
                     return (
                         <g key={i} className="group cursor-pointer">
-                            {/* Invisible hit area for easier hovering */}
                             <circle cx={p.x} cy={p.y} r="10" fill="transparent" />
-                            
-                            {/* Visible Dot */}
-                            <circle 
-                                cx={p.x} cy={p.y} r={radius} 
-                                fill={fillColor} stroke="white" strokeWidth="2" 
-                                className="transition-all duration-200 group-hover:r-6 shadow-sm"
-                            />
-
-                            {/* Tooltip (SVG ForeignObject or simple overlay) */}
-                            {/* Using simple text label for revision on X axis below point */}
-                            <text x={p.x} y={height + 15} textAnchor="middle" fontSize="10" fill="#64748b" fontWeight="bold">
-                                {p.data.study_case?.revision || `S${i}`}
-                            </text>
-
-                            {/* Hover Tooltip (HTML overlay via group-hover pattern in parent div is tricky in SVG, using Title tag for basic native tooltip) */}
+                            <circle cx={p.x} cy={p.y} r={radius} fill={fillColor} stroke="white" strokeWidth="2" className="transition-all duration-200 group-hover:r-6 shadow-sm"/>
+                            <text x={p.x} y={height + 15} textAnchor="middle" fontSize="10" fill="#64748b" fontWeight="bold">{p.data.study_case?.revision || `S${i}`}</text>
                             <title>{`${p.data.study_case?.config || p.data.filename}\nMW: ${p.data.mw_flow.toFixed(2)}\nWinner: ${p.data.is_winner ? 'YES' : 'NO'}`}</title>
                         </g>
                     );
@@ -260,7 +231,6 @@ export default function Loadflow({ user }: { user: any }) {
             </svg>
         </div>
         
-        {/* Legend */}
         <div className="h-6 flex items-center justify-center gap-4 text-[9px] font-bold text-slate-500 uppercase mt-2">
             <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500"></div> Winner</div>
             <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> Valid (Rejected)</div>
@@ -294,12 +264,7 @@ export default function Loadflow({ user }: { user: any }) {
           </h1>
         </div>
         <div className="flex gap-2 items-center">
-          <input 
-            value={baseName} 
-            onChange={(e) => setBaseName(e.target.value)} 
-            className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 w-32 text-right font-bold text-slate-600 focus:ring-1 focus:ring-yellow-500 outline-none"
-            placeholder="Result Filename"
-          />
+          <input value={baseName} onChange={(e) => setBaseName(e.target.value)} className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 w-32 text-right font-bold text-slate-600 focus:ring-1 focus:ring-yellow-500 outline-none" placeholder="Result Filename"/>
           <span className="text-slate-400 font-bold">.json</span>
           <div className="w-px h-6 bg-slate-200 mx-2"></div>
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Key className="w-3.5 h-3.5" /> TOKEN</button>
@@ -310,7 +275,7 @@ export default function Loadflow({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* MAIN CONTENT SPLIT */}
+      {/* MAIN */}
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
         
         {/* SIDEBAR */}
@@ -337,7 +302,7 @@ export default function Loadflow({ user }: { user: any }) {
             </div>
         </div>
 
-        {/* RIGHT: DASHBOARD AREA */}
+        {/* DASHBOARD */}
         <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar pr-2">
             {!results ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4 border-2 border-dashed border-slate-100 rounded bg-slate-50/50">
@@ -346,8 +311,6 @@ export default function Loadflow({ user }: { user: any }) {
                 </div>
             ) : (
                 <div className="flex flex-col gap-6 pb-10">
-                    
-                    {/* TOP METRICS */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white p-4 rounded border border-slate-200 shadow-sm flex justify-between items-center">
                             <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Scenarios</div><div className="text-2xl font-black text-slate-700">{results.results.length}</div></div>
@@ -359,19 +322,13 @@ export default function Loadflow({ user }: { user: any }) {
                         </div>
                     </div>
 
-                    {/* LINE CHART */}
                     <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <h2 className="font-black text-slate-700 uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> Power Ramp-up Curve</h2>
-                        </div>
+                        <div className="flex justify-between items-center mb-2"><h2 className="font-black text-slate-700 uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> Power Ramp-up Curve</h2></div>
                         <LineChart data={results.results} />
                     </div>
 
-                    {/* DETAILED TABLE */}
                     <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-black text-slate-700 uppercase flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-yellow-500" /> Detailed Results
-                        </div>
+                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-black text-slate-700 uppercase flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Detailed Results</div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left font-bold min-w-[900px]">
                                 <thead className="bg-slate-50 text-[9px] text-slate-400 uppercase tracking-widest border-b border-slate-100">
@@ -395,12 +352,8 @@ export default function Loadflow({ user }: { user: any }) {
                                                     <span className="text-[9px] text-slate-400">{r.study_case?.config || r.filename}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-right font-mono text-blue-600 text-[10px]">
-                                                {Math.abs(r.mw_flow).toFixed(2)}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono text-slate-400 text-[10px]">
-                                                {Math.abs(r.mvar_flow).toFixed(2)}
-                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-blue-600 text-[10px]">{Math.abs(r.mw_flow).toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-slate-400 text-[10px]">{Math.abs(r.mvar_flow).toFixed(2)}</td>
                                             <td className="px-4 py-3">
                                                 <div className="flex flex-wrap gap-2">
                                                     {Object.entries(r.transformers || {}).map(([name, data]) => (
@@ -420,7 +373,6 @@ export default function Loadflow({ user }: { user: any }) {
                             </table>
                         </div>
                     </div>
-
                 </div>
             )}
         </div>
