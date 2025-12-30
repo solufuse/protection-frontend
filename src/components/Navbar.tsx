@@ -10,7 +10,6 @@ interface NavbarProps {
 export default function Navbar({ user, onLogout }: NavbarProps) {
   const location = useLocation();
 
-  // [?] [THOUGHT] : Using startsWith to keep the link active even on sub-routes.
   const isActive = (path: string) => 
     location.pathname.startsWith(path) 
       ? "bg-orange-100 text-orange-700 shadow-sm ring-1 ring-orange-200" 
@@ -22,9 +21,10 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
         html { overflow-y: scroll; } 
         body { padding-right: 0 !important; }
         
-        /* [!] [CRITICAL] : Reactive brand animations */
+        /* Animation réactive du Logo SVG */
         .brand-container:hover .brand-logo {
-          transform: scale(1.15) rotate(8deg);
+          transform: scale(1.1) rotate(-5deg);
+          filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.3));
         }
         .brand-container:hover .brand-text {
           letter-spacing: 0.05em;
@@ -36,13 +36,13 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             
-            {/* LOGO & NOM AVEC EFFET RÉACTIF */}
+            {/* LOGO SVG & NOM */}
             <div className="flex items-center gap-2">
               <Link to="/loadflow" className="brand-container flex items-center gap-3 transition-all duration-300">
                   <img 
-                    src="/favicon.ico" 
-                    alt="Logo" 
-                    className="brand-logo w-9 h-9 object-contain transition-transform duration-300 ease-out"
+                    src="/logo.svg" 
+                    alt="Solufuse Logo" 
+                    className="brand-logo w-9 h-9 object-contain transition-all duration-300 ease-out"
                   />
                   <span className="brand-text font-black text-xl tracking-tighter text-slate-800 uppercase transition-all duration-300 ease-out">
                     SOLUFUSE
@@ -50,7 +50,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               </Link>
             </div>
 
-            {/* NAVIGATION PRINCIPALE */}
+            {/* NAVIGATION */}
             <nav className="hidden lg:flex items-center gap-1">
               <Link to="/loadflow" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/loadflow')}`}>Loadflow</Link>
               <Link to="/protection" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/protection')}`}>Protection</Link>
@@ -59,7 +59,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               
               <div className="w-px h-4 bg-slate-200 mx-2"></div>
 
-              {/* LIENS EXTERNES */}
               <a href="https://api.solufuse.com/docs" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1.5 transition-colors">
                 <Icons.FileText className="w-3.5 h-3.5" /> API DOCS
               </a>
@@ -68,9 +67,9 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               </a>
             </nav>
 
-            {/* PROFIL UTILISATEUR */}
+            {/* PROFIL */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-full border border-slate-200 pr-4 hover:border-orange-200 transition-all duration-300">
+              <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-full border border-slate-200 pr-4 hover:border-orange-200 transition-all">
                 {user?.photoURL ? (
                   <img 
                     src={user.photoURL} 
