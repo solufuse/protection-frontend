@@ -2,11 +2,11 @@
 import { useState, useEffect } from 'react';
 import { 
   Play, Activity, Folder, HardDrive, 
-  Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap
+  Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap, Search
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
-// --- TYPES ---
+// --- TYPES (Basés sur ton JSON lf_res.json) ---
 interface Project {
   project_id: string;
   role: 'owner' | 'member';
@@ -104,7 +104,37 @@ export default function Loadflow({ user }: { user: any }) {
     if (user) fetchProjects();
   }, [user]);
 
-  // --- LOADFLOW LOGIC ---
+  // --- LOADFLOW ACTIONS ---
+
+  // 1. Charger les résultats (Lecture seule, pas de calcul)
+  const handleLoadResults = async () => {
+    if (!user) return;
+    setLoading(true);
+    setResults(null);
+    try {
+        const t = await getToken();
+        const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
+        const jsonFilename = `${baseName}.json`;
+
+        const dataRes = await fetch(`${apiUrl}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
+        
+        if (!dataRes.ok) {
+            if(dataRes.status === 404) throw new Error("No previous results found. Please Run Analysis.");
+            throw new Error("Failed to load results");
+        }
+        
+        const jsonData: LoadflowResponse = await dataRes.json();
+        processAndSetResults(jsonData);
+        notify(`Loaded: ${jsonData.results.length} scenarios from storage`);
+
+    } catch (e: any) {
+        notify(e.message || "Load Error", "error");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  // 2. Lancer le calcul (RUN & SAVE)
   const handleRunAnalysis = async () => {
     if (!user) return;
     setLoading(true);
@@ -113,6 +143,7 @@ export default function Loadflow({ user }: { user: any }) {
       const t = await getToken();
       const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
       
+      // Call Backend Engine
       const runRes = await fetch(`${apiUrl}/loadflow/run-and-save?basename=${baseName}${pParam}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${t}` }
@@ -120,25 +151,29 @@ export default function Loadflow({ user }: { user: any }) {
 
       if (!runRes.ok) throw new Error("Calculation Failed");
       
+      // Reload the fresh file
       const jsonFilename = `${baseName}.json`;
       const dataRes = await fetch(`${apiUrl}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
-      
-      if (!dataRes.ok) throw new Error("Could not retrieve results");
+      if (!dataRes.ok) throw new Error("Result file missing after run");
       
       const jsonData: LoadflowResponse = await dataRes.json();
-      
-      // SORT FOR THE RAMP-UP CURVE (Ascending MW Flow)
-      jsonData.results.sort((a, b) => Math.abs(a.mw_flow) - Math.abs(b.mw_flow));
-      
-      setResults(jsonData);
-      notify(`Analysis Complete: ${jsonData.results.length} scenarios`);
+      processAndSetResults(jsonData);
+      notify("Analysis Freshly Computed & Saved");
 
     } catch (e) { 
-      notify("Error during analysis cycle", "error"); 
+      notify("Error during analysis", "error"); 
       console.error(e);
     } finally {
       setLoading(false);
     }
+  };
+
+  const processAndSetResults = (data: LoadflowResponse) => {
+      // Sort by MW Flow Absolute value to create a nice "Ramp Up" curve
+      if (data.results) {
+          data.results.sort((a, b) => Math.abs(a.mw_flow) - Math.abs(b.mw_flow));
+      }
+      setResults(data);
   };
 
   const handleCopyToken = async () => {
@@ -146,17 +181,17 @@ export default function Loadflow({ user }: { user: any }) {
     if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); }
   };
 
-  // --- CHART COMPONENT (RAMP UP CURVE) ---
+  // --- CHART: RAMP UP CURVE ---
   const RampUpChart = ({ data }: { data: LoadflowResult[] }) => {
     if (!data || data.length === 0) return null;
     
-    // Calculate scale
+    // Scale based on Max MW
     const maxVal = Math.max(...data.map(d => Math.abs(d.mw_flow)));
     
     return (
-      <div className="w-full h-64 flex items-end gap-[2px] pt-8 pb-4 px-2 bg-white rounded border border-slate-200 shadow-sm relative overflow-hidden">
-        {/* Background Grid Lines (Simplified) */}
-        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none p-4 opacity-10">
+      <div className="w-full h-64 flex items-end gap-[2px] pt-10 pb-6 px-4 bg-white rounded border border-slate-200 shadow-sm relative overflow-hidden">
+        {/* Grid Lines */}
+        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none p-4 opacity-10 z-0">
             <div className="border-t border-slate-400 w-full h-0"></div>
             <div className="border-t border-slate-400 w-full h-0"></div>
             <div className="border-t border-slate-400 w-full h-0"></div>
@@ -165,32 +200,33 @@ export default function Loadflow({ user }: { user: any }) {
         {data.map((r, i) => {
           const height = (Math.abs(r.mw_flow) / (maxVal || 1)) * 100;
           return (
-            <div key={i} className="flex-1 flex flex-col justify-end group relative h-full">
-              {/* Tooltip on Hover */}
+            <div key={i} className="flex-1 flex flex-col justify-end group relative h-full z-10">
+              {/* Tooltip */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center bg-slate-800 text-white text-[9px] p-2 rounded shadow-xl z-20 whitespace-nowrap">
                 <span className="font-bold">{r.filename}</span>
                 <span className="text-blue-300">{r.mw_flow.toFixed(2)} MW</span>
+                <span className="text-slate-400">Tap: {Object.values(r.transformers)[0]?.Tap}</span>
               </div>
               
               {/* Bar */}
               <div 
                 style={{ height: `${height}%` }} 
                 className={`w-full min-w-[4px] rounded-t-sm transition-all duration-300 relative ${
-                    r.is_valid ? 'bg-blue-500 hover:bg-blue-400' : 'bg-red-300 hover:bg-red-400'
+                    r.is_valid ? 'bg-blue-500 hover:bg-blue-600' : 'bg-red-200 hover:bg-red-400'
                 }`}
               >
-                {/* Winner Marker */}
+                {/* Winner Marker (Green Dot) */}
                 {r.is_winner && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-500 rounded-full shadow-sm ring-2 ring-white"></div>
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-500 rounded-full shadow-sm ring-2 ring-white animate-pulse"></div>
                 )}
               </div>
             </div>
           );
         })}
         
-        {/* Axis Label */}
-        <div className="absolute bottom-1 right-2 text-[9px] font-bold text-slate-400 uppercase">Scenarios (Sorted by MW Flow)</div>
-        <div className="absolute top-2 left-2 text-[9px] font-bold text-slate-400 uppercase">MW Flow (Max: {maxVal.toFixed(1)})</div>
+        {/* Labels */}
+        <div className="absolute bottom-1 right-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Scenarios (Sorted by Load)</div>
+        <div className="absolute top-2 left-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Power (MW)</div>
       </div>
     );
   };
@@ -201,7 +237,7 @@ export default function Loadflow({ user }: { user: any }) {
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
         <div className="flex flex-col">
-          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Simulation</label>
+          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Simulation Dashboard</label>
           <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
             {activeProjectId ? (
                 <>
@@ -223,7 +259,7 @@ export default function Loadflow({ user }: { user: any }) {
             value={baseName} 
             onChange={(e) => setBaseName(e.target.value)} 
             className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 w-32 text-right font-bold text-slate-600 focus:ring-1 focus:ring-yellow-500 outline-none"
-            placeholder="Filename..."
+            placeholder="Result Filename"
           />
           <span className="text-slate-400 font-bold">.json</span>
           
@@ -232,14 +268,21 @@ export default function Loadflow({ user }: { user: any }) {
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors">
             <Key className="w-3.5 h-3.5" /> TOKEN
           </button>
+          
+          {/* LOAD BUTTON (Manual) */}
+          <button onClick={handleLoadResults} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300">
+            <Search className="w-3.5 h-3.5" /> LOAD PREVIOUS
+          </button>
+
+          {/* RUN BUTTON (Action) */}
           <button onClick={handleRunAnalysis} disabled={loading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded font-black shadow-sm disabled:opacity-50 transition-all">
             {loading ? <Activity className="w-3.5 h-3.5 animate-spin"/> : <Play className="w-3.5 h-3.5 fill-current" />}
-            {loading ? "CALCULATING..." : "RUN LOADFLOW"}
+            {loading ? "CALCULATING..." : "RUN ANALYSIS"}
           </button>
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
+      {/* MAIN CONTENT SPLIT */}
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
         
         {/* SIDEBAR */}
@@ -259,47 +302,19 @@ export default function Loadflow({ user }: { user: any }) {
             <div className="border-t border-slate-200 my-1"></div>
             <div className="flex justify-between items-center px-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span>
-                <button 
-                    onClick={() => setIsCreatingProject(!isCreatingProject)}
-                    className="p-1 hover:bg-blue-50 text-blue-600 rounded transition-colors"
-                >
-                    <Plus className="w-3.5 h-3.5" />
-                </button>
+                <button onClick={() => setIsCreatingProject(!isCreatingProject)} className="p-1 hover:bg-blue-50 text-blue-600 rounded"><Plus className="w-3.5 h-3.5" /></button>
             </div>
             {isCreatingProject && (
                 <div className="flex gap-1">
-                    <input 
-                        className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Project ID..."
-                        value={newProjectName}
-                        onChange={(e) => setNewProjectName(e.target.value.toUpperCase())}
-                        onKeyDown={(e) => e.key === 'Enter' && createProject()}
-                        autoFocus
-                    />
+                    <input className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none" placeholder="ID..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value.toUpperCase())} />
                     <button onClick={createProject} className="bg-blue-600 text-white px-2 rounded font-bold text-[9px]">OK</button>
                 </div>
             )}
             <div className="flex-1 flex flex-col gap-1">
                 {projects.map(p => (
-                    <div 
-                        key={p.project_id}
-                        onClick={() => setActiveProjectId(p.project_id)}
-                        className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.project_id 
-                            ? 'bg-blue-600 text-white border-blue-700 shadow-sm' 
-                            : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:border-slate-200'}`}
-                    >
-                        <div className="flex items-center gap-2 overflow-hidden">
-                            <Folder className={`w-3.5 h-3.5 ${activeProjectId === p.project_id ? 'text-blue-200' : 'text-slate-400'}`} />
-                            <span className="font-bold truncate">{p.project_id}</span>
-                        </div>
-                        {p.role === 'owner' && (
-                            <button 
-                                onClick={(e) => deleteProject(p.project_id, e)}
-                                className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.project_id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}
-                            >
-                                <Trash2 className="w-3 h-3" />
-                            </button>
-                        )}
+                    <div key={p.project_id} onClick={() => setActiveProjectId(p.project_id)} className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.project_id ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-2 overflow-hidden"><Folder className="w-3.5 h-3.5" /><span className="font-bold truncate">{p.project_id}</span></div>
+                        {p.role === 'owner' && <button onClick={(e) => deleteProject(p.project_id, e)} className="opacity-0 group-hover:opacity-100 hover:bg-red-400 hover:text-white p-1 rounded"><Trash2 className="w-3 h-3" /></button>}
                     </div>
                 ))}
             </div>
@@ -311,29 +326,19 @@ export default function Loadflow({ user }: { user: any }) {
             {!results ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4 border-2 border-dashed border-slate-100 rounded bg-slate-50/50">
                     <Activity className={`w-16 h-16 ${loading ? 'animate-pulse text-yellow-400' : ''}`} />
-                    <span className="font-black uppercase tracking-widest">
-                        {loading ? "Simulating Scenarios..." : "Ready to Simulate"}
-                    </span>
+                    <span className="font-black uppercase tracking-widest">{loading ? "Simulating Scenarios..." : "Ready to Simulate"}</span>
                 </div>
             ) : (
                 <div className="flex flex-col gap-6 pb-10">
                     
-                    {/* METRICS */}
+                    {/* TOP METRICS */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white p-4 rounded border border-slate-200 shadow-sm flex justify-between items-center">
-                            <div>
-                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Scenarios</div>
-                                <div className="text-2xl font-black text-slate-700">{results.results.length}</div>
-                            </div>
+                            <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Scenarios</div><div className="text-2xl font-black text-slate-700">{results.results.length}</div></div>
                             <Activity className="w-8 h-8 text-slate-200" />
                         </div>
                         <div className="bg-white p-4 rounded border border-slate-200 shadow-sm flex justify-between items-center">
-                            <div>
-                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Valid Solutions</div>
-                                <div className="text-2xl font-black text-green-600">
-                                    {results.results.filter(r => r.is_valid).length}
-                                </div>
-                            </div>
+                            <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Valid Solutions</div><div className="text-2xl font-black text-green-600">{results.results.filter(r => r.is_valid).length}</div></div>
                             <CheckCircle className="w-8 h-8 text-green-100" />
                         </div>
                     </div>
@@ -341,9 +346,7 @@ export default function Loadflow({ user }: { user: any }) {
                     {/* CHART */}
                     <div>
                         <div className="flex justify-between items-center mb-2">
-                            <h2 className="font-black text-slate-700 uppercase flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-blue-500" /> Load Ramp-up Curve
-                            </h2>
+                            <h2 className="font-black text-slate-700 uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> Load Ramp-up Curve</h2>
                         </div>
                         <RampUpChart data={results.results} />
                     </div>
@@ -354,7 +357,7 @@ export default function Loadflow({ user }: { user: any }) {
                             <Zap className="w-4 h-4 text-yellow-500" /> Detailed Results
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left font-bold min-w-[800px]">
+                            <table className="w-full text-left font-bold min-w-[900px]">
                                 <thead className="bg-slate-50 text-[9px] text-slate-400 uppercase tracking-widest border-b border-slate-100">
                                     <tr>
                                         <th className="px-4 py-2 w-10">St</th>
@@ -368,10 +371,7 @@ export default function Loadflow({ user }: { user: any }) {
                                     {results.results.map((r, i) => (
                                         <tr key={i} className={`hover:bg-slate-50 ${r.is_winner ? 'bg-green-50/30' : ''}`}>
                                             <td className="px-4 py-3">
-                                                {r.is_valid ? 
-                                                    <CheckCircle className="w-4 h-4 text-green-500" /> : 
-                                                    <AlertTriangle className="w-4 h-4 text-slate-300" />
-                                                }
+                                                {r.is_valid ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertTriangle className="w-4 h-4 text-slate-300" />}
                                             </td>
                                             <td className="px-4 py-3 font-mono text-[10px] text-slate-600 truncate max-w-xs" title={r.filename}>
                                                 {r.filename}
