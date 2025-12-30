@@ -1,65 +1,78 @@
 
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { initializeApp, getApps } from "firebase/app";
-import { getAuth, onAuthStateChanged, signOut, User, signInWithPopup, GoogleAuthProvider, signInAnonymously } from "firebase/auth";
-import { Icons } from './icons';
-
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { auth } from './firebase';
 import Navbar from './components/Navbar';
-import Files from './pages/Files';
-import Config from './pages/Config';
 import Loadflow from './pages/Loadflow';
 import Protection from './pages/Protection';
+import Files from './pages/Files';
+import Config from './pages/Config';
+import { Icons } from './icons';
 
-export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+// Composant de chargement simple (Spinner)
+function LoadingScreen() {
+  return (
+    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4">
+      <Icons.Loader className="w-10 h-10 animate-spin text-blue-600" />
+      <span className="text-xs font-bold tracking-widest uppercase">Initializing Solufuse...</span>
+    </div>
+  );
+}
+
+function App() {
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const firebaseConfig = {
-      apiKey: "AIzaSyAZ-Zi6fOKCH7duGgCnnHX_qB4TI5wTC5g",
-      authDomain: "solufuse-5647c.firebaseapp.com",
-      projectId: "solufuse-5647c",
-      storageBucket: "solufuse-5647c.firebasestorage.app",
-      messagingSenderId: "718299136180",
-      appId: "1:718299136180:web:fb893609b7f0283c55d7e1",
-      measurementId: "G-B1FVSFY4S2"
-    };
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    const auth = getAuth(app);
-    return onAuthStateChanged(auth, (u) => { setUser(u); setLoading(false); });
+    // Écouteur d'état Firebase
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        // 1. Utilisateur connecté (Google ou Guest existant)
+        setUser(currentUser);
+        setLoading(false);
+      } else {
+        // 2. Pas d'utilisateur ? -> ON CRÉE UN GUEST AUTOMATIQUEMENT
+        console.log("[Auto-Login] No user found, creating Guest session...");
+        signInAnonymously(auth)
+          .then(() => {
+            // La réussite déclenchera à nouveau onAuthStateChanged avec le user
+          })
+          .catch((error) => {
+            console.error("[Auto-Login Error]", error);
+            setLoading(false); // On arrête le chargement même en cas d'erreur pour ne pas bloquer
+          });
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><Icons.Activity className="animate-pulse text-orange-500" /></div>;
+  const handleLogout = () => auth.signOut();
 
-  if (!user) {
-    return (
-      <div className="h-screen w-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-slate-100">
-          <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-6"><Icons.Shield className="w-8 h-8" /></div>
-          <h1 className="text-2xl font-black text-slate-800 mb-2">SOLUFUSE</h1>
-          <button onClick={() => signInWithPopup(getAuth(), new GoogleAuthProvider())} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm mb-3 hover:bg-slate-800 transition-all">Google Login</button>
-          <button onClick={() => signInAnonymously(getAuth())} className="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all">Guest Access</button>
-        </div>
-      </div>
-    );
-  }
+  // Tant qu'on charge (ou qu'on connecte le guest en arrière-plan), on affiche le spinner
+  if (loading) return <LoadingScreen />;
 
   return (
     <Router>
-      <div className="min-h-screen bg-slate-50 font-sans">
-        <Navbar user={user} onLogout={() => signOut(getAuth())} />
-        <main className="p-4">
+      <div className="min-h-screen bg-slate-50">
+        {/* On affiche la Navbar seulement si on a un user (ce qui sera toujours le cas après chargement) */}
+        {user && <Navbar user={user} onLogout={handleLogout} />}
+        
+        <main>
           <Routes>
-            <Route path="/" element={<Navigate to="/loadflow" replace />} />
+            <Route path="/" element={<Navigate to="/files" replace />} />
             <Route path="/loadflow" element={<Loadflow user={user} />} />
-            <Route path="/protection" element={<Protection />} />
-            <Route path="/config" element={<Config user={user} />} />
+            <Route path="/protection" element={<Protection user={user} />} />
             <Route path="/files" element={<Files user={user} />} />
-            <Route path="*" element={<Navigate to="/loadflow" replace />} />
+            <Route path="/config" element={<Config user={user} />} />
+            {/* Catch all : redirection vers files */}
+            <Route path="*" element={<Navigate to="/files" replace />} />
           </Routes>
         </main>
       </div>
     </Router>
   );
 }
+
+export default App;
