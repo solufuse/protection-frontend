@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Save, Trash2, Settings, Zap, Download, Activity, 
   ChevronDown, ChevronRight, Upload, ShieldCheck,
-  Folder, HardDrive, Plus, Key, Link as LinkIcon
+  Folder, HardDrive, Plus, Key, Link as LinkIcon, Clock
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -41,14 +41,26 @@ export default function Config({ user }: { user: any }) {
     setToast({ show: true, msg, type });
   };
 
-  // --- DEFAULT CONFIGURATION ---
+  // --- DEFAULT CONFIGURATION (Full Structure) ---
   const defaultConfig = {
     project_name: "NEW_PROJECT",
     settings: {
       ansi_51: {
-        transformer: { factor_I1: 1.2, factor_I2: 0.8, factor_I4: 6.0 },
-        incomer: { factor_I1: 1.0, factor_I2: 1.0, factor_I4: 10.0 },
-        coupling: { factor_I1: 1.0, factor_I2: 1.0, factor_I4: 10.0 }
+        transformer: {
+          factor_I1: 1.2, time_dial_I1: { value: 0.5, curve: "VIT", comment: "Overload" },
+          factor_I2: 0.8, time_dial_I2: { value: 0.1, curve: "DT", comment: "Backup" },
+          factor_I4: 6.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "Inst." }
+        },
+        incomer: {
+          factor_I1: 1.0, time_dial_I1: { value: 0.5, curve: "SIT", comment: "Incomer Std" },
+          factor_I2: 1.0, time_dial_I2: { value: 0.2, curve: "DT", comment: "Backup" },
+          factor_I4: 10.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "Inst." }
+        },
+        coupling: {
+          factor_I1: 1.0, time_dial_I1: { value: 0.5, curve: "SIT", comment: "Cpl Std" },
+          factor_I2: 1.0, time_dial_I2: { value: 0.2, curve: "DT", comment: "Backup" },
+          factor_I4: 10.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "Inst." }
+        }
       }
     },
     transformers: [],
@@ -113,7 +125,6 @@ export default function Config({ user }: { user: any }) {
         const token = await getToken();
         const pParam = activeProjectId ? `?project_id=${activeProjectId}` : "";
         
-        // 1. Check file existence
         const listRes = await fetch(`${apiUrl}/session/details${pParam}`, { 
             headers: { 'Authorization': `Bearer ${token}` } 
         });
@@ -123,7 +134,6 @@ export default function Config({ user }: { user: any }) {
         const configFile = listData.files?.find((f: any) => f.filename.toLowerCase() === 'config.json');
         
         if (configFile) {
-            // 2. Download
             const dlParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
             const fileRes = await fetch(`${apiUrl}/session/download?filename=${encodeURIComponent(configFile.filename)}&token=${token}${dlParam}`);
             
@@ -133,10 +143,23 @@ export default function Config({ user }: { user: any }) {
             const text = await blob.text();
             try {
                 const sessionConfig = JSON.parse(text);
-                if (sessionConfig && (sessionConfig.settings || sessionConfig.transformers)) {
-                    setConfig({ ...defaultConfig, ...sessionConfig });
+                // Deep merge to ensure structure exists
+                // Note: We prioritize session config, but fill missing keys with default
+                if (sessionConfig && sessionConfig.settings) {
+                    setConfig({ 
+                        ...defaultConfig, 
+                        ...sessionConfig,
+                        settings: {
+                            ...defaultConfig.settings,
+                            ...sessionConfig.settings,
+                            ansi_51: {
+                                ...defaultConfig.settings.ansi_51,
+                                ...(sessionConfig.settings.ansi_51 || {})
+                            }
+                        }
+                    });
                 } else {
-                    throw new Error("Invalid structure");
+                    setConfig(defaultConfig); // Fallback structure
                 }
             } catch (e) { throw new Error("Invalid JSON"); }
         } else {
@@ -208,6 +231,41 @@ export default function Config({ user }: { user: any }) {
   const handleCopyToken = async () => {
     const t = await getToken();
     if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); }
+  };
+
+  // Helper to update nested protection settings
+  const updateProtection = (category: string, threshold: string, field: string, value: any) => {
+      const currentSettings = config.settings.ansi_51;
+      const currentCategory = currentSettings[category] || {};
+      
+      // If updating a 'factor', it's a direct property (e.g. factor_I1)
+      if (field.startsWith('factor')) {
+          const newCategory = { ...currentCategory, [field]: parseFloat(value) };
+          setConfig({
+              ...config, 
+              settings: { 
+                  ...config.settings, 
+                  ansi_51: { ...currentSettings, [category]: newCategory } 
+              }
+          });
+      } 
+      // If updating time_dial, it's a nested object (e.g. time_dial_I1.value)
+      else {
+          const timeDialKey = `time_dial_${threshold}`; // e.g. time_dial_I1
+          const currentTimeDial = currentCategory[timeDialKey] || { value: 0.1, curve: "DT", comment: "" };
+          
+          const newTimeDial = { ...currentTimeDial, [field]: field === 'value' ? parseFloat(value) : value };
+          
+          const newCategory = { ...currentCategory, [timeDialKey]: newTimeDial };
+          
+          setConfig({
+              ...config, 
+              settings: { 
+                  ...config.settings, 
+                  ansi_51: { ...currentSettings, [category]: newCategory } 
+              }
+          });
+      }
   };
 
   if (!config) return <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Loading Configuration...</div>;
@@ -361,7 +419,7 @@ export default function Config({ user }: { user: any }) {
                             )}
                         </div>
 
-                        {/* 2. LINKS SECTION (NEW) */}
+                        {/* 2. LINKS SECTION */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('links')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.links ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <LinkIcon className="w-3.5 h-3.5 text-green-600" /> Network Links / Cables</h2>
@@ -401,40 +459,56 @@ export default function Config({ user }: { user: any }) {
                             )}
                         </div>
 
-                        {/* 4. PROTECTION SETTINGS (Refactored) */}
+                        {/* 4. PROTECTION SETTINGS (UPDATED V3) */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('protection')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.protection ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Protection Settings (ANSI 51)</h2>
                             </div>
                             {openSections.protection && config.settings?.ansi_51 && (
-                            <div className="p-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="p-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {['transformer', 'incomer', 'coupling'].map(category => {
-                                    const settings = config.settings.ansi_51[category] || {};
+                                    const catData = config.settings.ansi_51[category] || {};
                                     return (
-                                        <div key={category} className="bg-slate-50 p-2 rounded border border-slate-200">
-                                            <h3 className="text-[10px] font-black text-slate-600 uppercase mb-2 border-b border-slate-200 pb-1">{category}</h3>
-                                            <div className="space-y-2">
-                                                <div>
-                                                    <label className="text-[9px] text-slate-400 block">Overload (I1)</label>
-                                                    <input type="number" step="0.1" value={settings.factor_I1} onChange={e => {
-                                                        const newVal = {...config.settings.ansi_51, [category]: {...settings, factor_I1: parseFloat(e.target.value)}};
-                                                        setConfig({...config, settings: {...config.settings, ansi_51: newVal}});
-                                                    }} className="w-full p-1 bg-white border rounded text-[10px] font-bold text-center"/>
-                                                </div>
-                                                <div>
-                                                    <label className="text-[9px] text-slate-400 block">Backup (I2)</label>
-                                                    <input type="number" step="0.1" value={settings.factor_I2} onChange={e => {
-                                                        const newVal = {...config.settings.ansi_51, [category]: {...settings, factor_I2: parseFloat(e.target.value)}};
-                                                        setConfig({...config, settings: {...config.settings, ansi_51: newVal}});
-                                                    }} className="w-full p-1 bg-white border rounded text-[10px] font-bold text-center"/>
-                                                </div>
-                                                <div>
-                                                    <label className="text-[9px] text-slate-400 block">High-Set (I4)</label>
-                                                    <input type="number" step="0.1" value={settings.factor_I4} onChange={e => {
-                                                        const newVal = {...config.settings.ansi_51, [category]: {...settings, factor_I4: parseFloat(e.target.value)}};
-                                                        setConfig({...config, settings: {...config.settings, ansi_51: newVal}});
-                                                    }} className="w-full p-1 bg-white border rounded text-[10px] font-bold text-center"/>
-                                                </div>
+                                        <div key={category} className="bg-slate-50 p-3 rounded border border-slate-200">
+                                            <h3 className="text-[10px] font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-1 flex items-center gap-1">
+                                                <Clock className="w-3 h-3 text-slate-400"/> {category}
+                                            </h3>
+                                            
+                                            <div className="space-y-4">
+                                                {['I1', 'I2', 'I4'].map(threshold => {
+                                                    const factorKey = `factor_${threshold}`;
+                                                    const timeDialKey = `time_dial_${threshold}`;
+                                                    const factorValue = catData[factorKey] ?? 1.0;
+                                                    const timeDialData = catData[timeDialKey] || { value: 0.1, curve: "DT", comment: "" };
+
+                                                    return (
+                                                        <div key={threshold} className="bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 rounded">{threshold}</span>
+                                                                <input 
+                                                                    placeholder="Comment" 
+                                                                    value={timeDialData.comment || ""}
+                                                                    onChange={e => updateProtection(category, threshold, 'comment', e.target.value)}
+                                                                    className="text-[9px] text-right text-slate-400 bg-transparent outline-none w-24 focus:text-blue-600"
+                                                                />
+                                                            </div>
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                <div>
+                                                                    <label className="text-[8px] text-slate-400 uppercase block">Factor</label>
+                                                                    <input type="number" step="0.1" value={factorValue} onChange={e => updateProtection(category, threshold, factorKey, e.target.value)} className="w-full p-1 bg-slate-50 border rounded text-[10px] font-bold text-center focus:border-blue-400 outline-none"/>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[8px] text-slate-400 uppercase block">Time Dial</label>
+                                                                    <input type="number" step="0.05" value={timeDialData.value} onChange={e => updateProtection(category, threshold, 'value', e.target.value)} className="w-full p-1 bg-slate-50 border rounded text-[10px] font-bold text-center focus:border-blue-400 outline-none"/>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[8px] text-slate-400 uppercase block">Curve</label>
+                                                                    <input type="text" value={timeDialData.curve} onChange={e => updateProtection(category, threshold, 'curve', e.target.value)} className="w-full p-1 bg-slate-50 border rounded text-[10px] font-bold text-center uppercase focus:border-blue-400 outline-none"/>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     );
