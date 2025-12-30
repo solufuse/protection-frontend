@@ -32,7 +32,7 @@ function App() {
         console.log("[Auto-Login] No user found, creating Guest session...");
         signInAnonymously(auth)
           .then(() => {
-            // Success handled by onAuthStateChanged
+            // Success is handled by the listener firing again
           })
           .catch((error) => {
             console.error("[Auto-Login Error]", error);
@@ -51,22 +51,17 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-slate-50">
-        {/* Navbar accepte 'user' -> OK */}
         {user && <Navbar user={user} onLogout={handleLogout} />}
         
         <main>
           <Routes>
             <Route path="/" element={<Navigate to="/files" replace />} />
             
-            {/* [FIX] Ces pages ne sont pas encore prêtes à recevoir 'user', on le retire pour l'instant */}
-            <Route path="/loadflow" element={<Loadflow />} />
-            <Route path="/protection" element={<Protection />} />
-            
-            {/* Files accepte 'user' -> OK */}
+            {/* [FIX] Tous les composants reçoivent maintenant 'user' */}
+            <Route path="/loadflow" element={<Loadflow user={user} />} />
+            <Route path="/protection" element={<Protection user={user} />} />
             <Route path="/files" element={<Files user={user} />} />
-            
-            {/* Config n'est pas prêt -> on retire 'user' */}
-            <Route path="/config" element={<Config />} />
+            <Route path="/config" element={<Config user={user} />} />
             
             <Route path="*" element={<Navigate to="/files" replace />} />
           </Routes>
