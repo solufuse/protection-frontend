@@ -1,5 +1,4 @@
 
-import { useState, useEffect } from 'react';
 import { Icons } from '../icons';
 import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
@@ -8,12 +7,8 @@ interface FilesProps {
 }
 
 export default function Files({ user }: FilesProps) {
-  const [files, setFiles] = useState<string[]>([]);
-  
-  // [?] [THOUGHT] : Simulation for now. Replace with real API fetch later.
-  useEffect(() => {
-    // API call would go here: fetch('/api/files/list')...
-  }, [user]);
+  // [!] [FIX] : Removed unused state variables that were causing build failure (TS6133).
+  // We will re-introduce them when we implement the real API connection.
 
   const handleGoogleLogin = async () => {
     const auth = getAuth();
