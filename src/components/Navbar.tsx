@@ -10,6 +10,7 @@ interface NavbarProps {
 export default function Navbar({ user, onLogout }: NavbarProps) {
   const location = useLocation();
 
+  // [?] [THOUGHT] : Using startsWith to keep the link active even on sub-routes.
   const isActive = (path: string) => 
     location.pathname.startsWith(path) 
       ? "bg-orange-100 text-orange-700 shadow-sm ring-1 ring-orange-200" 
@@ -21,13 +22,13 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
         html { overflow-y: scroll; } 
         body { padding-right: 0 !important; }
         
-        /* Animation reactive pour le logo et le texte */
-        .brand-hover:hover img {
-          transform: scale(1.1) rotate(5deg);
+        /* [!] [CRITICAL] : Reactive brand animations */
+        .brand-container:hover .brand-logo {
+          transform: scale(1.15) rotate(8deg);
         }
-        .brand-hover:hover span {
+        .brand-container:hover .brand-text {
           letter-spacing: 0.05em;
-          color: #f97316; /* orange-500 */
+          color: #f97316;
         }
       `}</style>
 
@@ -35,15 +36,15 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             
-            {/* LOGO & NOM REACTIFS */}
+            {/* LOGO & NOM AVEC EFFET RÉACTIF */}
             <div className="flex items-center gap-2">
-              <Link to="/loadflow" className="flex items-center gap-3 brand-hover group transition-all duration-300">
+              <Link to="/loadflow" className="brand-container flex items-center gap-3 transition-all duration-300">
                   <img 
                     src="/favicon.ico" 
                     alt="Logo" 
-                    className="w-9 h-9 object-contain transition-transform duration-300 ease-out"
+                    className="brand-logo w-9 h-9 object-contain transition-transform duration-300 ease-out"
                   />
-                  <span className="font-black text-xl tracking-tighter text-slate-800 uppercase transition-all duration-300 ease-out">
+                  <span className="brand-text font-black text-xl tracking-tighter text-slate-800 uppercase transition-all duration-300 ease-out">
                     SOLUFUSE
                   </span>
               </Link>
@@ -58,6 +59,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               
               <div className="w-px h-4 bg-slate-200 mx-2"></div>
 
+              {/* LIENS EXTERNES */}
               <a href="https://api.solufuse.com/docs" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1.5 transition-colors">
                 <Icons.FileText className="w-3.5 h-3.5" /> API DOCS
               </a>
@@ -66,9 +68,9 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               </a>
             </nav>
 
-            {/* SECTION UTILISATEUR */}
+            {/* PROFIL UTILISATEUR */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-full border border-slate-200 pr-4 hover:border-orange-200 transition-colors">
+              <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-full border border-slate-200 pr-4 hover:border-orange-200 transition-all duration-300">
                 {user?.photoURL ? (
                   <img 
                     src={user.photoURL} 
