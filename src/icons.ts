@@ -1,61 +1,49 @@
 
-import { 
-  // UI & Navigation
-  Settings, Activity, Zap, Shield, LogOut, Menu, X, User, Play, 
-  Plus, Key, CheckCircle, AlertTriangle, TrendingUp, Search, Filter, XCircle,
-  ArrowRight, ArrowUpDown, ChevronDown, ChevronRight, ExternalLink, RefreshCw,
-  Loader2,
+import {
+  // General
+  Loader, User, LogOut, Settings, FileText, Search, Menu, X,
+  ChevronRight, ChevronDown, ChevronLeft, ChevronUp,
+  ExternalLink, Plus, Trash, Trash2, Edit, Save, Download, Upload,
+  Check, CheckCircle, AlertTriangle, AlertCircle, Info, HelpCircle,
   
-  // Files & Data
-  FileText, Folder, HardDrive, Archive, UploadCloud, 
-  FileSpreadsheet, FileJson, FileDown, Trash2, Calendar,
+  // Navigation & Modules
+  Folder, HardDrive, Activity, Shield, ShieldCheck, Zap,
   
-  // Visibility
-  Eye, EyeOff
+  // Files
+  File, FileJson, FileSpreadsheet, Archive, UploadCloud, RefreshCw,
+  ArrowRight, ArrowUpDown, Calendar, Eye, EyeOff,
+  
+  // Auth & Security
+  Key, Lock, Unlock, Crown,
+  
+  // Misc
+  SlidersHorizontal, Filter, XCircle, TrendingUp, Clock, FileSignature
 } from 'lucide-react';
 
 export const Icons = {
-  // --- GENERAL UI ---
-  Settings,
-  Activity,
-  Zap,
-  Shield,
-  LogOut,
-  Menu,
-  X,
-  User,
-  Play,
-  Plus,
-  Key,
-  Check: CheckCircle,
-  Alert: AlertTriangle,
-  Chart: TrendingUp,
-  Search,
-  Filter,
-  Clear: XCircle,
-  Loader: Loader2, // Utile pour les spinners de chargement
-
-  // --- NAVIGATION ---
-  ArrowRight,
-  ArrowUpDown,
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
+  // Generic
+  Loader, User, LogOut, Settings, FileText, Search, Menu, X,
+  ChevronRight, ChevronDown, ChevronLeft, ChevronUp,
+  ExternalLink, Plus, Trash, Trash2, Edit, Save, Download, Upload,
+  Check, CheckCircle, AlertTriangle, AlertCircle, Info, HelpCircle,
+  
+  // App Specific
+  Folder, HardDrive, Activity, Shield, ShieldCheck, Zap,
+  
+  // Files specific maps (pour compatibilité avec Files.tsx existant)
   Refresh: RefreshCw,
-
-  // --- FILES & SYSTEM ---
-  Folder,
-  HardDrive,
-  Archive,
-  UploadCloud,
-  FileText,
-  FileSpreadsheet,
-  FileJson,
-  FileDown,
-  Trash: Trash2,
-  Calendar,
-
-  // --- ACTIONS ---
+  Alert: AlertTriangle,
+  FileDown: Download,
+  Hide: EyeOff,
   Show: Eye,
-  Hide: EyeOff
+  
+  // File Types
+  File, FileJson, FileSpreadsheet, Archive, UploadCloud,
+  ArrowRight, ArrowUpDown, Calendar,
+  
+  // Security
+  Key, Lock, Unlock, Crown,
+  
+  // Dashboard / Loadflow
+  SlidersHorizontal, Filter, XCircle, TrendingUp, Clock, FileSignature
 };
