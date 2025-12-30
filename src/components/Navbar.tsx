@@ -56,7 +56,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
       {/* NAVBAR BACKGROUND */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 backdrop-blur-sm bg-white/90 shadow-sm">
         
-        {/* CONTAINER CENTRÉ (C'est ça qui fait le bon alignement) */}
+        {/* CONTAINER CENTRÉ */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             
@@ -131,6 +131,19 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                     <div className="p-4 border-b border-slate-50 bg-slate-50/50">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Session</p>
                       <p className="text-xs font-bold text-slate-700 truncate">{user.uid}</p>
+                    </div>
+
+                    {/* NEW: LINK TO PROFILE */}
+                    <div className="p-2 border-b border-slate-100">
+                        <Link to="/profile" onClick={() => setShowMenu(false)} className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 text-slate-700 hover:text-blue-600 transition-colors group">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-600">
+                                <Icons.User className="w-4 h-4" />
+                            </div>
+                            <div>
+                                <div className="text-[11px] font-bold">My Profile</div>
+                                <div className="text-[9px] text-slate-400">Roles & Settings</div>
+                            </div>
+                        </Link>
                     </div>
 
                     <div className="p-2 flex flex-col gap-1">

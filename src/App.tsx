@@ -8,6 +8,7 @@ import Loadflow from './pages/Loadflow';
 import Protection from './pages/Protection';
 import Files from './pages/Files';
 import Config from './pages/Config';
+import Profile from './pages/Profile';
 import { Icons } from './icons';
 
 function LoadingScreen() {
@@ -56,8 +57,9 @@ function App() {
             <Route path="/loadflow" element={<Loadflow user={user} />} />
             <Route path="/files" element={<Files user={user} />} />
             <Route path="/config" element={<Config user={user} />} />
+            <Route path="/profile" element={<Profile user={user} />} />
             
-            {/* [CRITICAL] Protection page does NOT accept 'user' prop */}
+            {/* Protection DOES NOT receive user prop */}
             <Route path="/protection" element={<Protection />} />
             
             <Route path="*" element={<Navigate to="/files" replace />} />
