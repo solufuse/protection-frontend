@@ -139,13 +139,13 @@ export default function Files({ user }: { user: any }) {
   const handleUpload = async (fileList: FileList | null) => {
     if (!fileList || !user) return;
     
-    // [!] SECURITY CHECK: Guest Restrictions
+    // [!] SECURITY CHECK: Guest Restrictions (UPDATED TO 10)
     if (user.isAnonymous) {
-        // 1. Check Count Quota
-        if (files.length + fileList.length > 5) {
-            return notify("Demo Limit: Max 5 files allowed in Guest Mode.", "error");
+        // 1. Quota Check
+        if (files.length + fileList.length > 10) {
+            return notify("Demo Limit: Max 10 files allowed in Guest Mode.", "error");
         }
-        // 2. Check File Type (No ZIPs)
+        // 2. Archive Check
         for (let i = 0; i < fileList.length; i++) {
             const name = fileList[i].name.toLowerCase();
             if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z')) {
@@ -163,7 +163,6 @@ export default function Files({ user }: { user: any }) {
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
       if (!res.ok) {
-          // Try to get error message from backend
           const err = await res.json().catch(() => ({ detail: "Upload Failed" }));
           throw new Error(err.detail || "Upload Failed");
       }
@@ -282,7 +281,7 @@ export default function Files({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* GUEST BANNER */}
+      {/* GUEST BANNER (UPDATED LIMIT 10) */}
       {user?.isAnonymous && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-4">
@@ -291,7 +290,7 @@ export default function Files({ user }: { user: any }) {
                 </div>
                 <div>
                     <h3 className="font-bold text-blue-900 text-xs">Guest Mode (Demo)</h3>
-                    <p className="text-blue-700 text-[10px] mt-0.5">Limits: Max 5 files. Storage is temporary. Projects & Zips disabled.</p>
+                    <p className="text-blue-700 text-[10px] mt-0.5">Limits: Max 10 files. Storage is temporary. Projects & Zips disabled.</p>
                 </div>
             </div>
             <button onClick={handleGoogleLogin} className="whitespace-nowrap px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2">
