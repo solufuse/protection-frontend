@@ -10,7 +10,7 @@ import {
   signOut,
   User 
 } from "firebase/auth";
-import { Activity, LogOut, LayoutGrid, Settings, FileText, Zap } from 'lucide-react';
+import { Activity, LogOut, Settings, FileText, Zap } from 'lucide-react';
 
 // Pages
 import Files from './pages/Files';
@@ -40,15 +40,12 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
-        // Utilisateur trouvé (Google ou Anonyme)
         setUser(currentUser);
         setLoading(false);
       } else {
-        // [!] MAGIE ICI : Si personne n'est connecté, on connecte en ANONYME automatiquement
         console.log("No user detected, signing in anonymously...");
         signInAnonymously(auth).catch((error) => {
             console.error("Auto-login failed:", error);
-            // Si l'anonyme échoue, on arrête le chargement pour montrer le bouton manuel au pire
             setLoading(false); 
         });
       }
@@ -56,7 +53,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fonction pour se connecter "vraiment" avec Google si l'utilisateur le veut plus tard
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
@@ -68,7 +64,6 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
 
-  // --- LOADING SCREEN ---
   if (loading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
@@ -80,7 +75,6 @@ export default function App() {
     );
   }
 
-  // --- APP LAYOUT (Toujours visible grâce à l'auth anonyme) ---
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-800">
       
