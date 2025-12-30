@@ -28,34 +28,28 @@ type SortKey = 'filename' | 'uploaded_at' | 'size';
 type SortOrder = 'asc' | 'desc';
 
 export default function Files({ user }: { user: any }) {
-  // --- STATE: FILES & DATA ---
+  // --- STATE ---
   const [files, setFiles] = useState<SessionFile[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  
-  // --- STATE: UI & NAVIGATION ---
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null); // null = User Session
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-
-  // --- STATE: SEARCH & SORT ---
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'filename', order: 'asc' });
-
-  // --- STATE: PREVIEW ---
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
+  // --- HELPERS ---
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
-
+  
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -69,15 +63,12 @@ export default function Files({ user }: { user: any }) {
     return await user.getIdToken(true); 
   };
 
-  // --- EFFECTS ---
-  useEffect(() => {
-    if (user) {
-      fetchProjects();
-      fetchFiles();
-    }
-  }, [user, activeProjectId]); 
+  const handleGoogleLogin = async () => {
+    const auth = getAuth();
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  };
 
-  // --- API CALLS ---
+  // --- API ---
   const fetchProjects = async () => {
     try {
       const t = await getToken();
@@ -95,7 +86,6 @@ export default function Files({ user }: { user: any }) {
       const t = await getToken();
       let url = `${API_URL}/session/details`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
-      
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
@@ -103,14 +93,17 @@ export default function Files({ user }: { user: any }) {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  const createProject = async () => {
-    // [!] SECURITY CHECK: GUESTS CANNOT CREATE PROJECTS
-    if (user?.isAnonymous) {
-        notify("Guest users cannot create projects.", "error");
-        return;
+  useEffect(() => {
+    if (user) {
+      fetchProjects();
+      fetchFiles();
     }
+  }, [user, activeProjectId]);
+
+  // --- HANDLERS ---
+  const createProject = async () => {
+    if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error");
     if (!newProjectName.trim()) return;
-    
     try {
       const t = await getToken();
       const res = await fetch(`${API_URL}/session/project/create?project_id=${encodeURIComponent(newProjectName)}`, {
@@ -122,12 +115,12 @@ export default function Files({ user }: { user: any }) {
       setNewProjectName("");
       setIsCreatingProject(false);
       fetchProjects();
-    } catch (e) { notify("Project creation failed (exists?)", "error"); }
+    } catch (e) { notify("Project creation failed", "error"); }
   };
 
   const deleteProject = async (projId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Delete project "${projId}" permanently? This cannot be undone.`)) return;
+    if (!confirm(`Delete project "${projId}" permanently?`)) return;
     try {
       const t = await getToken();
       const res = await fetch(`${API_URL}/session/project?project_id=${projId}`, {
@@ -143,27 +136,24 @@ export default function Files({ user }: { user: any }) {
 
   const handleUpload = async (fileList: FileList | null) => {
     if (!fileList || !user) return;
-
-    // [!] SECURITY CHECK: GUEST QUOTA
     if (user.isAnonymous && (files.length + fileList.length > 5)) {
-        notify("Demo Limit: Max 5 files allow in Guest Mode.", "error");
-        return;
+        return notify("Demo Limit: Max 5 files allow in Guest Mode.", "error");
     }
-
     setUploading(true);
     const formData = new FormData();
     Array.from(fileList).forEach(f => formData.append('files', f));
-
     try {
       const t = await getToken();
       let url = `${API_URL}/session/upload`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
-      
       const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
       if (!res.ok) throw new Error();
       notify(`${fileList.length} Uploaded`);
       fetchFiles();
-    } catch (e) { notify("Upload Failed", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    } catch (e) { notify("Upload Failed", "error"); } finally { 
+        setUploading(false); 
+        if (fileInputRef.current) fileInputRef.current.value = ''; 
+    }
   };
 
   const handleDelete = async (path: string) => {
@@ -179,7 +169,7 @@ export default function Files({ user }: { user: any }) {
   };
 
   const handleClear = async () => {
-    if (!confirm("Clear all files in this context?")) return;
+    if (!confirm("Clear all files?")) return;
     try {
       const t = await getToken();
       let url = `${API_URL}/session/clear`;
@@ -191,26 +181,8 @@ export default function Files({ user }: { user: any }) {
     } catch (e) { notify("Error", "error"); }
   };
 
-  // --- ACTIONS ---
-  const handleOpenLink = async (type: 'raw' | 'xlsx' | 'json' | 'json_tab', filename: string) => {
-      try {
-          const t = await getToken();
-          const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
-          let url = "";
-          if (type === 'raw') url = `${API_URL}/session/download?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
-          else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
-          else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
-          else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
-          
-          if (url) window.open(url, '_blank');
-      } catch (e) { notify("Link Error", "error"); }
-  };
-
   const togglePreview = async (filename: string) => {
-    if (expandedFileId === filename) {
-        setExpandedFileId(null);
-        return;
-    }
+    if (expandedFileId === filename) { setExpandedFileId(null); return; }
     setExpandedFileId(filename);
     setPreviewLoading(true);
     setPreviewData(null);
@@ -221,61 +193,42 @@ export default function Files({ user }: { user: any }) {
       if (!res.ok) throw new Error("Preview unavailable");
       const data = await res.json();
       setPreviewData(data);
-    } catch (e) { 
-        setExpandedFileId(null);
-        notify("Preview Error", "error");
-    } finally {
-        setPreviewLoading(false);
-    }
+    } catch (e) { setExpandedFileId(null); notify("Preview Error", "error"); } 
+    finally { setPreviewLoading(false); }
   };
 
-  const handleCopyToken = async () => {
-    const t = await getToken();
-    if (!t) return notify("No Token", "error");
-    navigator.clipboard.writeText(t);
-    notify("Token Copied");
+  const handleOpenLink = async (type: string, filename: string) => {
+      try {
+          const t = await getToken();
+          const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
+          let url = "";
+          if (type === 'raw') url = `${API_URL}/session/download?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
+          else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
+          else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
+          else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
+          if (url) window.open(url, '_blank');
+      } catch (e) { notify("Link Error", "error"); }
   };
 
   const handleSort = (key: SortKey) => {
-    setSortConfig(current => ({
-      key,
-      order: current.key === key && current.order === 'asc' ? 'desc' : 'asc'
-    }));
+    setSortConfig(current => ({ key, order: current.key === key && current.order === 'asc' ? 'desc' : 'asc' }));
   };
 
-  const handleGoogleLogin = async () => {
-    const auth = getAuth();
-    await signInWithPopup(auth, new GoogleAuthProvider());
-  };
-
-  // --- COMPUTED DATA ---
+  // --- COMPUTED ---
   const filteredFiles = files
     .filter(f => f.filename.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => {
       let aVal: any = a[sortConfig.key];
       let bVal: any = b[sortConfig.key];
-      if (sortConfig.key === 'size') {
-        aVal = a.size; bVal = b.size;
-      } else if (sortConfig.key === 'uploaded_at') {
-        aVal = new Date(a.uploaded_at || 0).getTime();
-        bVal = new Date(b.uploaded_at || 0).getTime();
-      } else {
-        aVal = aVal?.toString().toLowerCase() || "";
-        bVal = bVal?.toString().toLowerCase() || "";
-      }
+      if (sortConfig.key === 'size') { aVal = a.size; bVal = b.size; }
+      else if (sortConfig.key === 'uploaded_at') { aVal = new Date(a.uploaded_at || 0).getTime(); bVal = new Date(b.uploaded_at || 0).getTime(); }
+      else { aVal = aVal?.toString().toLowerCase() || ""; bVal = bVal?.toString().toLowerCase() || ""; }
       if (aVal < bVal) return sortConfig.order === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortConfig.order === 'asc' ? 1 : -1;
       return 0;
     });
 
-  // --- DRAG & DROP ---
-  const onDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
-  const onDragLeave = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
-      e.preventDefault(); e.stopPropagation(); setIsDragging(false);
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files);
-  };
-
+  // --- RENDER ---
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
       
@@ -300,120 +253,76 @@ export default function Files({ user }: { user: any }) {
           </h1>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors">
-            <Key className="w-3.5 h-3.5" /> TOKEN
-          </button>
           <button onClick={() => fetchFiles()} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> REFRESH
           </button>
         </div>
       </div>
 
-      {/* GUEST BANNER (NOUVEAU) */}
+      {/* GUEST BANNER */}
       {user?.isAnonymous && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm animate-in fade-in">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-4">
                 <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shrink-0">
                     <AlertTriangle className="w-4 h-4" />
                 </div>
                 <div>
                     <h3 className="font-bold text-blue-900 text-xs">Guest Mode (Demo)</h3>
-                    <p className="text-blue-700 text-[10px] mt-0.5">
-                        Limits: Max 5 files. Storage is temporary. Projects disabled.
-                    </p>
+                    <p className="text-blue-700 text-[10px] mt-0.5">Limits: Max 5 files. Storage is temporary. Projects disabled.</p>
                 </div>
             </div>
-            <button 
-                onClick={handleGoogleLogin}
-                className="whitespace-nowrap px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2"
-            >
+            <button onClick={handleGoogleLogin} className="whitespace-nowrap px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2">
                 GO UNLIMITED <ArrowRight className="w-3 h-3" />
             </button>
         </div>
       )}
 
-      {/* MAIN CONTENT SPLIT */}
       <div className="flex flex-1 gap-6 min-h-0">
-        
-        {/* SIDEBAR NAVIGATION */}
+        {/* SIDEBAR */}
         <div className="w-60 flex flex-col gap-4">
-            
-            {/* User Session */}
-            <div 
-                onClick={() => setActiveProjectId(null)}
-                className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null 
-                     ? 'bg-slate-800 text-white border-slate-900 shadow-md' 
-                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-            >
+            <div onClick={() => setActiveProjectId(null)} className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null ? 'bg-slate-800 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
                 <HardDrive className="w-4 h-4" />
                 <div className="flex flex-col">
                     <span className="font-bold uppercase tracking-wide">My Session</span>
-                    <span className={`text-[9px] ${activeProjectId === null ? 'text-slate-400' : 'text-slate-400'}`}>Private Storage</span>
+                    <span className="text-[9px] text-slate-400">Private Storage</span>
                 </div>
             </div>
-
             <div className="border-t border-slate-200 my-1"></div>
-
-            {/* Projects Header */}
             <div className="flex justify-between items-center px-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span>
-                <button 
-                    disabled={user?.isAnonymous}
-                    onClick={() => setIsCreatingProject(!isCreatingProject)} 
-                    className={`p-1 rounded transition-colors ${user?.isAnonymous ? 'text-slate-300 cursor-not-allowed' : 'hover:bg-blue-50 text-blue-600'}`}
-                >
+                <button disabled={user?.isAnonymous} onClick={() => setIsCreatingProject(!isCreatingProject)} className={`p-1 rounded transition-colors ${user?.isAnonymous ? 'text-slate-300 cursor-not-allowed' : 'hover:bg-blue-50 text-blue-600'}`}>
                     <Plus className="w-3.5 h-3.5" />
                 </button>
             </div>
-
-            {/* Create Input */}
             {isCreatingProject && (
                 <div className="flex gap-1">
-                    <input 
-                        className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Project ID..."
-                        value={newProjectName}
-                        onChange={(e) => setNewProjectName(e.target.value.toUpperCase())}
-                        onKeyDown={(e) => e.key === 'Enter' && createProject()}
-                        autoFocus
-                    />
+                    <input className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Project ID..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && createProject()} autoFocus />
                     <button onClick={createProject} className="bg-blue-600 text-white px-2 rounded font-bold text-[9px]">OK</button>
                 </div>
             )}
-
-            {/* Project List */}
             <div className="flex-1 overflow-y-auto flex flex-col gap-1 custom-scrollbar pr-1">
                 {projects.map(p => (
-                    <div 
-                        key={p.project_id}
-                        onClick={() => setActiveProjectId(p.project_id)}
-                        className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.project_id 
-                             ? 'bg-blue-600 text-white border-blue-700 shadow-sm' 
-                             : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:border-slate-200'}`}
-                    >
+                    <div key={p.project_id} onClick={() => setActiveProjectId(p.project_id)} className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.project_id ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:border-slate-200'}`}>
                         <div className="flex items-center gap-2 overflow-hidden">
                             <Folder className={`w-3.5 h-3.5 ${activeProjectId === p.project_id ? 'text-blue-200' : 'text-slate-400'}`} />
                             <span className="font-bold truncate">{p.project_id}</span>
                         </div>
                         {p.role === 'owner' && (
-                            <button 
-                                onClick={(e) => deleteProject(p.project_id, e)}
-                                className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.project_id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}
-                            >
+                            <button onClick={(e) => deleteProject(p.project_id, e)} className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.project_id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}>
                                 <Trash2 className="w-3 h-3" />
                             </button>
                         )}
                     </div>
                 ))}
-                {projects.length === 0 && !isCreatingProject && (
-                    <div className="text-center py-8 text-slate-300 italic text-[10px]">No projects yet</div>
-                )}
+                {projects.length === 0 && !isCreatingProject && <div className="text-center py-8 text-slate-300 italic text-[10px]">No projects yet</div>}
             </div>
         </div>
 
-        {/* RIGHT: FILES TABLE */}
+        {/* FILE TABLE */}
         <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold relative transition-all"
-            onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} 
+            onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} 
+            onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); }}
         >
             {isDragging && (
                 <div className="absolute inset-0 z-50 bg-blue-50/90 border-2 border-dashed border-blue-500 rounded flex flex-col items-center justify-center pointer-events-none">
@@ -421,25 +330,16 @@ export default function Files({ user }: { user: any }) {
                     <span className="text-lg font-black text-blue-700 uppercase tracking-widest">Drop files to upload</span>
                 </div>
             )}
-
-            {/* TABLE TOOLBAR */}
             <div className="flex justify-between items-center p-2 bg-slate-50 border-b border-slate-100 gap-4">
               <div className="flex items-center gap-2 flex-1">
                   <div className="relative flex-1 max-w-xs">
                     <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
-                    <input 
-                        type="text" 
-                        placeholder="Search files..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-8 pr-2 py-1.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:border-blue-400 text-slate-600"
-                    />
+                    <input type="text" placeholder="Search files..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-8 pr-2 py-1.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:border-blue-400 text-slate-600" />
                   </div>
                   <span className="text-[9px] text-slate-400 font-bold">{filteredFiles.length} FILES</span>
               </div>
               <div className="flex gap-2">
                  <input type="file" ref={fileInputRef} className="hidden" multiple onChange={(e) => handleUpload(e.target.files)} />
-                 
                  <button onClick={handleClear} className="flex items-center gap-1 bg-white hover:bg-red-50 px-2 py-1 rounded border border-slate-200 text-slate-500 hover:text-red-500 font-bold transition-colors">
                     <Trash2 className="w-3 h-3" /> CLEAR
                  </button>
@@ -450,35 +350,19 @@ export default function Files({ user }: { user: any }) {
               </div>
             </div>
             
-            {/* FILE LIST */}
             <div className="flex-1 overflow-y-auto">
               <table className="w-full text-left font-bold border-collapse">
                 <thead className="text-[9px] text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 z-10">
                   <tr>
                     <th className="py-2 px-3 border-b border-slate-100 font-bold w-8"></th>
-                    <th 
-                        className="py-2 px-3 border-b border-slate-100 font-bold cursor-pointer hover:text-blue-600 transition-colors group"
-                        onClick={() => handleSort('filename')}
-                    >
-                        <div className="flex items-center gap-1">
-                            FILENAME {sortConfig.key === 'filename' && <ArrowUpDown className="w-3 h-3 text-blue-500" />}
-                        </div>
+                    <th className="py-2 px-3 border-b border-slate-100 font-bold cursor-pointer hover:text-blue-600 transition-colors group" onClick={() => handleSort('filename')}>
+                        <div className="flex items-center gap-1">FILENAME {sortConfig.key === 'filename' && <ArrowUpDown className="w-3 h-3 text-blue-500" />}</div>
                     </th>
-                    <th 
-                        className="py-2 px-3 border-b border-slate-100 font-bold w-32 cursor-pointer hover:text-blue-600 transition-colors"
-                        onClick={() => handleSort('uploaded_at')}
-                    >
-                         <div className="flex items-center gap-1">
-                            DATE {sortConfig.key === 'uploaded_at' && <ArrowUpDown className="w-3 h-3 text-blue-500" />}
-                        </div>
+                    <th className="py-2 px-3 border-b border-slate-100 font-bold w-32 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => handleSort('uploaded_at')}>
+                         <div className="flex items-center gap-1">DATE {sortConfig.key === 'uploaded_at' && <ArrowUpDown className="w-3 h-3 text-blue-500" />}</div>
                     </th>
-                    <th 
-                        className="py-2 px-3 border-b border-slate-100 w-24 font-bold text-center cursor-pointer hover:text-blue-600 transition-colors"
-                        onClick={() => handleSort('size')}
-                    >
-                         <div className="flex items-center justify-center gap-1">
-                            SIZE {sortConfig.key === 'size' && <ArrowUpDown className="w-3 h-3 text-blue-500" />}
-                        </div>
+                    <th className="py-2 px-3 border-b border-slate-100 w-24 font-bold text-center cursor-pointer hover:text-blue-600 transition-colors" onClick={() => handleSort('size')}>
+                         <div className="flex items-center justify-center gap-1">SIZE {sortConfig.key === 'size' && <ArrowUpDown className="w-3 h-3 text-blue-500" />}</div>
                     </th>
                     <th className="py-2 px-3 border-b border-slate-100 text-right w-64 font-bold">Actions</th>
                   </tr>
@@ -488,9 +372,7 @@ export default function Files({ user }: { user: any }) {
                     <tr>
                       <td colSpan={5} className="py-20 text-center text-slate-300 italic">
                         <Archive className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                        <span className="block opacity-70">
-                            {searchTerm ? "No matches found" : "No files in this context"}
-                        </span>
+                        <span className="block opacity-70">{searchTerm ? "No matches found" : "No files in this context"}</span>
                       </td>
                     </tr>
                   ) : (
@@ -498,7 +380,6 @@ export default function Files({ user }: { user: any }) {
                        const isConvertible = /\.(si2s|lf1s|mdb|json)$/i.test(file.filename);
                        const isExpanded = expandedFileId === file.filename;
                        return (
-                        <>
                         <tr key={i} className={`group transition-colors ${isExpanded ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                           <td className="px-3 py-1 text-center">
                              {isConvertible && (
@@ -514,9 +395,7 @@ export default function Files({ user }: { user: any }) {
                             </div>
                           </td>
                           <td className="px-3 py-1 text-slate-400 font-mono text-[9px]">
-                             <div className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3 text-slate-300"/> {file.uploaded_at || "-"}
-                             </div>
+                             <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-slate-300"/> {file.uploaded_at || "-"}</div>
                           </td>
                           <td className="px-3 py-1 text-slate-400 font-mono text-[9px] text-center">{formatBytes(file.size)}</td>
                           <td className="px-3 py-1 text-right">
@@ -545,30 +424,28 @@ export default function Files({ user }: { user: any }) {
                             </div>
                           </td>
                         </tr>
-                        {isExpanded && (
-                            <tr>
-                                <td colSpan={5} className="bg-slate-900 p-0">
-                                    <div className="max-h-60 overflow-auto custom-scrollbar p-4 text-[10px] font-mono text-green-400">
-                                        {previewLoading ? (
-                                            <div className="flex items-center gap-2 text-slate-400 animate-pulse"><RefreshCw className="w-3 h-3 animate-spin"/> Loading...</div>
-                                        ) : previewData ? (
-                                            <pre>{JSON.stringify(previewData.tables || previewData, null, 2)}</pre>
-                                        ) : (
-                                            <span className="text-red-400">Failed to load preview.</span>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                        </>
-                      );
+                       );
                     })
+                  )}
+                  {/* PREVIEW ROW IF EXPANDED */}
+                  {expandedFileId && previewData && (
+                     <tr>
+                        <td colSpan={5} className="bg-slate-900 p-0">
+                            <div className="max-h-60 overflow-auto custom-scrollbar p-4 text-[10px] font-mono text-green-400">
+                                {previewLoading ? (
+                                    <div className="flex items-center gap-2 text-slate-400 animate-pulse"><RefreshCw className="w-3 h-3 animate-spin"/> Loading...</div>
+                                ) : (
+                                    <pre>{JSON.stringify(previewData.tables || previewData, null, 2)}</pre>
+                                )}
+                            </div>
+                        </td>
+                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
-      
+      </div>
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );
