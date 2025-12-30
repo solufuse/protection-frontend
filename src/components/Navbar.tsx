@@ -40,103 +40,128 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
   };
 
   return (
-    <nav className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 sticky top-0 z-50 shadow-sm">
-      
-      {/* LEFT: LOGO & NAV */}
-      <div className="flex items-center gap-8">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white shadow-orange-200 shadow-lg">
-            <Icons.Shield className="w-5 h-5" />
-          </div>
-          <span className="font-black text-lg tracking-tight text-slate-800">SOLUFUSE</span>
-        </div>
+    <>
+      {/* CUSTOM STYLES FOR ANIMATIONS */}
+      <style>{`
+        html { overflow-y: scroll; } 
+        body { padding-right: 0 !important; }
+        
+        /* Animation réactive du Logo SVG */
+        .brand-container:hover .brand-logo {
+          transform: scale(1.1) rotate(-5deg);
+          filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.3));
+        }
+        .brand-container:hover .brand-text {
+          letter-spacing: 0.05em;
+          color: #f97316;
+        }
+      `}</style>
 
-        <div className="hidden md:flex items-center gap-1">
-          <Link to="/files" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/files')}`}>
-            <Icons.Folder className="w-3.5 h-3.5" /> FILES
-          </Link>
-          <Link to="/loadflow" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/loadflow')}`}>
-            <Icons.Activity className="w-3.5 h-3.5" /> LOADFLOW
-          </Link>
-          <Link to="/protection" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/protection')}`}>
-            <Icons.Shield className="w-3.5 h-3.5" /> PROTECTION
-          </Link>
-          <Link to="/config" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/config')}`}>
-            <Icons.Settings className="w-3.5 h-3.5" /> CONFIG
-          </Link>
-        </div>
-      </div>
-
-      {/* RIGHT: USER PROFILE MENU */}
-      <div className="relative" ref={menuRef}>
-        <button 
-          onClick={() => setShowMenu(!showMenu)}
-          className={`flex items-center gap-3 pl-3 pr-2 py-1.5 rounded-full border transition-all ${user.isAnonymous ? 'bg-slate-50 border-slate-200 hover:border-blue-300' : 'bg-blue-50 border-blue-200 hover:border-blue-300'}`}
-        >
-          <div className="text-right hidden md:block">
-            <div className="text-[10px] font-black text-slate-700 leading-tight">
-              {user.isAnonymous ? "GUEST USER" : user.displayName || "PRO MEMBER"}
-            </div>
-            <div className="text-[9px] font-bold text-slate-400 leading-tight">
-              {user.isAnonymous ? "Demo Mode" : "Google Account"}
-            </div>
-          </div>
+      <nav className="h-16 border-b border-slate-200 bg-white/90 backdrop-blur-sm flex items-center justify-between px-6 sticky top-0 z-50 shadow-sm transition-all">
+        
+        {/* LEFT: LOGO & NAV LINKS */}
+        <div className="flex items-center gap-8">
           
-          {/* AVATAR (PHOTO OR ICON) */}
-          {user.photoURL ? (
-             <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-white shadow-sm" referrerPolicy="no-referrer" />
-          ) : (
-             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm ${user.isAnonymous ? 'bg-slate-400' : 'bg-blue-600'}`}>
-                <Icons.User className="w-4 h-4" />
-             </div>
-          )}
-        </button>
+          {/* LOGO SVG */}
+          <Link to="/loadflow" className="brand-container flex items-center gap-3 transition-all duration-300">
+             <img 
+               src="/logo.svg" 
+               alt="Solufuse Logo" 
+               className="brand-logo w-9 h-9 object-contain transition-all duration-300 ease-out"
+             />
+             <span className="brand-text font-black text-xl tracking-tighter text-slate-800 uppercase transition-all duration-300 ease-out hidden sm:block">
+               SOLUFUSE
+             </span>
+          </Link>
 
-        {/* DROPDOWN MENU */}
-        {showMenu && (
-          <div className="absolute right-0 top-12 w-64 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-slate-50 bg-slate-50/50">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Session</p>
-              <p className="text-xs font-bold text-slate-700 truncate">{user.uid}</p>
-            </div>
-
-            <div className="p-2 flex flex-col gap-1">
-              {user.isAnonymous ? (
-                <>
-                  <button 
-                    onClick={handleGoogleLogin}
-                    className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-slate-700 hover:text-blue-700 transition-colors group"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:border-blue-200">
-                        <Icons.User className="w-4 h-4" />
-                    </div>
-                    <div>
-                        <div className="text-[11px] font-bold">Sign in with Google</div>
-                        <div className="text-[9px] text-slate-400">Save your work</div>
-                    </div>
-                  </button>
-                </>
-              ) : (
-                <div className="px-3 py-2 text-center">
-                    <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded-full flex items-center justify-center gap-1">
-                        <Icons.Check className="w-3 h-3"/> Account Connected
-                    </span>
-                </div>
-              )}
-            </div>
-
-            <div className="p-2 border-t border-slate-100">
-              <button 
-                onClick={() => { onLogout(); setShowMenu(false); }}
-                className="w-full flex items-center justify-center gap-2 text-[10px] font-bold text-red-500 hover:bg-red-50 py-2 rounded-lg transition-colors"
-              >
-                <Icons.LogOut className="w-3.5 h-3.5" />
-                {user.isAnonymous ? "EXIT GUEST MODE" : "LOG OUT"}
-              </button>
-            </div>
+          {/* MENU LINKS */}
+          <div className="hidden md:flex items-center gap-1">
+            <Link to="/files" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/files')}`}>
+              <Icons.Folder className="w-3.5 h-3.5" /> FILES
+            </Link>
+            <Link to="/loadflow" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/loadflow')}`}>
+              <Icons.Activity className="w-3.5 h-3.5" /> LOADFLOW
+            </Link>
+            <Link to="/protection" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/protection')}`}>
+              <Icons.Shield className="w-3.5 h-3.5" /> PROTECTION
+            </Link>
+            <Link to="/config" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/config')}`}>
+              <Icons.Settings className="w-3.5 h-3.5" /> CONFIG
+            </Link>
           </div>
-        )}
-      </div>
-    </nav>
+        </div>
+
+        {/* RIGHT: USER PROFILE MENU */}
+        <div className="relative" ref={menuRef}>
+          <button 
+            onClick={() => setShowMenu(!showMenu)}
+            className={`flex items-center gap-3 pl-3 pr-2 py-1.5 rounded-full border transition-all ${user.isAnonymous ? 'bg-slate-50 border-slate-200 hover:border-blue-300' : 'bg-blue-50 border-blue-200 hover:border-blue-300'}`}
+          >
+            <div className="text-right hidden lg:block">
+              <div className="text-[10px] font-black text-slate-700 leading-tight">
+                {user.isAnonymous ? "GUEST USER" : user.displayName || "PRO MEMBER"}
+              </div>
+              <div className="text-[9px] font-bold text-slate-400 leading-tight">
+                {user.isAnonymous ? "Demo Mode" : "Google Account"}
+              </div>
+            </div>
+            
+            {/* AVATAR */}
+            {user.photoURL ? (
+               <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-white shadow-sm" referrerPolicy="no-referrer" />
+            ) : (
+               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm ${user.isAnonymous ? 'bg-slate-400' : 'bg-blue-600'}`}>
+                  <Icons.User className="w-4 h-4" />
+               </div>
+            )}
+          </button>
+
+          {/* DROPDOWN MENU */}
+          {showMenu && (
+            <div className="absolute right-0 top-12 w-64 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="p-4 border-b border-slate-50 bg-slate-50/50">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Session</p>
+                <p className="text-xs font-bold text-slate-700 truncate">{user.uid}</p>
+              </div>
+
+              <div className="p-2 flex flex-col gap-1">
+                {user.isAnonymous ? (
+                  <>
+                    <button 
+                      onClick={handleGoogleLogin}
+                      className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-slate-700 hover:text-blue-700 transition-colors group"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:border-blue-200">
+                          <Icons.User className="w-4 h-4" />
+                      </div>
+                      <div>
+                          <div className="text-[11px] font-bold">Sign in with Google</div>
+                          <div className="text-[9px] text-slate-400">Save your work</div>
+                      </div>
+                    </button>
+                  </>
+                ) : (
+                  <div className="px-3 py-2 text-center">
+                      <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded-full flex items-center justify-center gap-1">
+                          <Icons.Check className="w-3 h-3"/> Account Connected
+                      </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-2 border-t border-slate-100">
+                <button 
+                  onClick={() => { onLogout(); setShowMenu(false); }}
+                  className="w-full flex items-center justify-center gap-2 text-[10px] font-bold text-red-500 hover:bg-red-50 py-2 rounded-lg transition-colors"
+                >
+                  <Icons.LogOut className="w-3.5 h-3.5" />
+                  {user.isAnonymous ? "EXIT GUEST MODE" : "LOG OUT"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </nav>
+    </>
   );
 }
