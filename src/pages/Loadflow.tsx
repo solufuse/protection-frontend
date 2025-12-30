@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { 
   Play, Activity, Folder, HardDrive, 
   Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap, Search,
-  ChevronDown, ChevronRight, Eye, EyeOff
+  Eye, EyeOff
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
