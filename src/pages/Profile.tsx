@@ -1,8 +1,8 @@
 
 import { useState } from 'react';
 import { 
-  User, Shield, Key, Settings, CreditCard, LogOut, 
-  CheckCircle, AlertTriangle, ChevronRight, Crown, HardDrive
+  User, Shield, Key, Settings, 
+  CheckCircle, AlertTriangle, Crown
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -15,13 +15,9 @@ export default function Profile({ user }: ProfileProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'roles' | 'security'>('general');
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
 
-  const notify = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast({ show: true, msg, type });
-  };
-
-  // --- MOCK ROLES (Simulation du Backend) ---
-  // Plus tard, ceci viendra de user.getIdTokenResult().claims
-  const userRole = user.isAnonymous ? "GUEST" : (user.email?.includes('admin') ? "ADMIN" : "USER");
+  // --- MOCK ROLES (Simulation) ---
+  // On force le type 'string' pour éviter que TypeScript ne verrouille sur "GUEST"|"ADMIN"|"USER"
+  const userRole: string = user.isAnonymous ? "GUEST" : (user.email?.includes('admin') ? "ADMIN" : "USER");
   
   const permissions = [
     { name: "Access Loadflow", allowed: true },
@@ -100,7 +96,7 @@ export default function Profile({ user }: ProfileProps) {
                     {/* Identity Card */}
                     <div className="bg-white border border-slate-200 rounded shadow-sm p-6 flex items-start gap-6">
                         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center border-4 border-white shadow-lg text-slate-300">
-                            {user.photoURL ? <img src={user.photoURL} className="w-full h-full rounded-full" /> : <User className="w-10 h-10" />}
+                            {user.photoURL ? <img src={user.photoURL} className="w-full h-full rounded-full" alt="avatar" /> : <User className="w-10 h-10" />}
                         </div>
                         <div className="flex-1">
                             <h2 className="text-xl font-black text-slate-800 mb-1">{user.displayName || "Guest User"}</h2>
