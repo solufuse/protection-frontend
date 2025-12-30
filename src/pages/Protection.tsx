@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Shield, ChevronRight, Settings, SlidersHorizontal } from 'lucide-react';
 import Toast from '../components/Toast';
 
-export default function Protection({ user }: { user: any }) {
+// [FIX] Removed '{ user }' because it was unused and caused build error TS6133
+export default function Protection() {
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => {

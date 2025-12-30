@@ -32,7 +32,7 @@ function App() {
         console.log("[Auto-Login] No user found, creating Guest session...");
         signInAnonymously(auth)
           .then(() => {
-            // Success is handled by the listener firing again
+            // Success handled by listener
           })
           .catch((error) => {
             console.error("[Auto-Login Error]", error);
@@ -57,11 +57,13 @@ function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/files" replace />} />
             
-            {/* [FIX] Tous les composants reçoivent maintenant 'user' */}
+            {/* Pages requiring user */}
             <Route path="/loadflow" element={<Loadflow user={user} />} />
-            <Route path="/protection" element={<Protection user={user} />} />
             <Route path="/files" element={<Files user={user} />} />
             <Route path="/config" element={<Config user={user} />} />
+            
+            {/* [FIX] Protection does NOT use 'user' prop yet, so we don't pass it */}
+            <Route path="/protection" element={<Protection />} />
             
             <Route path="*" element={<Navigate to="/files" replace />} />
           </Routes>
