@@ -10,7 +10,6 @@ import Files from './pages/Files';
 import Config from './pages/Config';
 import { Icons } from './icons';
 
-// Composant de chargement simple (Spinner)
 function LoadingScreen() {
   return (
     <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4">
@@ -25,22 +24,19 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Écouteur d'état Firebase
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
-        // 1. Utilisateur connecté (Google ou Guest existant)
         setUser(currentUser);
         setLoading(false);
       } else {
-        // 2. Pas d'utilisateur ? -> ON CRÉE UN GUEST AUTOMATIQUEMENT
         console.log("[Auto-Login] No user found, creating Guest session...");
         signInAnonymously(auth)
           .then(() => {
-            // La réussite déclenchera à nouveau onAuthStateChanged avec le user
+            // Success handled by onAuthStateChanged
           })
           .catch((error) => {
             console.error("[Auto-Login Error]", error);
-            setLoading(false); // On arrête le chargement même en cas d'erreur pour ne pas bloquer
+            setLoading(false);
           });
       }
     });
@@ -50,23 +46,28 @@ function App() {
 
   const handleLogout = () => auth.signOut();
 
-  // Tant qu'on charge (ou qu'on connecte le guest en arrière-plan), on affiche le spinner
   if (loading) return <LoadingScreen />;
 
   return (
     <Router>
       <div className="min-h-screen bg-slate-50">
-        {/* On affiche la Navbar seulement si on a un user (ce qui sera toujours le cas après chargement) */}
+        {/* Navbar accepte 'user' -> OK */}
         {user && <Navbar user={user} onLogout={handleLogout} />}
         
         <main>
           <Routes>
             <Route path="/" element={<Navigate to="/files" replace />} />
-            <Route path="/loadflow" element={<Loadflow user={user} />} />
-            <Route path="/protection" element={<Protection user={user} />} />
+            
+            {/* [FIX] Ces pages ne sont pas encore prêtes à recevoir 'user', on le retire pour l'instant */}
+            <Route path="/loadflow" element={<Loadflow />} />
+            <Route path="/protection" element={<Protection />} />
+            
+            {/* Files accepte 'user' -> OK */}
             <Route path="/files" element={<Files user={user} />} />
-            <Route path="/config" element={<Config user={user} />} />
-            {/* Catch all : redirection vers files */}
+            
+            {/* Config n'est pas prêt -> on retire 'user' */}
+            <Route path="/config" element={<Config />} />
+            
             <Route path="*" element={<Navigate to="/files" replace />} />
           </Routes>
         </main>
