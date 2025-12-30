@@ -17,7 +17,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
 
   return (
     <>
-      {/* CSS pour éviter le décalage de la barre de scroll */}
       <style>{`
         html { overflow-y: scroll; } 
         body { padding-right: 0 !important; }
@@ -29,9 +28,12 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
             
             <div className="flex items-center gap-2">
               <Link to="/loadflow" className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-200">
-                      <Icons.Shield className="w-5 h-5 text-white" />
-                  </div>
+                  {/* ON REMPLACE L'ICONE PAR TON IMAGE */}
+                  <img 
+                    src="/favicon.ico" 
+                    alt="Logo" 
+                    className="w-9 h-9 object-contain"
+                  />
                   <span className="font-black text-xl tracking-tighter text-slate-800 uppercase">SOLUFUSE</span>
               </Link>
             </div>
@@ -45,7 +47,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
 
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-full border border-slate-200 pr-4">
-                {/* [decision:logic] -> Show Google Photo if available, otherwise fallback to Initials */}
                 {user?.photoURL ? (
                   <img 
                     src={user.photoURL} 
