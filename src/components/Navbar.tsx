@@ -51,7 +51,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
           <span className="font-black text-lg tracking-tight text-slate-800">SOLUFUSE</span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-1">
           <Link to="/files" className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive('/files')}`}>
             <Icons.Folder className="w-3.5 h-3.5" /> FILES
           </Link>
@@ -81,9 +81,15 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               {user.isAnonymous ? "Demo Mode" : "Google Account"}
             </div>
           </div>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm ${user.isAnonymous ? 'bg-slate-400' : 'bg-blue-600'}`}>
-            <Icons.User className="w-4 h-4" />
-          </div>
+          
+          {/* AVATAR (PHOTO OR ICON) */}
+          {user.photoURL ? (
+             <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-white shadow-sm" referrerPolicy="no-referrer" />
+          ) : (
+             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm ${user.isAnonymous ? 'bg-slate-400' : 'bg-blue-600'}`}>
+                <Icons.User className="w-4 h-4" />
+             </div>
+          )}
         </button>
 
         {/* DROPDOWN MENU */}
@@ -107,17 +113,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                     <div>
                         <div className="text-[11px] font-bold">Sign in with Google</div>
                         <div className="text-[9px] text-slate-400">Save your work</div>
-                    </div>
-                  </button>
-                  
-                  {/* Placeholder for future Auth methods */}
-                  <button className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 text-slate-400 cursor-not-allowed opacity-60">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                        <Icons.Key className="w-4 h-4" />
-                    </div>
-                    <div>
-                        <div className="text-[11px] font-bold">Email / Password</div>
-                        <div className="text-[9px]">Coming soon</div>
                     </div>
                   </button>
                 </>
