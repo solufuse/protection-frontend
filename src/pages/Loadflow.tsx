@@ -2,14 +2,21 @@
 import { useState, useEffect } from 'react';
 import { 
   Play, Activity, Folder, HardDrive, 
-  Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap, Search
+  Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap, Search,
+  GitCommit
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
-// --- TYPES (Basés sur ton JSON lf_res.json) ---
+// --- TYPES ---
 interface Project {
   project_id: string;
   role: 'owner' | 'member';
+}
+
+interface StudyCase {
+  id: string;
+  config: string;
+  revision: string;
 }
 
 interface TransformerResult {
@@ -26,6 +33,7 @@ interface LoadflowResult {
   mvar_flow: number;
   delta_target: number;
   is_winner: boolean;
+  study_case?: StudyCase; // Added study_case support
   transformers: Record<string, TransformerResult>;
 }
 
@@ -35,13 +43,12 @@ interface LoadflowResponse {
 }
 
 export default function Loadflow({ user }: { user: any }) {
-  // --- STATE: NAVIGATION ---
+  // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
 
-  // --- STATE: DATA & UI ---
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<LoadflowResponse | null>(null);
   const [baseName, setBaseName] = useState("lf_results");
@@ -100,13 +107,30 @@ export default function Loadflow({ user }: { user: any }) {
     } catch (e) { notify("Delete failed", "error"); }
   };
 
-  useEffect(() => {
-    if (user) fetchProjects();
-  }, [user]);
+  useEffect(() => { if (user) fetchProjects(); }, [user]);
 
   // --- LOADFLOW ACTIONS ---
 
-  // 1. Charger les résultats (Lecture seule, pas de calcul)
+  // Helper to extract number from "CH195" for sorting
+  const extractLoadNumber = (rev: string | undefined) => {
+      if (!rev) return 999999;
+      const match = rev.match(/(\d+)/);
+      return match ? parseInt(match[0]) : 0;
+  };
+
+  const processAndSetResults = (data: LoadflowResponse) => {
+      if (data.results) {
+          // SORT BY LOAD REVISION (Montée en charge)
+          // CH195 -> CH200 -> CH208
+          data.results.sort((a, b) => {
+              const valA = extractLoadNumber(a.study_case?.revision);
+              const valB = extractLoadNumber(b.study_case?.revision);
+              return valA - valB;
+          });
+      }
+      setResults(data);
+  };
+
   const handleLoadResults = async () => {
     if (!user) return;
     setLoading(true);
@@ -117,24 +141,15 @@ export default function Loadflow({ user }: { user: any }) {
         const jsonFilename = `${baseName}.json`;
 
         const dataRes = await fetch(`${apiUrl}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
-        
-        if (!dataRes.ok) {
-            if(dataRes.status === 404) throw new Error("No previous results found. Please Run Analysis.");
-            throw new Error("Failed to load results");
-        }
+        if (!dataRes.ok) throw new Error("No previous results found.");
         
         const jsonData: LoadflowResponse = await dataRes.json();
         processAndSetResults(jsonData);
-        notify(`Loaded: ${jsonData.results.length} scenarios from storage`);
-
-    } catch (e: any) {
-        notify(e.message || "Load Error", "error");
-    } finally {
-        setLoading(false);
-    }
+        notify(`Loaded: ${jsonData.results.length} scenarios`);
+    } catch (e: any) { notify(e.message, "error"); } 
+    finally { setLoading(false); }
   };
 
-  // 2. Lancer le calcul (RUN & SAVE)
   const handleRunAnalysis = async () => {
     if (!user) return;
     setLoading(true);
@@ -143,37 +158,20 @@ export default function Loadflow({ user }: { user: any }) {
       const t = await getToken();
       const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
       
-      // Call Backend Engine
       const runRes = await fetch(`${apiUrl}/loadflow/run-and-save?basename=${baseName}${pParam}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${t}` }
+        method: 'POST', headers: { 'Authorization': `Bearer ${t}` }
       });
-
       if (!runRes.ok) throw new Error("Calculation Failed");
       
-      // Reload the fresh file
       const jsonFilename = `${baseName}.json`;
       const dataRes = await fetch(`${apiUrl}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
-      if (!dataRes.ok) throw new Error("Result file missing after run");
+      if (!dataRes.ok) throw new Error("Result file missing");
       
       const jsonData: LoadflowResponse = await dataRes.json();
       processAndSetResults(jsonData);
-      notify("Analysis Freshly Computed & Saved");
-
-    } catch (e) { 
-      notify("Error during analysis", "error"); 
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const processAndSetResults = (data: LoadflowResponse) => {
-      // Sort by MW Flow Absolute value to create a nice "Ramp Up" curve
-      if (data.results) {
-          data.results.sort((a, b) => Math.abs(a.mw_flow) - Math.abs(b.mw_flow));
-      }
-      setResults(data);
+      notify("Analysis Freshly Computed");
+    } catch (e) { notify("Error during analysis", "error"); } 
+    finally { setLoading(false); }
   };
 
   const handleCopyToken = async () => {
@@ -181,52 +179,93 @@ export default function Loadflow({ user }: { user: any }) {
     if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); }
   };
 
-  // --- CHART: RAMP UP CURVE ---
-  const RampUpChart = ({ data }: { data: LoadflowResult[] }) => {
+  // --- CHART: EXCEL STYLE LINE CHART ---
+  const LineChart = ({ data }: { data: LoadflowResult[] }) => {
     if (!data || data.length === 0) return null;
-    
-    // Scale based on Max MW
-    const maxVal = Math.max(...data.map(d => Math.abs(d.mw_flow)));
-    
-    return (
-      <div className="w-full h-64 flex items-end gap-[2px] pt-10 pb-6 px-4 bg-white rounded border border-slate-200 shadow-sm relative overflow-hidden">
-        {/* Grid Lines */}
-        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none p-4 opacity-10 z-0">
-            <div className="border-t border-slate-400 w-full h-0"></div>
-            <div className="border-t border-slate-400 w-full h-0"></div>
-            <div className="border-t border-slate-400 w-full h-0"></div>
-        </div>
 
-        {data.map((r, i) => {
-          const height = (Math.abs(r.mw_flow) / (maxVal || 1)) * 100;
-          return (
-            <div key={i} className="flex-1 flex flex-col justify-end group relative h-full z-10">
-              {/* Tooltip */}
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center bg-slate-800 text-white text-[9px] p-2 rounded shadow-xl z-20 whitespace-nowrap">
-                <span className="font-bold">{r.filename}</span>
-                <span className="text-blue-300">{r.mw_flow.toFixed(2)} MW</span>
-                <span className="text-slate-400">Tap: {Object.values(r.transformers)[0]?.Tap}</span>
-              </div>
-              
-              {/* Bar */}
-              <div 
-                style={{ height: `${height}%` }} 
-                className={`w-full min-w-[4px] rounded-t-sm transition-all duration-300 relative ${
-                    r.is_valid ? 'bg-blue-500 hover:bg-blue-600' : 'bg-red-200 hover:bg-red-400'
-                }`}
-              >
-                {/* Winner Marker (Green Dot) */}
-                {r.is_winner && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-2 h-2 bg-green-500 rounded-full shadow-sm ring-2 ring-white animate-pulse"></div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+    // 1. Calculate Scales
+    const flows = data.map(d => Math.abs(d.mw_flow));
+    const minVal = Math.min(...flows) * 0.95; // 5% padding bottom
+    const maxVal = Math.max(...flows) * 1.05; // 5% padding top
+    const range = maxVal - minVal;
+    
+    // 2. Generate SVG Points
+    const width = 800; // arbitrary internal SVG units
+    const height = 200;
+    const stepX = width / (data.length > 1 ? data.length - 1 : 1);
+
+    const points = data.map((d, i) => {
+        const x = i * stepX;
+        const y = height - ((Math.abs(d.mw_flow) - minVal) / (range || 1)) * height;
+        return { x, y, data: d };
+    });
+
+    const polylinePoints = points.map(p => `${p.x},${p.y}`).join(" ");
+
+    return (
+      <div className="w-full h-72 bg-white rounded border border-slate-200 shadow-sm p-4 flex flex-col">
+        <div className="flex-1 relative">
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+                {/* Grid Lines (Horizontal) */}
+                <line x1="0" y1="0" x2={width} y2="0" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
+                <line x1="0" y1={height/2} x2={width} y2={height/2} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
+                <line x1="0" y1={height} x2={width} y2={height} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
+
+                {/* The Line */}
+                <polyline 
+                    points={polylinePoints} 
+                    fill="none" 
+                    stroke="#3b82f6" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                />
+
+                {/* The Points (Dots) */}
+                {points.map((p, i) => {
+                    // Color Logic: Winner=Green, Valid=Red, Invalid=Grey
+                    let fillColor = "#94a3b8"; // Grey (Default/Invalid)
+                    let radius = 4;
+                    
+                    if (p.data.is_winner) {
+                        fillColor = "#22c55e"; // Green
+                        radius = 6; // Bigger for winner
+                    } else if (p.data.is_valid) {
+                        fillColor = "#ef4444"; // Red (Valid but rejected)
+                    }
+
+                    return (
+                        <g key={i} className="group cursor-pointer">
+                            {/* Invisible hit area for easier hovering */}
+                            <circle cx={p.x} cy={p.y} r="10" fill="transparent" />
+                            
+                            {/* Visible Dot */}
+                            <circle 
+                                cx={p.x} cy={p.y} r={radius} 
+                                fill={fillColor} stroke="white" strokeWidth="2" 
+                                className="transition-all duration-200 group-hover:r-6 shadow-sm"
+                            />
+
+                            {/* Tooltip (SVG ForeignObject or simple overlay) */}
+                            {/* Using simple text label for revision on X axis below point */}
+                            <text x={p.x} y={height + 15} textAnchor="middle" fontSize="10" fill="#64748b" fontWeight="bold">
+                                {p.data.study_case?.revision || `S${i}`}
+                            </text>
+
+                            {/* Hover Tooltip (HTML overlay via group-hover pattern in parent div is tricky in SVG, using Title tag for basic native tooltip) */}
+                            <title>{`${p.data.study_case?.config || p.data.filename}\nMW: ${p.data.mw_flow.toFixed(2)}\nWinner: ${p.data.is_winner ? 'YES' : 'NO'}`}</title>
+                        </g>
+                    );
+                })}
+            </svg>
+        </div>
         
-        {/* Labels */}
-        <div className="absolute bottom-1 right-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Scenarios (Sorted by Load)</div>
-        <div className="absolute top-2 left-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Power (MW)</div>
+        {/* Legend */}
+        <div className="h-6 flex items-center justify-center gap-4 text-[9px] font-bold text-slate-500 uppercase mt-2">
+            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500"></div> Winner</div>
+            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> Valid (Rejected)</div>
+            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400"></div> Invalid</div>
+        </div>
       </div>
     );
   };
@@ -262,22 +301,11 @@ export default function Loadflow({ user }: { user: any }) {
             placeholder="Result Filename"
           />
           <span className="text-slate-400 font-bold">.json</span>
-          
           <div className="w-px h-6 bg-slate-200 mx-2"></div>
-
-          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors">
-            <Key className="w-3.5 h-3.5" /> TOKEN
-          </button>
-          
-          {/* LOAD BUTTON (Manual) */}
-          <button onClick={handleLoadResults} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300">
-            <Search className="w-3.5 h-3.5" /> LOAD PREVIOUS
-          </button>
-
-          {/* RUN BUTTON (Action) */}
+          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Key className="w-3.5 h-3.5" /> TOKEN</button>
+          <button onClick={handleLoadResults} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300"><Search className="w-3.5 h-3.5" /> LOAD EXISTING</button>
           <button onClick={handleRunAnalysis} disabled={loading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded font-black shadow-sm disabled:opacity-50 transition-all">
-            {loading ? <Activity className="w-3.5 h-3.5 animate-spin"/> : <Play className="w-3.5 h-3.5 fill-current" />}
-            {loading ? "CALCULATING..." : "RUN ANALYSIS"}
+            {loading ? <Activity className="w-3.5 h-3.5 animate-spin"/> : <Play className="w-3.5 h-3.5 fill-current" />} {loading ? "CALCULATING..." : "RUN ANALYSIS"}
           </button>
         </div>
       </div>
@@ -287,26 +315,15 @@ export default function Loadflow({ user }: { user: any }) {
         
         {/* SIDEBAR */}
         <div className="w-60 flex flex-col gap-4 flex-shrink-0 overflow-y-auto custom-scrollbar">
-            <div 
-                onClick={() => setActiveProjectId(null)}
-                className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null 
-                    ? 'bg-slate-800 text-white border-slate-900 shadow-md' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-            >
+            <div onClick={() => setActiveProjectId(null)} className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null ? 'bg-slate-800 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
                 <HardDrive className="w-4 h-4" />
-                <div className="flex flex-col">
-                    <span className="font-bold uppercase tracking-wide">My Session</span>
-                    <span className={`text-[9px] ${activeProjectId === null ? 'text-slate-400' : 'text-slate-400'}`}>Private Sandbox</span>
-                </div>
+                <div className="flex flex-col"><span className="font-bold uppercase tracking-wide">My Session</span><span className={`text-[9px] ${activeProjectId === null ? 'text-slate-400' : 'text-slate-400'}`}>Private Sandbox</span></div>
             </div>
             <div className="border-t border-slate-200 my-1"></div>
-            <div className="flex justify-between items-center px-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span>
-                <button onClick={() => setIsCreatingProject(!isCreatingProject)} className="p-1 hover:bg-blue-50 text-blue-600 rounded"><Plus className="w-3.5 h-3.5" /></button>
-            </div>
+            <div className="flex justify-between items-center px-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span><button onClick={() => setIsCreatingProject(!isCreatingProject)} className="p-1 hover:bg-blue-50 text-blue-600 rounded"><Plus className="w-3.5 h-3.5" /></button></div>
             {isCreatingProject && (
                 <div className="flex gap-1">
-                    <input className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none" placeholder="ID..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value.toUpperCase())} />
+                    <input className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none" placeholder="Project ID..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value.toUpperCase())} />
                     <button onClick={createProject} className="bg-blue-600 text-white px-2 rounded font-bold text-[9px]">OK</button>
                 </div>
             )}
@@ -322,7 +339,6 @@ export default function Loadflow({ user }: { user: any }) {
 
         {/* RIGHT: DASHBOARD AREA */}
         <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar pr-2">
-            
             {!results ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4 border-2 border-dashed border-slate-100 rounded bg-slate-50/50">
                     <Activity className={`w-16 h-16 ${loading ? 'animate-pulse text-yellow-400' : ''}`} />
@@ -338,17 +354,17 @@ export default function Loadflow({ user }: { user: any }) {
                             <Activity className="w-8 h-8 text-slate-200" />
                         </div>
                         <div className="bg-white p-4 rounded border border-slate-200 shadow-sm flex justify-between items-center">
-                            <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Valid Solutions</div><div className="text-2xl font-black text-green-600">{results.results.filter(r => r.is_valid).length}</div></div>
+                            <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Winners</div><div className="text-2xl font-black text-green-600">{results.results.filter(r => r.is_winner).length}</div></div>
                             <CheckCircle className="w-8 h-8 text-green-100" />
                         </div>
                     </div>
 
-                    {/* CHART */}
+                    {/* LINE CHART */}
                     <div>
                         <div className="flex justify-between items-center mb-2">
-                            <h2 className="font-black text-slate-700 uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> Load Ramp-up Curve</h2>
+                            <h2 className="font-black text-slate-700 uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> Power Ramp-up Curve</h2>
                         </div>
-                        <RampUpChart data={results.results} />
+                        <LineChart data={results.results} />
                     </div>
 
                     {/* DETAILED TABLE */}
@@ -361,9 +377,9 @@ export default function Loadflow({ user }: { user: any }) {
                                 <thead className="bg-slate-50 text-[9px] text-slate-400 uppercase tracking-widest border-b border-slate-100">
                                     <tr>
                                         <th className="px-4 py-2 w-10">St</th>
-                                        <th className="px-4 py-2 w-64">Scenario</th>
-                                        <th className="px-4 py-2 text-right">Global MW</th>
-                                        <th className="px-4 py-2 text-right">Global MVar</th>
+                                        <th className="px-4 py-2">Load Step (Revision)</th>
+                                        <th className="px-4 py-2 text-right">MW Flow</th>
+                                        <th className="px-4 py-2 text-right">MVar Flow</th>
                                         <th className="px-4 py-2">Transformers Detail (Tap | MW | MVar)</th>
                                     </tr>
                                 </thead>
@@ -371,10 +387,13 @@ export default function Loadflow({ user }: { user: any }) {
                                     {results.results.map((r, i) => (
                                         <tr key={i} className={`hover:bg-slate-50 ${r.is_winner ? 'bg-green-50/30' : ''}`}>
                                             <td className="px-4 py-3">
-                                                {r.is_valid ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertTriangle className="w-4 h-4 text-slate-300" />}
+                                                {r.is_winner ? <CheckCircle className="w-4 h-4 text-green-500" /> : r.is_valid ? <AlertTriangle className="w-4 h-4 text-red-400" /> : <AlertTriangle className="w-4 h-4 text-slate-300" />}
                                             </td>
-                                            <td className="px-4 py-3 font-mono text-[10px] text-slate-600 truncate max-w-xs" title={r.filename}>
-                                                {r.filename}
+                                            <td className="px-4 py-3 font-mono text-[10px] text-slate-600">
+                                                <div className="flex flex-col">
+                                                    <span className="font-black text-slate-800">{r.study_case?.revision || "-"}</span>
+                                                    <span className="text-[9px] text-slate-400">{r.study_case?.config || r.filename}</span>
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3 text-right font-mono text-blue-600 text-[10px]">
                                                 {Math.abs(r.mw_flow).toFixed(2)}
