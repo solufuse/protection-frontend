@@ -138,9 +138,22 @@ export default function Files({ user }: { user: any }) {
 
   const handleUpload = async (fileList: FileList | null) => {
     if (!fileList || !user) return;
-    if (user.isAnonymous && (files.length + fileList.length > 5)) {
-        return notify("Demo Limit: Max 5 files allow in Guest Mode.", "error");
+    
+    // [!] SECURITY CHECK: Guest Restrictions
+    if (user.isAnonymous) {
+        // 1. Check Count Quota
+        if (files.length + fileList.length > 5) {
+            return notify("Demo Limit: Max 5 files allowed in Guest Mode.", "error");
+        }
+        // 2. Check File Type (No ZIPs)
+        for (let i = 0; i < fileList.length; i++) {
+            const name = fileList[i].name.toLowerCase();
+            if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z')) {
+                return notify("Restricted: Guests cannot upload archives (.zip). Please sign in.", "error");
+            }
+        }
     }
+
     setUploading(true);
     const formData = new FormData();
     Array.from(fileList).forEach(f => formData.append('files', f));
@@ -149,10 +162,15 @@ export default function Files({ user }: { user: any }) {
       let url = `${API_URL}/session/upload`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+          // Try to get error message from backend
+          const err = await res.json().catch(() => ({ detail: "Upload Failed" }));
+          throw new Error(err.detail || "Upload Failed");
+      }
       notify(`${fileList.length} Uploaded`);
       fetchFiles();
-    } catch (e) { notify("Upload Failed", "error"); } finally { 
+    } catch (e: any) { notify(e.message || "Upload Failed", "error"); } 
+    finally { 
         setUploading(false); 
         if (fileInputRef.current) fileInputRef.current.value = ''; 
     }
@@ -273,7 +291,7 @@ export default function Files({ user }: { user: any }) {
                 </div>
                 <div>
                     <h3 className="font-bold text-blue-900 text-xs">Guest Mode (Demo)</h3>
-                    <p className="text-blue-700 text-[10px] mt-0.5">Limits: Max 5 files. Storage is temporary. Projects disabled.</p>
+                    <p className="text-blue-700 text-[10px] mt-0.5">Limits: Max 5 files. Storage is temporary. Projects & Zips disabled.</p>
                 </div>
             </div>
             <button onClick={handleGoogleLogin} className="whitespace-nowrap px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2">
