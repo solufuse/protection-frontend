@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   Save, Trash2, Settings, Zap, Download, Activity, 
-  ChevronDown, ChevronRight, Upload, ShieldCheck, RefreshCw,
+  ChevronDown, ChevronRight, Upload, ShieldCheck,
   Folder, HardDrive, Plus, Key, Link as LinkIcon
 } from 'lucide-react';
 import Toast from '../components/Toast';
@@ -17,7 +17,7 @@ export default function Config({ user }: { user: any }) {
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   
-  // Sections (Added 'links' for the new JSON part)
+  // Sections
   const [openSections, setOpenSections] = useState({ 
     inrush: true, 
     links: true, 
@@ -41,7 +41,7 @@ export default function Config({ user }: { user: any }) {
     setToast({ show: true, msg, type });
   };
 
-  // --- DEFAULT CONFIGURATION (Updated to match config.json) ---
+  // --- DEFAULT CONFIGURATION ---
   const defaultConfig = {
     project_name: "NEW_PROJECT",
     settings: {
@@ -52,7 +52,7 @@ export default function Config({ user }: { user: any }) {
       }
     },
     transformers: [],
-    links_data: [], // New Field
+    links_data: [], 
     loadflow_settings: { target_mw: 0, tolerance_mw: 0.3, swing_bus_id: "" },
     plans: []
   };
@@ -133,9 +133,7 @@ export default function Config({ user }: { user: any }) {
             const text = await blob.text();
             try {
                 const sessionConfig = JSON.parse(text);
-                // Basic validation
                 if (sessionConfig && (sessionConfig.settings || sessionConfig.transformers)) {
-                    // Merge with default to ensure new fields (like links_data) exist if old config
                     setConfig({ ...defaultConfig, ...sessionConfig });
                 } else {
                     throw new Error("Invalid structure");
