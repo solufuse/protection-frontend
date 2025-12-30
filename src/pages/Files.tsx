@@ -1,8 +1,11 @@
+
 import { useEffect, useState, useRef, DragEvent } from 'react';
 import { 
   Trash2, FileText, HardDrive, 
   FileSpreadsheet, FileJson, FileDown,
-  RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, ChevronDown, ChevronRight, Calendar, ExternalLink
+  RefreshCw, Archive, Key, UploadCloud, Eye, EyeOff, 
+  ChevronDown, ChevronRight, Calendar, ExternalLink,
+  Folder, Plus, Search, ArrowUpDown, Layers
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -14,13 +17,34 @@ interface SessionFile {
   content_type: string;
 }
 
+interface Project {
+  project_id: string;
+  role: 'owner' | 'member';
+  created_at: string;
+  owner_email: string;
+}
+
+type SortKey = 'filename' | 'uploaded_at' | 'size';
+type SortOrder = 'asc' | 'desc';
+
 export default function Files({ user }: { user: any }) {
+  // --- STATE: FILES & DATA ---
   const [files, setFiles] = useState<SessionFile[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  
+  // --- STATE: UI & NAVIGATION ---
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null); // null = User Session
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  
-  // Accordion State
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+
+  // --- STATE: SEARCH & SORT ---
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'filename', order: 'asc' });
+
+  // --- STATE: PREVIEW ---
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -45,19 +69,73 @@ export default function Files({ user }: { user: any }) {
     return await user.getIdToken(true); 
   };
 
+  // --- EFFECTS ---
+
   useEffect(() => {
-    if (user) fetchFiles();
-  }, [user]);
+    if (user) {
+      fetchProjects();
+      fetchFiles();
+    }
+  }, [user, activeProjectId]); // Re-fetch files when switching context
+
+  // --- API CALLS ---
+
+  const fetchProjects = async () => {
+    try {
+      const t = await getToken();
+      const res = await fetch(`${API_URL}/session/projects`, { headers: { 'Authorization': `Bearer ${t}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data);
+      }
+    } catch (e) { console.error("Failed to load projects", e); }
+  };
 
   const fetchFiles = async () => {
     setLoading(true);
     try {
       const t = await getToken();
-      const res = await fetch(`${API_URL}/session/details`, { headers: { 'Authorization': `Bearer ${t}` } });
+      // Add project_id param if active
+      let url = `${API_URL}/session/details`;
+      if (activeProjectId) url += `?project_id=${activeProjectId}`;
+
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setFiles(data.files || []);
     } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
+
+  const createProject = async () => {
+    if (!newProjectName.trim()) return;
+    try {
+      const t = await getToken();
+      const res = await fetch(`${API_URL}/session/project/create?project_id=${encodeURIComponent(newProjectName)}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${t}` }
+      });
+      if (!res.ok) throw new Error();
+      notify("Project Created");
+      setNewProjectName("");
+      setIsCreatingProject(false);
+      fetchProjects();
+    } catch (e) { notify("Project creation failed (exists?)", "error"); }
+  };
+
+  const deleteProject = async (projId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Delete project "${projId}" permanently? This cannot be undone.`)) return;
+    try {
+      const t = await getToken();
+      const res = await fetch(`${API_URL}/session/project?project_id=${projId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${t}` }
+      });
+      if (!res.ok) throw new Error();
+      notify("Project Deleted");
+      if (activeProjectId === projId) setActiveProjectId(null); // Reset to user session
+      fetchProjects();
+    } catch (e) { notify("Delete failed", "error"); }
   };
 
   const handleUpload = async (fileList: FileList | null) => {
@@ -68,28 +146,38 @@ export default function Files({ user }: { user: any }) {
 
     try {
       const t = await getToken();
-      const res = await fetch(`${API_URL}/session/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
+      // Add project_id if active
+      let url = `${API_URL}/session/upload`;
+      if (activeProjectId) url += `?project_id=${activeProjectId}`;
+
+      const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
       if (!res.ok) throw new Error();
       notify(`${fileList.length} Uploaded`);
       fetchFiles();
-    } catch (e) { notify("Echec Upload", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    } catch (e) { notify("Upload Failed", "error"); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
   const handleDelete = async (path: string) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete file?")) return;
     try {
       const t = await getToken();
-      await fetch(`${API_URL}/session/file/${path}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
+      let url = `${API_URL}/session/file/${path}`;
+      if (activeProjectId) url += `?project_id=${activeProjectId}`;
+
+      await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
       setFiles(p => p.filter(f => f.path !== path));
       notify("Deleted");
     } catch (e) { notify("Error", "error"); }
   };
 
   const handleClear = async () => {
-    if (!confirm("Clear all?")) return;
+    if (!confirm("Clear all files in this context?")) return;
     try {
       const t = await getToken();
-      await fetch(`${API_URL}/session/clear`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
+      let url = `${API_URL}/session/clear`;
+      if (activeProjectId) url += `?project_id=${activeProjectId}`;
+
+      await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
       setFiles([]);
       setExpandedFileId(null);
       notify("Cleared");
@@ -101,22 +189,16 @@ export default function Files({ user }: { user: any }) {
   const handleOpenLink = async (type: 'raw' | 'xlsx' | 'json' | 'json_tab', filename: string) => {
       try {
           const t = await getToken();
-          let url = "";
+          // Inject Project ID into download links
+          const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
           
-          if (type === 'raw') {
-              url = `${API_URL}/session/download?filename=${encodeURIComponent(filename)}&token=${t}`;
-          } else if (type === 'xlsx') {
-              url = `${API_URL}/ingestion/download/xlsx?filename=${encodeURIComponent(filename)}&token=${t}`;
-          } else if (type === 'json') {
-              // DOWNLOAD JSON (Attachment)
-              url = `${API_URL}/ingestion/download/json?filename=${encodeURIComponent(filename)}&token=${t}`;
-          } else if (type === 'json_tab') {
-              // VIEW JSON (Inline/Tab)
-              url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}`;
-          }
+          let url = "";
+          if (type === 'raw') url = `${API_URL}/session/download?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
+          else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
+          else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
+          else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`;
           
           if (url) window.open(url, '_blank');
-          
       } catch (e) { notify("Link Error", "error"); }
   };
 
@@ -131,7 +213,8 @@ export default function Files({ user }: { user: any }) {
 
     try {
       const t = await getToken();
-      const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}`);
+      const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
+      const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`);
       if (!res.ok) throw new Error("Preview unavailable");
       const data = await res.json();
       setPreviewData(data);
@@ -150,17 +233,65 @@ export default function Files({ user }: { user: any }) {
     notify("Token Copied");
   };
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(current => ({
+      key,
+      order: current.key === key && current.order === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  // --- COMPUTED DATA (Search & Sort) ---
+  const filteredFiles = files
+    .filter(f => f.filename.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      let aVal: any = a[sortConfig.key];
+      let bVal: any = b[sortConfig.key];
+
+      // Handle specific types
+      if (sortConfig.key === 'size') {
+        aVal = a.size; bVal = b.size;
+      } else if (sortConfig.key === 'uploaded_at') {
+        aVal = new Date(a.uploaded_at || 0).getTime();
+        bVal = new Date(b.uploaded_at || 0).getTime();
+      } else {
+        aVal = aVal?.toString().toLowerCase() || "";
+        bVal = bVal?.toString().toLowerCase() || "";
+      }
+
+      if (aVal < bVal) return sortConfig.order === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.order === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+  // --- DRAG & DROP ---
   const onDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
   const onDragLeave = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
-  const onDrop = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); };
+  const onDrop = (e: DragEvent<HTMLDivElement>) => { 
+    e.preventDefault(); e.stopPropagation(); setIsDragging(false); 
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); 
+  };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-4 text-[11px] font-sans">
-      <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-2">
+    <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
+      
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
         <div className="flex flex-col">
-          <label className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Session Manager</label>
-          <h1 className="text-lg font-bold text-slate-800 uppercase flex items-center gap-2">
-            RAM STORAGE <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full border border-blue-200">{files.length} ITEMS</span>
+          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Workspace</label>
+          <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
+            {activeProjectId ? (
+                <>
+                    <Folder className="w-5 h-5 text-blue-600" />
+                    <span>{activeProjectId}</span>
+                    <span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">PROJECT</span>
+                </>
+            ) : (
+                <>
+                    <HardDrive className="w-5 h-5 text-slate-600" />
+                    <span>My Session</span>
+                    <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span>
+                </>
+            )}
           </h1>
         </div>
         <div className="flex gap-2">
@@ -170,54 +301,177 @@ export default function Files({ user }: { user: any }) {
           <button onClick={() => fetchFiles()} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> REFRESH
           </button>
-          <button onClick={handleClear} className="flex items-center gap-1 bg-white hover:bg-red-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-red-600 font-bold transition-colors">
-            <Trash2 className="w-3.5 h-3.5" /> CLEAR ALL
-          </button>
         </div>
       </div>
 
-      <div className="w-full">
-          <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold relative transition-all"
-            onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
-          >
-            {isDragging && (
-                <div className="absolute inset-0 z-50 bg-blue-50/90 border-2 border-dashed border-blue-500 rounded flex flex-col items-center justify-center pointer-events-none">
-                    <UploadCloud className="w-12 h-12 text-blue-600 mb-2" />
-                    <span className="text-lg font-black text-blue-700 uppercase tracking-widest">Drop files here to upload</span>
+      {/* MAIN CONTENT SPLIT */}
+      <div className="flex flex-1 gap-6 min-h-0">
+        
+        {/* SIDEBAR NAVIGATION */}
+        <div className="w-60 flex flex-col gap-4">
+            
+            {/* User Session */}
+            <div 
+                onClick={() => setActiveProjectId(null)}
+                className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null 
+                    ? 'bg-slate-800 text-white border-slate-900 shadow-md' 
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+            >
+                <HardDrive className="w-4 h-4" />
+                <div className="flex flex-col">
+                    <span className="font-bold uppercase tracking-wide">My Session</span>
+                    <span className={`text-[9px] ${activeProjectId === null ? 'text-slate-400' : 'text-slate-400'}`}>Private Storage</span>
+                </div>
+            </div>
+
+            <div className="border-t border-slate-200 my-1"></div>
+
+            {/* Projects Header */}
+            <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span>
+                <button 
+                    onClick={() => setIsCreatingProject(!isCreatingProject)}
+                    className="p-1 hover:bg-blue-50 text-blue-600 rounded transition-colors"
+                >
+                    <Plus className="w-3.5 h-3.5" />
+                </button>
+            </div>
+
+            {/* Create Input */}
+            {isCreatingProject && (
+                <div className="flex gap-1">
+                    <input 
+                        className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Project ID..."
+                        value={newProjectName}
+                        onChange={(e) => setNewProjectName(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => e.key === 'Enter' && createProject()}
+                        autoFocus
+                    />
+                    <button onClick={createProject} className="bg-blue-600 text-white px-2 rounded font-bold text-[9px]">OK</button>
                 </div>
             )}
 
-            <div className="flex justify-between items-center p-2 bg-slate-50 border-b border-slate-100">
-              <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase"><HardDrive className="w-3.5 h-3.5 text-blue-600" /> Active Files</h2>
+            {/* Project List */}
+            <div className="flex-1 overflow-y-auto flex flex-col gap-1 custom-scrollbar pr-1">
+                {projects.map(p => (
+                    <div 
+                        key={p.project_id}
+                        onClick={() => setActiveProjectId(p.project_id)}
+                        className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.project_id 
+                            ? 'bg-blue-600 text-white border-blue-700 shadow-sm' 
+                            : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:border-slate-200'}`}
+                    >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                            <Folder className={`w-3.5 h-3.5 ${activeProjectId === p.project_id ? 'text-blue-200' : 'text-slate-400'}`} />
+                            <span className="font-bold truncate">{p.project_id}</span>
+                        </div>
+                        {p.role === 'owner' && (
+                            <button 
+                                onClick={(e) => deleteProject(p.project_id, e)}
+                                className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.project_id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        )}
+                    </div>
+                ))}
+                {projects.length === 0 && !isCreatingProject && (
+                    <div className="text-center py-8 text-slate-300 italic text-[10px]">No projects yet</div>
+                )}
+            </div>
+        </div>
+
+        {/* RIGHT: FILES TABLE */}
+        <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold relative transition-all"
+            onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+        >
+            {isDragging && (
+                <div className="absolute inset-0 z-50 bg-blue-50/90 border-2 border-dashed border-blue-500 rounded flex flex-col items-center justify-center pointer-events-none">
+                    <UploadCloud className="w-12 h-12 text-blue-600 mb-2" />
+                    <span className="text-lg font-black text-blue-700 uppercase tracking-widest">Drop files to upload</span>
+                </div>
+            )}
+
+            {/* TABLE TOOLBAR */}
+            <div className="flex justify-between items-center p-2 bg-slate-50 border-b border-slate-100 gap-4">
+              <div className="flex items-center gap-2 flex-1">
+                  <div className="relative flex-1 max-w-xs">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+                    <input 
+                        type="text" 
+                        placeholder="Search files..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-8 pr-2 py-1.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:border-blue-400 text-slate-600"
+                    />
+                  </div>
+                  <span className="text-[9px] text-slate-400 font-bold">{filteredFiles.length} FILES</span>
+              </div>
+
               <div className="flex gap-2">
                  <input type="file" ref={fileInputRef} className="hidden" multiple onChange={(e) => handleUpload(e.target.files)} />
-                 <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="text-[9px] font-bold bg-white text-blue-600 px-2 py-0.5 rounded border border-blue-200 hover:bg-blue-50 transition-colors">
-                    {uploading ? "UPLOADING..." : "+ UPLOAD FILES"}
+                 
+                 <button onClick={handleClear} className="flex items-center gap-1 bg-white hover:bg-red-50 px-2 py-1 rounded border border-slate-200 text-slate-500 hover:text-red-500 font-bold transition-colors">
+                    <Trash2 className="w-3 h-3" /> CLEAR
+                 </button>
+
+                 <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="flex items-center gap-1 text-[9px] font-bold bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition-colors shadow-sm">
+                    {uploading ? <RefreshCw className="w-3 h-3 animate-spin"/> : <UploadCloud className="w-3 h-3"/>}
+                    {uploading ? "UPLOADING..." : "UPLOAD"}
                  </button>
               </div>
             </div>
             
-            <div className="p-0 min-h-[300px] max-h-[70vh] overflow-y-auto">
+            {/* FILE LIST */}
+            <div className="flex-1 overflow-y-auto">
               <table className="w-full text-left font-bold border-collapse">
                 <thead className="text-[9px] text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 z-10">
                   <tr>
                     <th className="py-2 px-3 border-b border-slate-100 font-bold w-8"></th>
-                    <th className="py-2 px-3 border-b border-slate-100 font-bold">Filename</th>
-                    <th className="py-2 px-3 border-b border-slate-100 font-bold w-32">Date</th>
-                    <th className="py-2 px-3 border-b border-slate-100 w-24 font-bold text-center">Size</th>
+                    
+                    <th 
+                        className="py-2 px-3 border-b border-slate-100 font-bold cursor-pointer hover:text-blue-600 transition-colors group"
+                        onClick={() => handleSort('filename')}
+                    >
+                        <div className="flex items-center gap-1">
+                            FILENAME {sortConfig.key === 'filename' && <ArrowUpDown className="w-3 h-3 text-blue-500" />}
+                        </div>
+                    </th>
+                    
+                    <th 
+                        className="py-2 px-3 border-b border-slate-100 font-bold w-32 cursor-pointer hover:text-blue-600 transition-colors"
+                        onClick={() => handleSort('uploaded_at')}
+                    >
+                         <div className="flex items-center gap-1">
+                            DATE {sortConfig.key === 'uploaded_at' && <ArrowUpDown className="w-3 h-3 text-blue-500" />}
+                        </div>
+                    </th>
+                    
+                    <th 
+                        className="py-2 px-3 border-b border-slate-100 w-24 font-bold text-center cursor-pointer hover:text-blue-600 transition-colors"
+                        onClick={() => handleSort('size')}
+                    >
+                         <div className="flex items-center justify-center gap-1">
+                            SIZE {sortConfig.key === 'size' && <ArrowUpDown className="w-3 h-3 text-blue-500" />}
+                        </div>
+                    </th>
+                    
                     <th className="py-2 px-3 border-b border-slate-100 text-right w-64 font-bold">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {files.length === 0 ? (
+                  {filteredFiles.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-20 text-center text-slate-300 italic">
                         <Archive className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                        <span className="block opacity-70">Session is empty</span>
+                        <span className="block opacity-70">
+                            {searchTerm ? "No matches found" : "No files in this context"}
+                        </span>
                       </td>
                     </tr>
                   ) : (
-                    files.map((file, i) => {
+                    filteredFiles.map((file, i) => {
                        const isConvertible = /\.(si2s|lf1s|mdb|json)$/i.test(file.filename);
                        const isExpanded = expandedFileId === file.filename;
                        return (
@@ -233,7 +487,7 @@ export default function Files({ user }: { user: any }) {
                           <td className="px-3 py-1">
                             <div className="flex items-center gap-2">
                                <FileText className={`w-3.5 h-3.5 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} />
-                               <span className="truncate max-w-[300px] text-slate-700 text-[10px]" title={file.filename}>{file.filename}</span>
+                               <span className="truncate max-w-[280px] text-slate-700 text-[10px]" title={file.filename}>{file.filename}</span>
                             </div>
                           </td>
                           <td className="px-3 py-1 text-slate-400 font-mono text-[9px]">
@@ -255,12 +509,10 @@ export default function Files({ user }: { user: any }) {
                                     <FileSpreadsheet className="w-3 h-3"/> <span className="text-[9px]">XLSX</span>
                                   </button>
                                   
-                                  {/* BOUTON DOWNLOAD JSON */}
                                   <button onClick={() => handleOpenLink('json', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded border border-yellow-200 transition-colors" title="Download JSON">
                                     <FileJson className="w-3 h-3"/> <span className="text-[9px]">JSON</span>
                                   </button>
 
-                                  {/* BOUTON OPEN TAB */}
                                   <button onClick={() => handleOpenLink('json_tab', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200 transition-colors" title="Open in new Tab">
                                     <ExternalLink className="w-3 h-3"/> <span className="text-[9px]">OPEN</span>
                                   </button>
