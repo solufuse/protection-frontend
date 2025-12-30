@@ -66,10 +66,8 @@ export default function Loadflow({ user }: { user: any }) {
   const [results, setResults] = useState<LoadflowResponse | null>(null);
   const [baseName, setBaseName] = useState("lf_results");
   
-  // Grouped data for the chart
   const [scenarioGroups, setScenarioGroups] = useState<Record<string, LoadflowResult[]>>({});
   
-  // Table Filtering & UI
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [filterSearch, setFilterSearch] = useState("");
   const [filterWinner, setFilterWinner] = useState(false);
@@ -135,7 +133,6 @@ export default function Loadflow({ user }: { user: any }) {
   const processResults = (data: LoadflowResponse) => {
       if (!data.results) return;
 
-      // 1. Group by Scenario (ID + Config) for Chart
       const groups: Record<string, LoadflowResult[]> = {};
       data.results.forEach(r => {
           const key = r.study_case ? `${r.study_case.id} / ${r.study_case.config}` : "Unknown Scenario";
@@ -143,14 +140,12 @@ export default function Loadflow({ user }: { user: any }) {
           groups[key].push(r);
       });
 
-      // 2. Sort each group by Revision (CHxxx)
       Object.keys(groups).forEach(k => {
           groups[k].sort((a, b) => extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision));
       });
 
       setScenarioGroups(groups);
       
-      // 3. Sort Global Results List by Group then Revision for Table
       data.results.sort((a, b) => {
           const keyA = a.study_case ? `${a.study_case.id}_${a.study_case.config}` : a.filename;
           const keyB = b.study_case ? `${b.study_case.id}_${b.study_case.config}` : b.filename;
@@ -217,11 +212,9 @@ export default function Loadflow({ user }: { user: any }) {
       setExpandedRows(newSet);
   };
 
-  // --- FILTERS LOGIC ---
   const getFilteredResults = () => {
       if (!results?.results) return [];
       return results.results.filter(r => {
-          // 1. Text Search
           const searchLower = filterSearch.toLowerCase();
           const matchesSearch = 
             filterSearch === "" ||
@@ -231,21 +224,16 @@ export default function Loadflow({ user }: { user: any }) {
             r.study_case?.revision.toLowerCase().includes(searchLower);
           
           if (!matchesSearch) return false;
-
-          // 2. Boolean Filters
           if (filterWinner && !r.is_winner) return false;
           if (filterValid && !r.is_valid) return false;
-
           return true;
       });
   };
 
-  // --- MULTI-LINE CHART COMPONENT ---
   const MultiScenarioChart = ({ groups }: { groups: Record<string, LoadflowResult[]> }) => {
     const keys = Object.keys(groups);
     if (keys.length === 0) return null;
 
-    // 1. Calculate Global Scales
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
 
@@ -275,11 +263,9 @@ export default function Loadflow({ user }: { user: any }) {
       <div className="w-full bg-white rounded border border-slate-200 shadow-sm p-4 flex flex-col">
         <div className="flex-1 relative h-[320px]">
             <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-                {/* Axes */}
                 <line x1="20" y1={height-20} x2={width-20} y2={height-20} stroke="#cbd5e1" strokeWidth="1" />
                 <line x1="20" y1="20" x2="20" y2={height-20} stroke="#cbd5e1" strokeWidth="1" />
                 
-                {/* Y-Axis Grid & Labels */}
                 {[0, 0.25, 0.5, 0.75, 1].map(pct => {
                     const yPos = 20 + (height - 40) * pct;
                     const val = maxY - (maxY - minY) * pct;
@@ -291,11 +277,9 @@ export default function Loadflow({ user }: { user: any }) {
                     );
                 })}
 
-                {/* Scenarios Lines */}
                 {keys.map((key, kIdx) => {
                     const group = groups[key];
                     const color = LINE_COLORS[kIdx % LINE_COLORS.length];
-                    
                     const pointsStr = group.map(r => {
                         const x = getX(extractLoadNumber(r.study_case?.revision));
                         const y = getY(Math.abs(r.mw_flow));
@@ -320,10 +304,9 @@ export default function Loadflow({ user }: { user: any }) {
                 })}
             </svg>
         </div>
-        
         <div className="flex flex-wrap gap-4 mt-2 justify-center">
             {keys.map((key, idx) => (
-                <div key={key} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 uppercase bg-slate-50 px-2 py-1 rounded border border-slate-200">
+                <div key={key} className="flex items-center gap-1.5 text-[9px] font-bold text-slate-600 uppercase bg-slate-50 px-2 py-1 rounded border border-slate-200">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: LINE_COLORS[idx % LINE_COLORS.length] }}></div>
                     {key}
                 </div>
@@ -407,46 +390,21 @@ export default function Loadflow({ user }: { user: any }) {
                         <MultiScenarioChart groups={scenarioGroups} />
                     </div>
 
-                    {/* DETAILED TABLE */}
+                    {/* DETAILED TABLE (COMPACT) */}
                     <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-                        
-                        {/* TABLE HEADER WITH FILTERS */}
                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-black text-slate-700 uppercase flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
                                 <Zap className="w-4 h-4 text-yellow-500" /> Detailed Results
                                 <span className="ml-2 bg-slate-200 text-slate-600 text-[9px] px-2 py-0.5 rounded-full">{filteredData.length}</span>
                             </div>
-                            
-                            {/* FILTERS CONTROLS */}
                             <div className="flex items-center gap-2">
                                 <div className="relative">
                                     <Filter className="w-3 h-3 absolute left-2 top-2 text-slate-400" />
-                                    <input 
-                                        value={filterSearch}
-                                        onChange={(e) => setFilterSearch(e.target.value)}
-                                        placeholder="Search..."
-                                        className="pl-7 pr-2 py-1 text-[10px] border border-slate-300 rounded bg-white outline-none focus:border-blue-500 w-32"
-                                    />
-                                    {filterSearch && (
-                                        <button onClick={() => setFilterSearch("")} className="absolute right-1 top-1.5 text-slate-400 hover:text-red-500">
-                                            <XCircle className="w-3 h-3" />
-                                        </button>
-                                    )}
+                                    <input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder="Search..." className="pl-7 pr-2 py-1 text-[10px] border border-slate-300 rounded bg-white outline-none focus:border-blue-500 w-32" />
+                                    {filterSearch && <button onClick={() => setFilterSearch("")} className="absolute right-1 top-1.5 text-slate-400 hover:text-red-500"><XCircle className="w-3 h-3" /></button>}
                                 </div>
-
-                                <button 
-                                    onClick={() => setFilterWinner(!filterWinner)}
-                                    className={`flex items-center gap-1 px-2 py-1 rounded border transition-colors ${filterWinner ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'}`}
-                                >
-                                    <CheckCircle className="w-3 h-3" /> Winner Only
-                                </button>
-
-                                <button 
-                                    onClick={() => setFilterValid(!filterValid)}
-                                    className={`flex items-center gap-1 px-2 py-1 rounded border transition-colors ${filterValid ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'}`}
-                                >
-                                    <CheckCircle className="w-3 h-3" /> Valid Only
-                                </button>
+                                <button onClick={() => setFilterWinner(!filterWinner)} className={`flex items-center gap-1 px-2 py-1 rounded border transition-colors ${filterWinner ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'}`}><CheckCircle className="w-3 h-3" /> Winner</button>
+                                <button onClick={() => setFilterValid(!filterValid)} className={`flex items-center gap-1 px-2 py-1 rounded border transition-colors ${filterValid ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'}`}><CheckCircle className="w-3 h-3" /> Valid</button>
                             </div>
                         </div>
 
@@ -454,49 +412,47 @@ export default function Loadflow({ user }: { user: any }) {
                             <table className="w-full text-left font-bold min-w-[900px]">
                                 <thead className="bg-slate-50 text-[9px] text-slate-400 uppercase tracking-widest border-b border-slate-100">
                                     <tr>
-                                        <th className="px-4 py-2 w-10">St</th>
-                                        <th className="px-4 py-2">Scenario (ID / Config)</th>
-                                        <th className="px-4 py-2">Revision</th>
-                                        <th className="px-4 py-2 text-right">MW Flow</th>
-                                        <th className="px-4 py-2 text-right">MVar Flow</th>
-                                        <th className="px-4 py-2 text-right">Details</th>
+                                        <th className="px-2 py-1 w-10 text-center">St</th>
+                                        <th className="px-2 py-1">Scenario (ID / Config)</th>
+                                        <th className="px-2 py-1">Revision</th>
+                                        <th className="px-2 py-1 text-right">MW Flow</th>
+                                        <th className="px-2 py-1 text-right">MVar Flow</th>
+                                        <th className="px-2 py-1 text-right">Details</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
+                                <tbody className="divide-y divide-slate-50 text-[9px]">
                                     {filteredData.map((r, i) => {
-                                        // Use index relative to full result to manage expansion correctly or use filename as key if unique
-                                        // Using mapped index might desync if filters change, so better use filename for state key but simple index here for now
                                         const isExpanded = expandedRows.has(i);
                                         return (
                                         <>
                                         <tr key={i} className={`hover:bg-slate-50 ${r.is_winner ? 'bg-green-50/30' : ''} ${!r.is_valid ? 'opacity-70' : ''}`}>
-                                            <td className="px-4 py-3">
-                                                {r.is_winner ? <CheckCircle className="w-4 h-4 text-green-500" /> : r.is_valid ? <AlertTriangle className="w-4 h-4 text-red-400" /> : <AlertTriangle className="w-4 h-4 text-slate-300" />}
+                                            <td className="px-2 py-1 text-center">
+                                                {r.is_winner ? <CheckCircle className="w-3.5 h-3.5 text-green-500 mx-auto" /> : r.is_valid ? <AlertTriangle className="w-3.5 h-3.5 text-red-400 mx-auto" /> : <AlertTriangle className="w-3.5 h-3.5 text-slate-300 mx-auto" />}
                                             </td>
-                                            <td className="px-4 py-3 font-mono text-[10px] text-slate-600">
+                                            <td className="px-2 py-1 font-mono text-slate-600">
                                                 <span className="font-black text-slate-800">{r.study_case?.id || "-"}</span>
-                                                <span className="text-slate-400 mx-2">/</span>
+                                                <span className="text-slate-400 mx-1">/</span>
                                                 <span className="text-slate-500">{r.study_case?.config || r.filename}</span>
                                             </td>
-                                            <td className="px-4 py-3 font-mono text-[10px] font-black text-blue-600">
+                                            <td className="px-2 py-1 font-mono font-black text-blue-600">
                                                 {r.study_case?.revision}
                                             </td>
-                                            <td className="px-4 py-3 text-right font-mono text-slate-700 text-[10px]">{Math.abs(r.mw_flow).toFixed(2)}</td>
-                                            <td className="px-4 py-3 text-right font-mono text-slate-400 text-[10px]">{Math.abs(r.mvar_flow).toFixed(2)}</td>
-                                            <td className="px-4 py-3 text-right">
-                                                <button onClick={() => toggleRow(i)} className={`p-1 rounded ${isExpanded ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100 text-slate-400'}`}>
+                                            <td className="px-2 py-1 text-right font-mono text-slate-700">{Math.abs(r.mw_flow).toFixed(2)}</td>
+                                            <td className="px-2 py-1 text-right font-mono text-slate-400">{Math.abs(r.mvar_flow).toFixed(2)}</td>
+                                            <td className="px-2 py-1 text-right">
+                                                <button onClick={() => toggleRow(i)} className={`p-0.5 rounded ${isExpanded ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100 text-slate-400'}`}>
                                                     {isExpanded ? <EyeOff className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}
                                                 </button>
                                             </td>
                                         </tr>
                                         {isExpanded && (
                                             <tr className="bg-slate-50/50">
-                                                <td colSpan={6} className="px-10 py-3 border-b border-slate-100">
-                                                    <div className="flex flex-wrap gap-3">
+                                                <td colSpan={6} className="px-4 py-2 border-b border-slate-100">
+                                                    <div className="flex flex-wrap gap-2">
                                                         {Object.entries(r.transformers || {}).map(([name, data]) => (
-                                                            <div key={name} className="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1.5 text-[9px] shadow-sm">
+                                                            <div key={name} className="flex items-center gap-1.5 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[8.5px] shadow-sm">
                                                                 <span className="font-black text-slate-700">{name}</span>
-                                                                <div className="h-3 w-px bg-slate-200"></div>
+                                                                <div className="h-2 w-px bg-slate-200"></div>
                                                                 <span className="text-slate-500">Tap: <b className="text-slate-800">{data.Tap}</b></span>
                                                                 <span className="text-blue-600 font-bold">{data.LFMW.toFixed(1)} MW</span>
                                                                 <span className="text-slate-400">{data.LFMvar.toFixed(1)} MVar</span>
