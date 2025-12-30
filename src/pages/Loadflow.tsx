@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { 
   Play, Activity, Folder, HardDrive, 
   Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap, Search,
-  Eye, EyeOff
+  Eye, EyeOff, Filter, XCircle
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -69,8 +69,11 @@ export default function Loadflow({ user }: { user: any }) {
   // Grouped data for the chart
   const [scenarioGroups, setScenarioGroups] = useState<Record<string, LoadflowResult[]>>({});
   
-  // Table expansion state
+  // Table Filtering & UI
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterWinner, setFilterWinner] = useState(false);
+  const [filterValid, setFilterValid] = useState(false);
 
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
@@ -132,7 +135,7 @@ export default function Loadflow({ user }: { user: any }) {
   const processResults = (data: LoadflowResponse) => {
       if (!data.results) return;
 
-      // 1. Group by Scenario (ID + Config)
+      // 1. Group by Scenario (ID + Config) for Chart
       const groups: Record<string, LoadflowResult[]> = {};
       data.results.forEach(r => {
           const key = r.study_case ? `${r.study_case.id} / ${r.study_case.config}` : "Unknown Scenario";
@@ -146,6 +149,16 @@ export default function Loadflow({ user }: { user: any }) {
       });
 
       setScenarioGroups(groups);
+      
+      // 3. Sort Global Results List by Group then Revision for Table
+      data.results.sort((a, b) => {
+          const keyA = a.study_case ? `${a.study_case.id}_${a.study_case.config}` : a.filename;
+          const keyB = b.study_case ? `${b.study_case.id}_${b.study_case.config}` : b.filename;
+          if (keyA < keyB) return -1;
+          if (keyA > keyB) return 1;
+          return extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision);
+      });
+
       setResults(data);
   };
 
@@ -204,6 +217,29 @@ export default function Loadflow({ user }: { user: any }) {
       setExpandedRows(newSet);
   };
 
+  // --- FILTERS LOGIC ---
+  const getFilteredResults = () => {
+      if (!results?.results) return [];
+      return results.results.filter(r => {
+          // 1. Text Search
+          const searchLower = filterSearch.toLowerCase();
+          const matchesSearch = 
+            filterSearch === "" ||
+            r.filename.toLowerCase().includes(searchLower) ||
+            r.study_case?.id.toLowerCase().includes(searchLower) ||
+            r.study_case?.config.toLowerCase().includes(searchLower) ||
+            r.study_case?.revision.toLowerCase().includes(searchLower);
+          
+          if (!matchesSearch) return false;
+
+          // 2. Boolean Filters
+          if (filterWinner && !r.is_winner) return false;
+          if (filterValid && !r.is_valid) return false;
+
+          return true;
+      });
+  };
+
   // --- MULTI-LINE CHART COMPONENT ---
   const MultiScenarioChart = ({ groups }: { groups: Record<string, LoadflowResult[]> }) => {
     const keys = Object.keys(groups);
@@ -224,13 +260,11 @@ export default function Loadflow({ user }: { user: any }) {
         });
     });
 
-    // Padding
     const rangeX = maxX - minX || 1;
     const rangeY = maxY - minY || 1;
     const padY = rangeY * 0.1;
     minY -= padY; maxY += padY;
 
-    // SVG Dimensions
     const width = 800;
     const height = 300;
 
@@ -270,10 +304,7 @@ export default function Loadflow({ user }: { user: any }) {
 
                     return (
                         <g key={key}>
-                            {/* The Line */}
                             <polyline points={pointsStr} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
-                            
-                            {/* The Points */}
                             {group.map((r, i) => {
                                 const x = getX(extractLoadNumber(r.study_case?.revision));
                                 const y = getY(Math.abs(r.mw_flow));
@@ -290,7 +321,6 @@ export default function Loadflow({ user }: { user: any }) {
             </svg>
         </div>
         
-        {/* Legend */}
         <div className="flex flex-wrap gap-4 mt-2 justify-center">
             {keys.map((key, idx) => (
                 <div key={key} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 uppercase bg-slate-50 px-2 py-1 rounded border border-slate-200">
@@ -302,6 +332,8 @@ export default function Loadflow({ user }: { user: any }) {
       </div>
     );
   };
+
+  const filteredData = getFilteredResults();
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
@@ -377,7 +409,47 @@ export default function Loadflow({ user }: { user: any }) {
 
                     {/* DETAILED TABLE */}
                     <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-black text-slate-700 uppercase flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Detailed Results</div>
+                        
+                        {/* TABLE HEADER WITH FILTERS */}
+                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-black text-slate-700 uppercase flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <Zap className="w-4 h-4 text-yellow-500" /> Detailed Results
+                                <span className="ml-2 bg-slate-200 text-slate-600 text-[9px] px-2 py-0.5 rounded-full">{filteredData.length}</span>
+                            </div>
+                            
+                            {/* FILTERS CONTROLS */}
+                            <div className="flex items-center gap-2">
+                                <div className="relative">
+                                    <Filter className="w-3 h-3 absolute left-2 top-2 text-slate-400" />
+                                    <input 
+                                        value={filterSearch}
+                                        onChange={(e) => setFilterSearch(e.target.value)}
+                                        placeholder="Search..."
+                                        className="pl-7 pr-2 py-1 text-[10px] border border-slate-300 rounded bg-white outline-none focus:border-blue-500 w-32"
+                                    />
+                                    {filterSearch && (
+                                        <button onClick={() => setFilterSearch("")} className="absolute right-1 top-1.5 text-slate-400 hover:text-red-500">
+                                            <XCircle className="w-3 h-3" />
+                                        </button>
+                                    )}
+                                </div>
+
+                                <button 
+                                    onClick={() => setFilterWinner(!filterWinner)}
+                                    className={`flex items-center gap-1 px-2 py-1 rounded border transition-colors ${filterWinner ? 'bg-green-100 border-green-300 text-green-700' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'}`}
+                                >
+                                    <CheckCircle className="w-3 h-3" /> Winner Only
+                                </button>
+
+                                <button 
+                                    onClick={() => setFilterValid(!filterValid)}
+                                    className={`flex items-center gap-1 px-2 py-1 rounded border transition-colors ${filterValid ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'}`}
+                                >
+                                    <CheckCircle className="w-3 h-3" /> Valid Only
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="overflow-x-auto">
                             <table className="w-full text-left font-bold min-w-[900px]">
                                 <thead className="bg-slate-50 text-[9px] text-slate-400 uppercase tracking-widest border-b border-slate-100">
@@ -391,7 +463,9 @@ export default function Loadflow({ user }: { user: any }) {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {results.results.map((r, i) => {
+                                    {filteredData.map((r, i) => {
+                                        // Use index relative to full result to manage expansion correctly or use filename as key if unique
+                                        // Using mapped index might desync if filters change, so better use filename for state key but simple index here for now
                                         const isExpanded = expandedRows.has(i);
                                         return (
                                         <>
