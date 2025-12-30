@@ -28,7 +28,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
             
             <div className="flex items-center gap-2">
               <Link to="/loadflow" className="flex items-center gap-3">
-                  {/* ON REMPLACE L'ICONE PAR TON IMAGE */}
                   <img 
                     src="/favicon.ico" 
                     alt="Logo" 
@@ -38,13 +37,36 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               </Link>
             </div>
 
-            <nav className="hidden md:flex items-center gap-1">
+            {/* NAVIGATION PRINCIPALE (Interne) */}
+            <nav className="hidden lg:flex items-center gap-1">
               <Link to="/loadflow" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/loadflow')}`}>Loadflow</Link>
               <Link to="/protection" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/protection')}`}>Protection</Link>
               <Link to="/files" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/files')}`}>Files</Link>
               <Link to="/config" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/config')}`}>Config</Link>
+              
+              {/* Séparateur visuel discret */}
+              <div className="w-px h-4 bg-slate-200 mx-2"></div>
+
+              {/* LIENS EXTERNES */}
+              <a 
+                href="https://api.solufuse.com/docs" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1.5 transition-colors"
+              >
+                <Icons.FileText className="w-3.5 h-3.5" /> API DOCS
+              </a>
+              <a 
+                href="https://solufuse.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-orange-600 flex items-center gap-1.5 transition-colors"
+              >
+                <Icons.Search className="w-3.5 h-3.5" /> ABOUT
+              </a>
             </nav>
 
+            {/* SECTION UTILISATEUR */}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-full border border-slate-200 pr-4">
                 {user?.photoURL ? (
@@ -60,7 +82,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                   </div>
                 )}
                 
-                <div className="flex flex-col">
+                <div className="flex flex-col hidden sm:flex">
                   <span className="text-[10px] font-black text-slate-700 leading-none">
                     {user?.isAnonymous ? 'Guest Mode' : (user?.displayName || 'User')}
                   </span>
