@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react';
 import { 
   Play, Activity, Folder, HardDrive, 
-  Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap, Search
+  Plus, Key, Trash2, CheckCircle, AlertTriangle, TrendingUp, Zap, Search,
+  ChevronDown, ChevronRight, Eye, EyeOff
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -41,6 +42,19 @@ interface LoadflowResponse {
   results: LoadflowResult[];
 }
 
+// Helper to extract revision number (CH195 -> 195)
+const extractLoadNumber = (rev: string | undefined) => {
+    if (!rev) return 0;
+    const match = rev.match(/(\d+)/);
+    return match ? parseInt(match[0]) : 0;
+};
+
+// Distinct colors for scenarios
+const LINE_COLORS = [
+  "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", 
+  "#ec4899", "#06b6d4", "#f97316", "#6366f1", "#84cc16"
+];
+
 export default function Loadflow({ user }: { user: any }) {
   // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
@@ -52,6 +66,12 @@ export default function Loadflow({ user }: { user: any }) {
   const [results, setResults] = useState<LoadflowResponse | null>(null);
   const [baseName, setBaseName] = useState("lf_results");
   
+  // Grouped data for the chart
+  const [scenarioGroups, setScenarioGroups] = useState<Record<string, LoadflowResult[]>>({});
+  
+  // Table expansion state
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
 
@@ -108,22 +128,24 @@ export default function Loadflow({ user }: { user: any }) {
 
   useEffect(() => { if (user) fetchProjects(); }, [user]);
 
-  // --- LOADFLOW ACTIONS ---
+  // --- PROCESSING ---
+  const processResults = (data: LoadflowResponse) => {
+      if (!data.results) return;
 
-  const extractLoadNumber = (rev: string | undefined) => {
-      if (!rev) return 999999;
-      const match = rev.match(/(\d+)/);
-      return match ? parseInt(match[0]) : 0;
-  };
+      // 1. Group by Scenario (ID + Config)
+      const groups: Record<string, LoadflowResult[]> = {};
+      data.results.forEach(r => {
+          const key = r.study_case ? `${r.study_case.id} / ${r.study_case.config}` : "Unknown Scenario";
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(r);
+      });
 
-  const processAndSetResults = (data: LoadflowResponse) => {
-      if (data.results) {
-          data.results.sort((a, b) => {
-              const valA = extractLoadNumber(a.study_case?.revision);
-              const valB = extractLoadNumber(b.study_case?.revision);
-              return valA - valB;
-          });
-      }
+      // 2. Sort each group by Revision (CHxxx)
+      Object.keys(groups).forEach(k => {
+          groups[k].sort((a, b) => extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision));
+      });
+
+      setScenarioGroups(groups);
       setResults(data);
   };
 
@@ -131,17 +153,18 @@ export default function Loadflow({ user }: { user: any }) {
     if (!user) return;
     setLoading(true);
     setResults(null);
+    setScenarioGroups({});
     try {
         const t = await getToken();
         const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
         const jsonFilename = `${baseName}.json`;
 
         const dataRes = await fetch(`${apiUrl}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
-        if (!dataRes.ok) throw new Error("No previous results found.");
+        if (!dataRes.ok) throw new Error("No results found.");
         
         const jsonData: LoadflowResponse = await dataRes.json();
-        processAndSetResults(jsonData);
-        notify(`Loaded: ${jsonData.results.length} scenarios`);
+        processResults(jsonData);
+        notify(`Loaded: ${jsonData.results.length} files`);
     } catch (e: any) { notify(e.message, "error"); } 
     finally { setLoading(false); }
   };
@@ -164,8 +187,8 @@ export default function Loadflow({ user }: { user: any }) {
       if (!dataRes.ok) throw new Error("Result file missing");
       
       const jsonData: LoadflowResponse = await dataRes.json();
-      processAndSetResults(jsonData);
-      notify("Analysis Freshly Computed");
+      processResults(jsonData);
+      notify("Analysis Computed");
     } catch (e) { notify("Error during analysis", "error"); } 
     finally { setLoading(false); }
   };
@@ -175,66 +198,106 @@ export default function Loadflow({ user }: { user: any }) {
     if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); }
   };
 
-  // --- CHART: EXCEL STYLE LINE CHART ---
-  const LineChart = ({ data }: { data: LoadflowResult[] }) => {
-    if (!data || data.length === 0) return null;
+  const toggleRow = (idx: number) => {
+      const newSet = new Set(expandedRows);
+      if (newSet.has(idx)) newSet.delete(idx); else newSet.add(idx);
+      setExpandedRows(newSet);
+  };
 
-    const flows = data.map(d => Math.abs(d.mw_flow));
-    const minVal = Math.min(...flows) * 0.95;
-    const maxVal = Math.max(...flows) * 1.05;
-    const range = maxVal - minVal;
-    
-    const width = 800;
-    const height = 200;
-    const stepX = width / (data.length > 1 ? data.length - 1 : 1);
+  // --- MULTI-LINE CHART COMPONENT ---
+  const MultiScenarioChart = ({ groups }: { groups: Record<string, LoadflowResult[]> }) => {
+    const keys = Object.keys(groups);
+    if (keys.length === 0) return null;
 
-    const points = data.map((d, i) => {
-        const x = i * stepX;
-        const y = height - ((Math.abs(d.mw_flow) - minVal) / (range || 1)) * height;
-        return { x, y, data: d };
+    // 1. Calculate Global Scales
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    Object.values(groups).forEach(group => {
+        group.forEach(r => {
+            const x = extractLoadNumber(r.study_case?.revision);
+            const y = Math.abs(r.mw_flow);
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        });
     });
 
-    const polylinePoints = points.map(p => `${p.x},${p.y}`).join(" ");
+    // Padding
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
+    const padY = rangeY * 0.1;
+    minY -= padY; maxY += padY;
+
+    // SVG Dimensions
+    const width = 800;
+    const height = 300;
+
+    const getX = (val: number) => ((val - minX) / rangeX) * (width - 40) + 20;
+    const getY = (val: number) => height - ((val - minY) / (maxY - minY)) * (height - 40) - 20;
 
     return (
-      <div className="w-full h-72 bg-white rounded border border-slate-200 shadow-sm p-4 flex flex-col">
-        <div className="flex-1 relative">
+      <div className="w-full bg-white rounded border border-slate-200 shadow-sm p-4 flex flex-col">
+        <div className="flex-1 relative h-[320px]">
             <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-                <line x1="0" y1="0" x2={width} y2="0" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
-                <line x1="0" y1={height/2} x2={width} y2={height/2} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
-                <line x1="0" y1={height} x2={width} y2={height} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
+                {/* Axes */}
+                <line x1="20" y1={height-20} x2={width-20} y2={height-20} stroke="#cbd5e1" strokeWidth="1" />
+                <line x1="20" y1="20" x2="20" y2={height-20} stroke="#cbd5e1" strokeWidth="1" />
+                
+                {/* Y-Axis Grid & Labels */}
+                {[0, 0.25, 0.5, 0.75, 1].map(pct => {
+                    const yPos = 20 + (height - 40) * pct;
+                    const val = maxY - (maxY - minY) * pct;
+                    return (
+                        <g key={pct}>
+                            <line x1="20" y1={yPos} x2={width-20} y2={yPos} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
+                            <text x="15" y={yPos + 3} textAnchor="end" fontSize="9" fill="#94a3b8">{val.toFixed(0)}</text>
+                        </g>
+                    );
+                })}
 
-                <polyline 
-                    points={polylinePoints} 
-                    fill="none" 
-                    stroke="#3b82f6" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                />
-
-                {points.map((p, i) => {
-                    let fillColor = "#94a3b8";
-                    let radius = 4;
-                    if (p.data.is_winner) { fillColor = "#22c55e"; radius = 6; } 
-                    else if (p.data.is_valid) { fillColor = "#ef4444"; }
+                {/* Scenarios Lines */}
+                {keys.map((key, kIdx) => {
+                    const group = groups[key];
+                    const color = LINE_COLORS[kIdx % LINE_COLORS.length];
+                    
+                    const pointsStr = group.map(r => {
+                        const x = getX(extractLoadNumber(r.study_case?.revision));
+                        const y = getY(Math.abs(r.mw_flow));
+                        return `${x},${y}`;
+                    }).join(" ");
 
                     return (
-                        <g key={i} className="group cursor-pointer">
-                            <circle cx={p.x} cy={p.y} r="10" fill="transparent" />
-                            <circle cx={p.x} cy={p.y} r={radius} fill={fillColor} stroke="white" strokeWidth="2" className="transition-all duration-200 group-hover:r-6 shadow-sm"/>
-                            <text x={p.x} y={height + 15} textAnchor="middle" fontSize="10" fill="#64748b" fontWeight="bold">{p.data.study_case?.revision || `S${i}`}</text>
-                            <title>{`${p.data.study_case?.config || p.data.filename}\nMW: ${p.data.mw_flow.toFixed(2)}\nWinner: ${p.data.is_winner ? 'YES' : 'NO'}`}</title>
+                        <g key={key}>
+                            {/* The Line */}
+                            <polyline points={pointsStr} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+                            
+                            {/* The Points */}
+                            {group.map((r, i) => {
+                                const x = getX(extractLoadNumber(r.study_case?.revision));
+                                const y = getY(Math.abs(r.mw_flow));
+                                return (
+                                    <g key={i} className="group cursor-pointer">
+                                        <circle cx={x} cy={y} r="4" fill={r.is_winner ? "#22c55e" : "white"} stroke={color} strokeWidth="2" className="transition-all hover:r-6"/>
+                                        <title>{`${key}\nRev: ${r.study_case?.revision}\nMW: ${Math.abs(r.mw_flow).toFixed(2)}\nWinner: ${r.is_winner}`}</title>
+                                    </g>
+                                );
+                            })}
                         </g>
                     );
                 })}
             </svg>
         </div>
         
-        <div className="h-6 flex items-center justify-center gap-4 text-[9px] font-bold text-slate-500 uppercase mt-2">
-            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500"></div> Winner</div>
-            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> Valid (Rejected)</div>
-            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400"></div> Invalid</div>
+        {/* Legend */}
+        <div className="flex flex-wrap gap-4 mt-2 justify-center">
+            {keys.map((key, idx) => (
+                <div key={key} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 uppercase bg-slate-50 px-2 py-1 rounded border border-slate-200">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: LINE_COLORS[idx % LINE_COLORS.length] }}></div>
+                    {key}
+                </div>
+            ))}
         </div>
       </div>
     );
@@ -249,17 +312,9 @@ export default function Loadflow({ user }: { user: any }) {
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Simulation Dashboard</label>
           <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
             {activeProjectId ? (
-                <>
-                    <Folder className="w-5 h-5 text-blue-600" />
-                    <span>{activeProjectId}</span>
-                    <span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">PROJECT</span>
-                </>
+                <><Folder className="w-5 h-5 text-blue-600" /><span>{activeProjectId}</span><span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">PROJECT</span></>
             ) : (
-                <>
-                    <HardDrive className="w-5 h-5 text-slate-600" />
-                    <span>My Session</span>
-                    <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span>
-                </>
+                <><HardDrive className="w-5 h-5 text-slate-600" /><span>My Session</span><span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span></>
             )}
           </h1>
         </div>
@@ -275,7 +330,7 @@ export default function Loadflow({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* MAIN */}
+      {/* MAIN CONTENT */}
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
         
         {/* SIDEBAR */}
@@ -311,22 +366,16 @@ export default function Loadflow({ user }: { user: any }) {
                 </div>
             ) : (
                 <div className="flex flex-col gap-6 pb-10">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-4 rounded border border-slate-200 shadow-sm flex justify-between items-center">
-                            <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Scenarios</div><div className="text-2xl font-black text-slate-700">{results.results.length}</div></div>
-                            <Activity className="w-8 h-8 text-slate-200" />
-                        </div>
-                        <div className="bg-white p-4 rounded border border-slate-200 shadow-sm flex justify-between items-center">
-                            <div><div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Winners</div><div className="text-2xl font-black text-green-600">{results.results.filter(r => r.is_winner).length}</div></div>
-                            <CheckCircle className="w-8 h-8 text-green-100" />
-                        </div>
-                    </div>
-
+                    
+                    {/* CHART */}
                     <div>
-                        <div className="flex justify-between items-center mb-2"><h2 className="font-black text-slate-700 uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> Power Ramp-up Curve</h2></div>
-                        <LineChart data={results.results} />
+                        <div className="flex justify-between items-center mb-2">
+                            <h2 className="font-black text-slate-700 uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> Scenario Load Curves</h2>
+                        </div>
+                        <MultiScenarioChart groups={scenarioGroups} />
                     </div>
 
+                    {/* DETAILED TABLE */}
                     <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-black text-slate-700 uppercase flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Detailed Results</div>
                         <div className="overflow-x-auto">
@@ -334,41 +383,57 @@ export default function Loadflow({ user }: { user: any }) {
                                 <thead className="bg-slate-50 text-[9px] text-slate-400 uppercase tracking-widest border-b border-slate-100">
                                     <tr>
                                         <th className="px-4 py-2 w-10">St</th>
-                                        <th className="px-4 py-2">Load Step (Revision)</th>
+                                        <th className="px-4 py-2">Scenario (ID / Config)</th>
+                                        <th className="px-4 py-2">Revision</th>
                                         <th className="px-4 py-2 text-right">MW Flow</th>
                                         <th className="px-4 py-2 text-right">MVar Flow</th>
-                                        <th className="px-4 py-2">Transformers Detail (Tap | MW | MVar)</th>
+                                        <th className="px-4 py-2 text-right">Details</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {results.results.map((r, i) => (
-                                        <tr key={i} className={`hover:bg-slate-50 ${r.is_winner ? 'bg-green-50/30' : ''}`}>
+                                    {results.results.map((r, i) => {
+                                        const isExpanded = expandedRows.has(i);
+                                        return (
+                                        <>
+                                        <tr key={i} className={`hover:bg-slate-50 ${r.is_winner ? 'bg-green-50/30' : ''} ${!r.is_valid ? 'opacity-70' : ''}`}>
                                             <td className="px-4 py-3">
                                                 {r.is_winner ? <CheckCircle className="w-4 h-4 text-green-500" /> : r.is_valid ? <AlertTriangle className="w-4 h-4 text-red-400" /> : <AlertTriangle className="w-4 h-4 text-slate-300" />}
                                             </td>
                                             <td className="px-4 py-3 font-mono text-[10px] text-slate-600">
-                                                <div className="flex flex-col">
-                                                    <span className="font-black text-slate-800">{r.study_case?.revision || "-"}</span>
-                                                    <span className="text-[9px] text-slate-400">{r.study_case?.config || r.filename}</span>
-                                                </div>
+                                                <span className="font-black text-slate-800">{r.study_case?.id || "-"}</span>
+                                                <span className="text-slate-400 mx-2">/</span>
+                                                <span className="text-slate-500">{r.study_case?.config || r.filename}</span>
                                             </td>
-                                            <td className="px-4 py-3 text-right font-mono text-blue-600 text-[10px]">{Math.abs(r.mw_flow).toFixed(2)}</td>
+                                            <td className="px-4 py-3 font-mono text-[10px] font-black text-blue-600">
+                                                {r.study_case?.revision}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-slate-700 text-[10px]">{Math.abs(r.mw_flow).toFixed(2)}</td>
                                             <td className="px-4 py-3 text-right font-mono text-slate-400 text-[10px]">{Math.abs(r.mvar_flow).toFixed(2)}</td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex flex-wrap gap-2">
-                                                    {Object.entries(r.transformers || {}).map(([name, data]) => (
-                                                        <div key={name} className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded px-2 py-1 text-[9px]">
-                                                            <span className="font-black text-slate-700">{name}</span>
-                                                            <div className="h-3 w-px bg-slate-300"></div>
-                                                            <span className="text-slate-500">Tap: <b className="text-slate-700">{data.Tap}</b></span>
-                                                            <span className="text-blue-600">{data.LFMW.toFixed(1)} MW</span>
-                                                            <span className="text-slate-400">{data.LFMvar.toFixed(1)} MVar</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                            <td className="px-4 py-3 text-right">
+                                                <button onClick={() => toggleRow(i)} className={`p-1 rounded ${isExpanded ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100 text-slate-400'}`}>
+                                                    {isExpanded ? <EyeOff className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}
+                                                </button>
                                             </td>
                                         </tr>
-                                    ))}
+                                        {isExpanded && (
+                                            <tr className="bg-slate-50/50">
+                                                <td colSpan={6} className="px-10 py-3 border-b border-slate-100">
+                                                    <div className="flex flex-wrap gap-3">
+                                                        {Object.entries(r.transformers || {}).map(([name, data]) => (
+                                                            <div key={name} className="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1.5 text-[9px] shadow-sm">
+                                                                <span className="font-black text-slate-700">{name}</span>
+                                                                <div className="h-3 w-px bg-slate-200"></div>
+                                                                <span className="text-slate-500">Tap: <b className="text-slate-800">{data.Tap}</b></span>
+                                                                <span className="text-blue-600 font-bold">{data.LFMW.toFixed(1)} MW</span>
+                                                                <span className="text-slate-400">{data.LFMvar.toFixed(1)} MVar</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        </>
+                                    )})}
                                 </tbody>
                             </table>
                         </div>
