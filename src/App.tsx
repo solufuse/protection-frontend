@@ -33,7 +33,7 @@ function App() {
         console.log("[Auto-Login] No user found, creating Guest session...");
         signInAnonymously(auth)
           .then(() => {
-            // Listener will fire again with the new user
+            // Success
           })
           .catch((error) => {
             console.error("[Auto-Login Error]", error);
@@ -47,25 +47,22 @@ function App() {
 
   const handleLogout = () => auth.signOut();
 
-  // Show spinner only while waiting for initial auth check or auto-login
   if (loading) return <LoadingScreen />;
 
   return (
     <Router>
       <div className="min-h-screen bg-slate-50">
-        {/* Navbar handles the login menu now */}
         {user && <Navbar user={user} onLogout={handleLogout} />}
         
         <main>
           <Routes>
             <Route path="/" element={<Navigate to="/files" replace />} />
             
-            {/* Pages requiring user props */}
             <Route path="/loadflow" element={<Loadflow user={user} />} />
             <Route path="/files" element={<Files user={user} />} />
             <Route path="/config" element={<Config user={user} />} />
             
-            {/* Page NOT requiring user props */}
+            {/* Protection DOES NOT receive user prop */}
             <Route path="/protection" element={<Protection />} />
             
             <Route path="*" element={<Navigate to="/files" replace />} />
