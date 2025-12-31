@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Fragment } from 'react';
 import { Icons } from '../icons';
 import Toast from '../components/Toast';
 import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
@@ -33,7 +33,6 @@ export default function Files({ user }: { user: any }) {
   const [newProjectName, setNewProjectName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   
-  // Default Sort: Uploaded At (DESC)
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'uploaded_at', order: 'desc' });
   
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
@@ -88,7 +87,6 @@ export default function Files({ user }: { user: any }) {
     setLoading(true);
     try {
       const t = await getToken();
-      // [FIX] Clean V2 Route: /files/details
       let url = `${API_URL}/files/details`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
@@ -146,7 +144,6 @@ export default function Files({ user }: { user: any }) {
   const handleUpload = async (fileList: FileList | null) => {
     if (!fileList || !user) return;
     
-    // Guest Checks
     if (user.isAnonymous) {
         if (files.length + fileList.length > 10) return notify("Demo Limit: Max 10 files allowed.", "error");
         for (let i = 0; i < fileList.length; i++) {
@@ -156,7 +153,6 @@ export default function Files({ user }: { user: any }) {
 
     setUploading(true);
     const formData = new FormData();
-    // Optimistic UI Data
     const optimisticFiles: SessionFile[] = [];
 
     Array.from(fileList).forEach(f => {
@@ -172,7 +168,6 @@ export default function Files({ user }: { user: any }) {
 
     try {
       const t = await getToken();
-      // [FIX] Clean V2 Route: /files/upload
       let url = `${API_URL}/files/upload`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
@@ -197,7 +192,6 @@ export default function Files({ user }: { user: any }) {
     if (!confirm("Delete file?")) return;
     try {
       const t = await getToken();
-      // [FIX] Clean V2 Route: /files/file/{path}
       let url = `${API_URL}/files/file/${path}`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
@@ -210,7 +204,6 @@ export default function Files({ user }: { user: any }) {
     if (!confirm("Clear all files?")) return;
     try {
       const t = await getToken();
-      // [FIX] Clean V2 Route: /files/clear
       let url = `${API_URL}/files/clear`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
@@ -228,7 +221,6 @@ export default function Files({ user }: { user: any }) {
     try {
       const t = await getToken();
       const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
-      // Ingestion routes remain /ingestion/* (Business logic)
       const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`);
       if (!res.ok) throw new Error("Preview unavailable");
       const data = await res.json();
@@ -243,7 +235,6 @@ export default function Files({ user }: { user: any }) {
           const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
           let url = "";
           const encName = encodeURIComponent(filename);
-          // [FIX] Clean V2 Route: /files/download
           if (type === 'raw') url = `${API_URL}/files/download?filename=${encName}&token=${t}${pParam}`;
           else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encName}&token=${t}${pParam}`;
           else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}&token=${t}${pParam}`;
@@ -359,12 +350,15 @@ export default function Files({ user }: { user: any }) {
             onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} 
             onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); }}
         >
+            {/* Drag Overlay */}
             {isDragging && (
                 <div className="absolute inset-0 z-50 bg-blue-50/90 border-2 border-dashed border-blue-500 rounded flex flex-col items-center justify-center pointer-events-none">
                     <Icons.UploadCloud className="w-12 h-12 text-blue-600 mb-2" />
                     <span className="text-lg font-black text-blue-700 uppercase tracking-widest">Drop files to upload</span>
                 </div>
             )}
+            
+            {/* Toolbar */}
             <div className="flex justify-between items-center p-2 bg-slate-50 border-b border-slate-100 gap-4">
               <div className="flex items-center gap-2 flex-1">
                   <div className="relative flex-1 max-w-xs">
@@ -415,65 +409,68 @@ export default function Files({ user }: { user: any }) {
                        const isConvertible = /\.(si2s|lf1s|mdb|json)$/i.test(file.filename);
                        const isExpanded = expandedFileId === file.filename;
                        return (
-                        <tr key={i} className={`group transition-colors ${isExpanded ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                          <td className="px-3 py-1 text-center">
-                             {isConvertible && (
-                                <button onClick={() => togglePreview(file.filename)} className="text-slate-400 hover:text-blue-600">
-                                    {isExpanded ? <Icons.ChevronDown className="w-3.5 h-3.5"/> : <Icons.ChevronRight className="w-3.5 h-3.5"/>}
-                                </button>
-                             )}
-                          </td>
-                          <td className="px-3 py-1">
-                            <div className="flex items-center gap-2">
-                               <Icons.FileText className={`w-3.5 h-3.5 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} />
-                               <span className="truncate max-w-[280px] text-slate-700 text-[10px]" title={file.filename}>{file.filename}</span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-1 text-slate-400 font-mono text-[9px]">
-                             <div className="flex items-center gap-1"><Icons.Calendar className="w-3 h-3 text-slate-300"/> {file.uploaded_at || "-"}</div>
-                          </td>
-                          <td className="px-3 py-1 text-slate-400 font-mono text-[9px] text-center">{formatBytes(file.size)}</td>
-                          <td className="px-3 py-1 text-right">
-                            <div className="flex justify-end gap-1.5 items-center">
-                                <button onClick={() => handleOpenLink('raw', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 transition-colors" title="Download Raw">
-                                <Icons.FileDown className="w-3 h-3"/> <span className="text-[9px]">RAW</span>
-                                </button>
+                        <Fragment key={i}>
+                            <tr className={`group transition-colors ${isExpanded ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                            <td className="px-3 py-1 text-center">
                                 {isConvertible && (
-                                <>
-                                  <button onClick={() => handleOpenLink('xlsx', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 hover:bg-green-100 text-green-700 rounded border border-green-200 transition-colors" title="Download XLSX">
-                                    <Icons.FileSpreadsheet className="w-3 h-3"/> <span className="text-[9px]">XLSX</span>
-                                  </button>
-                                  <button onClick={() => handleOpenLink('json', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded border border-yellow-200 transition-colors" title="Download JSON">
-                                    <Icons.FileJson className="w-3 h-3"/> <span className="text-[9px]">JSON</span>
-                                  </button>
-                                  <button onClick={() => handleOpenLink('json_tab', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200 transition-colors" title="Open in new Tab">
-                                    <Icons.ExternalLink className="w-3 h-3"/> <span className="text-[9px]">OPEN</span>
-                                  </button>
-                                  <div className="w-px h-3 bg-slate-300 mx-1"></div>
-                                  <button onClick={() => togglePreview(file.filename)} className={`p-1 rounded transition-colors ${isExpanded ? 'text-blue-600 bg-blue-100' : 'hover:bg-blue-100 text-blue-600'}`} title="Inline Preview">
-                                    {isExpanded ? <Icons.Hide className="w-3.5 h-3.5"/> : <Icons.Show className="w-3.5 h-3.5"/>}
-                                  </button>
-                                </>
+                                    <button onClick={() => togglePreview(file.filename)} className="text-slate-400 hover:text-blue-600">
+                                        {isExpanded ? <Icons.ChevronDown className="w-3.5 h-3.5"/> : <Icons.ChevronRight className="w-3.5 h-3.5"/>}
+                                    </button>
                                 )}
-                                <button onClick={() => handleDelete(file.path)} className="p-1 hover:bg-red-100 text-red-500 rounded transition-colors ml-1"><Icons.Trash className="w-3.5 h-3.5"/></button>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="px-3 py-1">
+                                <div className="flex items-center gap-2">
+                                <Icons.FileText className={`w-3.5 h-3.5 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} />
+                                <span className="truncate max-w-[280px] text-slate-700 text-[10px]" title={file.filename}>{file.filename}</span>
+                                </div>
+                            </td>
+                            <td className="px-3 py-1 text-slate-400 font-mono text-[9px]">
+                                <div className="flex items-center gap-1"><Icons.Calendar className="w-3 h-3 text-slate-300"/> {file.uploaded_at || "-"}</div>
+                            </td>
+                            <td className="px-3 py-1 text-slate-400 font-mono text-[9px] text-center">{formatBytes(file.size)}</td>
+                            <td className="px-3 py-1 text-right">
+                                <div className="flex justify-end gap-1.5 items-center">
+                                    <button onClick={() => handleOpenLink('raw', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 transition-colors" title="Download Raw">
+                                    <Icons.FileDown className="w-3 h-3"/> <span className="text-[9px]">RAW</span>
+                                    </button>
+                                    {isConvertible && (
+                                    <>
+                                    <button onClick={() => handleOpenLink('xlsx', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 hover:bg-green-100 text-green-700 rounded border border-green-200 transition-colors" title="Download XLSX">
+                                        <Icons.FileSpreadsheet className="w-3 h-3"/> <span className="text-[9px]">XLSX</span>
+                                    </button>
+                                    <button onClick={() => handleOpenLink('json', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded border border-yellow-200 transition-colors" title="Download JSON">
+                                        <Icons.FileJson className="w-3 h-3"/> <span className="text-[9px]">JSON</span>
+                                    </button>
+                                    <button onClick={() => handleOpenLink('json_tab', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200 transition-colors" title="Open in new Tab">
+                                        <Icons.ExternalLink className="w-3 h-3"/> <span className="text-[9px]">OPEN</span>
+                                    </button>
+                                    <div className="w-px h-3 bg-slate-300 mx-1"></div>
+                                    <button onClick={() => togglePreview(file.filename)} className={`p-1 rounded transition-colors ${isExpanded ? 'text-blue-600 bg-blue-100' : 'hover:bg-blue-100 text-blue-600'}`} title="Inline Preview">
+                                        {isExpanded ? <Icons.Hide className="w-3.5 h-3.5"/> : <Icons.Show className="w-3.5 h-3.5"/>}
+                                    </button>
+                                    </>
+                                    )}
+                                    <button onClick={() => handleDelete(file.path)} className="p-1 hover:bg-red-100 text-red-500 rounded transition-colors ml-1"><Icons.Trash className="w-3.5 h-3.5"/></button>
+                                </div>
+                            </td>
+                            </tr>
+                            {/* PREVIEW ROW INSIDE MAP */}
+                            {isExpanded && previewData && (
+                                <tr>
+                                    <td colSpan={5} className="bg-slate-900 p-0">
+                                        <div className="max-h-60 overflow-auto custom-scrollbar p-4 text-[10px] font-mono text-green-400">
+                                            {previewLoading ? (
+                                                <div className="flex items-center gap-2 text-slate-400 animate-pulse"><Icons.Refresh className="w-3 h-3 animate-spin"/> Loading...</div>
+                                            ) : (
+                                                <pre>{JSON.stringify(previewData.tables || previewData, null, 2)}</pre>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </Fragment>
                        );
                     })
-                  )}
-                  {expandedFileId && previewData && (
-                     <tr>
-                        <td colSpan={5} className="bg-slate-900 p-0">
-                            <div className="max-h-60 overflow-auto custom-scrollbar p-4 text-[10px] font-mono text-green-400">
-                                {previewLoading ? (
-                                    <div className="flex items-center gap-2 text-slate-400 animate-pulse"><Icons.Refresh className="w-3 h-3 animate-spin"/> Loading...</div>
-                                ) : (
-                                    <pre>{JSON.stringify(previewData.tables || previewData, null, 2)}</pre>
-                                )}
-                            </div>
-                        </td>
-                     </tr>
                   )}
                 </tbody>
               </table>
