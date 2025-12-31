@@ -62,7 +62,7 @@ export default function Files({ user }: { user: any }) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
-  const getToken = async () => { if (!user) return null; return await user.getIdToken(true); };
+  const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
   const handleGoogleLogin = async () => { const auth = getAuth(); await signInWithPopup(auth, new GoogleAuthProvider()); };
   const handleCopyToken = async () => { const t = await getToken(); if (!t) return notify("No Token", "error"); navigator.clipboard.writeText(t); notify("Token Copied"); };
 
