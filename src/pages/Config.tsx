@@ -1,31 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
-import { Save, Upload, Download, FileSignature, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Save, Upload, FileSignature } from 'lucide-react';
 import { Icons } from '../icons';
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 
 export default function Config({ user }: { user: any }) {
-  // --- STATE: PROJECTS ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
 
-  // --- STATE: CONFIG ---
   const [config, setConfig] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  // [FIX] Removed unused 'loading' state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
-  // --- HELPERS ---
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
 
-  // --- API CALLS ---
   const fetchGlobalProfile = async () => {
      try {
          const t = await getToken();
@@ -73,23 +69,19 @@ export default function Config({ user }: { user: any }) {
     } catch (e) { notify("Delete failed", "error"); }
   };
 
-  // --- CONFIG LOGIC ---
   const fetchConfig = async () => {
-    setLoading(true);
     try {
       const t = await getToken();
       let url = `${API_URL}/files/download?filename=config.json`;
       if (activeProjectId) url += `&project_id=${activeProjectId}`;
-      
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
       if (res.ok) {
           const data = await res.json();
           setConfig(data);
       } else {
-          setConfig(null); // No config found
+          setConfig(null);
       }
     } catch (e) { console.error(e); } 
-    finally { setLoading(false); }
   };
 
   const handleSaveConfig = async () => {
@@ -99,10 +91,8 @@ export default function Config({ user }: { user: any }) {
       const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
       const formData = new FormData();
       formData.append('files', blob, 'config.json');
-      
       let url = `${API_URL}/files/upload`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
-
       const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
       if (res.ok) notify("Config Saved");
       else throw new Error();
@@ -133,8 +123,6 @@ export default function Config({ user }: { user: any }) {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
-      
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
@@ -167,7 +155,6 @@ export default function Config({ user }: { user: any }) {
             </button>
         </div>
       </div>
-
       <div className="flex flex-1 gap-6 min-h-0">
         <ProjectsSidebar 
           user={user}
@@ -181,8 +168,6 @@ export default function Config({ user }: { user: any }) {
           onCreateProject={createProject}
           onDeleteProject={deleteProject}
         />
-
-        {/* MAIN EDITOR AREA */}
         <div className="flex-1 flex flex-col bg-slate-900 border border-slate-800 rounded shadow-inner overflow-hidden relative">
             <div className="bg-slate-950 p-2 border-b border-slate-800 flex justify-between items-center">
                 <span className="text-slate-400 font-mono text-[10px]">config.json</span>
@@ -211,7 +196,6 @@ export default function Config({ user }: { user: any }) {
             </div>
         </div>
       </div>
-
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );

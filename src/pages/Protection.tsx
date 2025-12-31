@@ -1,31 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Shield, ChevronRight, Settings, SlidersHorizontal } from 'lucide-react';
-import { Icons } from '../icons'; // Ensure we have common icons
+import { ChevronRight, Settings, SlidersHorizontal } from 'lucide-react';
+import { Icons } from '../icons';
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 
 export default function Protection({ user }: { user: any }) {
-  // --- STATE: PROJECTS ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  
-  // --- STATE: UI ---
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
-  // --- HELPERS ---
   const notify = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, msg, type });
   };
 
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
 
-  // --- API CALLS (Projects) ---
   const fetchGlobalProfile = async () => {
      try {
          const t = await getToken();
@@ -83,11 +78,8 @@ export default function Protection({ user }: { user: any }) {
     }
   }, [user]);
 
-  // --- RENDER ---
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
-      
-      {/* HEADER (Standardized) */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
@@ -116,10 +108,7 @@ export default function Protection({ user }: { user: any }) {
             </button>
         </div>
       </div>
-
       <div className="flex flex-1 gap-6 min-h-0">
-        
-        {/* SIDEBAR */}
         <ProjectsSidebar 
           user={user}
           projects={projects}
@@ -132,12 +121,8 @@ export default function Protection({ user }: { user: any }) {
           onCreateProject={createProject}
           onDeleteProject={deleteProject}
         />
-
-        {/* MAIN CONTENT (Original Protection UI) */}
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-white border border-slate-200 rounded shadow-sm p-4">
-            
             <div className="grid grid-cols-12 gap-6 text-left h-full">
-                {/* LISTE DISJONCTEURS */}
                 <div className="col-span-12 lg:col-span-4 space-y-4">
                 <div className="bg-white border border-slate-200 rounded shadow-sm p-3">
                     <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 border-b pb-1">Circuit Breakers</h2>
@@ -151,8 +136,6 @@ export default function Protection({ user }: { user: any }) {
                     </div>
                 </div>
                 </div>
-
-                {/* GRAPH / DETAILS */}
                 <div className="col-span-12 lg:col-span-8 bg-slate-50 border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center p-20 text-slate-400 italic font-bold">
                 <div className="bg-white p-3 rounded-full shadow-sm mb-3">
                     <Settings className="w-6 h-6 text-slate-200 animate-spin-slow" />
@@ -160,10 +143,8 @@ export default function Protection({ user }: { user: any }) {
                 Select a breaker to view curves and time-current coordination
                 </div>
             </div>
-
         </div>
       </div>
-
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );

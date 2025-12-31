@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react';
+import { Fragment } from 'react';
 import { Icons } from '../icons';
 import FilePreview from './FilePreview';
 
@@ -40,11 +40,9 @@ export default function FileTable({
   onDelete,
   formatBytes
 }: FileTableProps) {
-  
   return (
     <div className="flex-1 overflow-y-auto">
       <table className="w-full text-left font-bold border-collapse">
-        {/* TABLE HEAD */}
         <thead className="text-[9px] text-slate-400 uppercase tracking-widest bg-slate-50/50 sticky top-0 z-10">
           <tr>
             <th className="py-2 px-3 border-b border-slate-100 font-bold w-8"></th>
@@ -60,8 +58,6 @@ export default function FileTable({
             <th className="py-2 px-3 border-b border-slate-100 text-right w-64 font-bold">Actions</th>
           </tr>
         </thead>
-        
-        {/* TABLE BODY */}
         <tbody className="divide-y divide-slate-50">
           {files.length === 0 ? (
             <tr><td colSpan={5} className="py-20 text-center text-slate-300 italic"><Icons.Archive className="w-10 h-10 mx-auto mb-3 opacity-50" /><span className="block opacity-70">{searchTerm ? "No matches found" : "No files in this context"}</span></td></tr>
@@ -72,19 +68,10 @@ export default function FileTable({
                return (
                 <Fragment key={i}>
                     <tr className={`group transition-colors ${isExpanded ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                      {/* CHEVRON */}
                       <td className="px-3 py-1 text-center">{isConvertible && (<button onClick={() => onTogglePreview(file.filename)} className="text-slate-400 hover:text-blue-600">{isExpanded ? <Icons.ChevronDown className="w-3.5 h-3.5"/> : <Icons.ChevronRight className="w-3.5 h-3.5"/>}</button>)}</td>
-                      
-                      {/* FILENAME */}
                       <td className="px-3 py-1"><div className="flex items-center gap-2"><Icons.FileText className={`w-3.5 h-3.5 ${isConvertible ? 'text-blue-500' : 'text-slate-400'}`} /><span className="truncate max-w-[280px] text-slate-700 text-[10px]" title={file.filename}>{file.filename}</span></div></td>
-                      
-                      {/* DATE */}
                       <td className="px-3 py-1 text-slate-400 font-mono text-[9px]"><div className="flex items-center gap-1"><Icons.Calendar className="w-3 h-3 text-slate-300"/> {file.uploaded_at || "-"}</div></td>
-                      
-                      {/* SIZE */}
                       <td className="px-3 py-1 text-slate-400 font-mono text-[9px] text-center">{formatBytes(file.size)}</td>
-                      
-                      {/* ACTIONS */}
                       <td className="px-3 py-1 text-right">
                           <div className="flex justify-end gap-1.5 items-center">
                               <button onClick={() => onOpenLink('raw', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 transition-colors" title="Download Raw"><Icons.FileDown className="w-3 h-3"/> <span className="text-[9px]">RAW</span></button>
@@ -101,8 +88,6 @@ export default function FileTable({
                           </div>
                       </td>
                     </tr>
-                    
-                    {/* EXPANDED PREVIEW ROW */}
                     {isExpanded && <FilePreview data={previewData} loading={previewLoading} />}
                 </Fragment>
                );

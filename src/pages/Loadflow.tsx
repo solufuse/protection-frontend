@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react';
-import { 
-  Play, Activity, TrendingUp, Zap, Filter, XCircle, Search, Eye
-} from 'lucide-react';
+import { Play, Activity, TrendingUp, Filter, Search, Eye } from 'lucide-react';
 import { Icons } from '../icons'; 
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 
-// --- TYPES ---
 interface StudyCase {
   id: string;
   config: string;
@@ -37,20 +34,13 @@ interface LoadflowResponse {
   results: LoadflowResult[];
 }
 
-const LINE_COLORS = [
-  "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", 
-  "#ec4899", "#6366f1", "#14b8a6", "#f43f5e", "#84cc16"
-];
-
 export default function Loadflow({ user }: { user: any }) {
-  // --- STATE: PROJECTS ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
 
-  // --- STATE: LOADFLOW ---
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<LoadflowResult[]>([]);
   const [filterValid, setFilterValid] = useState(false);
@@ -60,11 +50,9 @@ export default function Loadflow({ user }: { user: any }) {
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
-  // --- HELPERS ---
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
 
-  // --- API CALLS ---
   const fetchGlobalProfile = async () => {
      try {
          const t = await getToken();
@@ -112,19 +100,16 @@ export default function Loadflow({ user }: { user: any }) {
     } catch (e) { notify("Delete failed", "error"); }
   };
 
-  // --- LOADFLOW LOGIC ---
   const runLoadflow = async () => {
     setLoading(true);
     setResults([]);
     setSelectedCase(null);
     try {
       const t = await getToken();
-      let url = `${API_URL}/loadflow/run_batch?token=${t}`; // Use token param for compatibility or header
+      let url = `${API_URL}/loadflow/run_batch?token=${t}`; 
       if (activeProjectId) url += `&project_id=${activeProjectId}`;
-      
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
       if (!res.ok) throw new Error("Calculation failed");
-      
       const data: LoadflowResponse = await res.json();
       setResults(data.results);
       notify(`Calculated ${data.results.length} scenarios`);
@@ -139,7 +124,6 @@ export default function Loadflow({ user }: { user: any }) {
     }
   }, [user]);
 
-  // Filtering
   const filteredResults = results.filter(r => {
     if (filterValid && !r.is_valid) return false;
     if (searchQuery && !r.filename.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -148,8 +132,6 @@ export default function Loadflow({ user }: { user: any }) {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
-      
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
@@ -179,9 +161,7 @@ export default function Loadflow({ user }: { user: any }) {
             </button>
         </div>
       </div>
-
       <div className="flex flex-1 gap-6 min-h-0">
-        {/* SIDEBAR */}
         <ProjectsSidebar 
           user={user}
           projects={projects}
@@ -194,11 +174,7 @@ export default function Loadflow({ user }: { user: any }) {
           onCreateProject={createProject}
           onDeleteProject={deleteProject}
         />
-
-        {/* MAIN CONTENT */}
         <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden relative">
-            
-            {/* TOOLBAR */}
             <div className="p-2 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-4">
                 <div className="flex items-center gap-2 flex-1">
                      <div className="relative flex-1 max-w-xs">
@@ -213,8 +189,6 @@ export default function Loadflow({ user }: { user: any }) {
                     {filteredResults.length} Scenarios
                 </div>
             </div>
-
-            {/* RESULTS TABLE */}
             <div className="flex-1 overflow-y-auto bg-slate-50/50">
                 {results.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-slate-300">
@@ -224,7 +198,6 @@ export default function Loadflow({ user }: { user: any }) {
                     </div>
                 ) : (
                     <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                         {/* LIST */}
                          <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-250px)]">
                             <div className="overflow-y-auto custom-scrollbar">
                                 <table className="w-full text-left font-bold">
@@ -256,8 +229,6 @@ export default function Loadflow({ user }: { user: any }) {
                                 </table>
                             </div>
                          </div>
-
-                         {/* DETAILS */}
                          <div className="bg-white border border-slate-200 rounded shadow-sm p-4 overflow-y-auto">
                             {selectedCase ? (
                                 <div className="space-y-4">
@@ -265,7 +236,6 @@ export default function Loadflow({ user }: { user: any }) {
                                         <TrendingUp className="w-4 h-4 text-blue-500" />
                                         <h3 className="font-black text-slate-700 uppercase">Scenario Analysis</h3>
                                     </div>
-                                    
                                     <div className="grid grid-cols-2 gap-2">
                                         <div className="bg-slate-50 p-2 rounded border border-slate-100">
                                             <span className="block text-[9px] text-slate-400 uppercase font-bold">Active Power</span>
@@ -280,7 +250,6 @@ export default function Loadflow({ user }: { user: any }) {
                                             <span className={`text-lg font-mono ${Math.abs(selectedCase.delta_target) < 1 ? 'text-green-600' : 'text-orange-500'}`}>{selectedCase.delta_target.toFixed(3)}</span>
                                         </div>
                                     </div>
-
                                     <div>
                                         <span className="block text-[9px] text-slate-400 uppercase font-bold mb-2">Transformer Taps</span>
                                         <div className="space-y-1">
@@ -308,7 +277,6 @@ export default function Loadflow({ user }: { user: any }) {
             </div>
         </div>
       </div>
-
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );
