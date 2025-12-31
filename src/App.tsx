@@ -1,8 +1,7 @@
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Files from './pages/Files';
-import Navbar from './components/Navbar'; // Assumant que tu as une Navbar
-import { Icons } from './icons';
+import CookieConsent from './components/CookieConsent'; // Import du composant
 import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 const LoginScreen = () => {
@@ -28,6 +27,9 @@ const LoginScreen = () => {
                 <span>•</span>
                 <span>Secure Access</span>
             </div>
+            
+            {/* Le bandeau s'affiche aussi sur le login */}
+            <CookieConsent />
         </div>
     );
 };
@@ -35,15 +37,13 @@ const LoginScreen = () => {
 const AppContent = () => {
     const { user } = useAuth();
 
-    // Si pas connecté, on montre l'écran de login
     if (!user) return <LoginScreen />;
 
-    // Si connecté, on montre l'app
     return (
         <>
-            {/* Si tu as une Navbar, décommente la ligne suivante */}
-            {/* <Navbar user={user} /> */}
             <Files user={user} />
+            {/* Le bandeau s'affiche aussi dans l'app si pas encore accepté */}
+            <CookieConsent />
         </>
     );
 };
