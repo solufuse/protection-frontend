@@ -1,9 +1,9 @@
-
 import { useEffect, useState, useRef, Fragment } from 'react';
 import { Icons } from '../icons';
 import Toast from '../components/Toast';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import MembersModal from '../components/MembersModal';
+import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../firebase'; // Import direct de l'instance
 
@@ -16,11 +16,7 @@ interface SessionFile {
   content_type: string;
 }
 
-interface Project {
-  id: string;
-  name: string;
-  role: 'owner' | 'admin' | 'moderator' | 'editor' | 'viewer' | 'staff_override';
-}
+// Project type is now imported from ProjectsSidebar
 
 type SortKey = 'filename' | 'uploaded_at' | 'size';
 type SortOrder = 'asc' | 'desc';
@@ -164,7 +160,7 @@ export default function Files({ user }: { user: any }) {
       const t = await getToken();
       let url = `${API_URL}/files/upload`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
-      const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
+      const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } });
       if (!res.ok) {
           const err = await res.json().catch(() => ({ detail: "Upload Failed" }));
           throw new Error(err.detail);
@@ -293,41 +289,19 @@ export default function Files({ user }: { user: any }) {
       )}
 
       <div className="flex flex-1 gap-6 min-h-0">
-        {/* SIDEBAR PROJECTS */}
-        <div className="w-60 flex flex-col gap-4">
-            <div onClick={() => setActiveProjectId(null)} className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null ? 'bg-slate-800 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
-                <Icons.HardDrive className="w-4 h-4" />
-                <div className="flex flex-col"><span className="font-bold uppercase tracking-wide">My Session</span><span className="text-[9px] text-slate-400">Private Storage</span></div>
-            </div>
-            <div className="border-t border-slate-200 my-1"></div>
-            <div className="flex justify-between items-center px-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span>
-                <button disabled={user?.isAnonymous} onClick={() => setIsCreatingProject(!isCreatingProject)} className={`p-1 rounded transition-colors ${user?.isAnonymous ? 'text-slate-300 cursor-not-allowed' : 'hover:bg-blue-50 text-blue-600'}`}><Icons.Plus className="w-3.5 h-3.5" /></button>
-            </div>
-            {isCreatingProject && (
-                <div className="flex gap-1">
-                    <input className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Project ID..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && createProject()} autoFocus />
-                    <button onClick={createProject} className="bg-blue-600 text-white px-2 rounded font-bold text-[9px]">OK</button>
-                </div>
-            )}
-            <div className="flex-1 overflow-y-auto flex flex-col gap-1 custom-scrollbar pr-1">
-                {projects.map(p => (
-                    <div key={p.id} onClick={() => setActiveProjectId(p.id)} className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.id ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:border-slate-200'}`}>
-                        <div className="flex items-center gap-2 overflow-hidden">
-                            {/* OWNER CROWN OR MEMBER USER */}
-                            {p.role === 'owner' ? <span title="Owner">👑</span> : <Icons.User className={`w-3.5 h-3.5 ${activeProjectId === p.id ? 'text-blue-200' : 'text-slate-300'}`} />}
-                            <span className="font-bold truncate">{p.id}</span>
-                        </div>
-                        {/* DELETE BUTTON */}
-                        {p.role !== 'moderator' && (
-                            <button onClick={(e) => deleteProject(p.id, e)} className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}>
-                                <Icons.Trash className="w-3 h-3" />
-                            </button>
-                        )}
-                    </div>
-                ))}
-            </div>
-        </div>
+        {/* SIDEBAR COMPONENT */}
+        <ProjectsSidebar 
+          user={user}
+          projects={projects}
+          activeProjectId={activeProjectId}
+          setActiveProjectId={setActiveProjectId}
+          isCreatingProject={isCreatingProject}
+          setIsCreatingProject={setIsCreatingProject}
+          newProjectName={newProjectName}
+          setNewProjectName={setNewProjectName}
+          onCreateProject={createProject}
+          onDeleteProject={deleteProject}
+        />
 
         {/* MAIN CONTENT */}
         <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold relative transition-all"
