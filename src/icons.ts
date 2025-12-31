@@ -41,7 +41,9 @@ import {
   ChevronDown,
   ArrowUpDown,
   Archive,
-  Lock
+  Lock,
+  Activity,
+  Crown
 } from 'lucide-react';
 
 export const Icons = {
@@ -62,31 +64,32 @@ export const Icons = {
   Trash,
   Plus,
   Download,
-  Refresh: RefreshCw, // Alias pour RefreshCw
-  Alert: AlertTriangle, // Alias pour AlertTriangle
+  Refresh: RefreshCw,    // Alias standard
+  Alert: AlertTriangle,  // Alias utilisé dans Files.tsx
+  AlertTriangle,         // Requis par Profile.tsx (sans alias)
   Check,
   Info,
   MoreVertical,
   HardDrive,
   Key,
-  // New Icons for Roles & Teams
-  Shield,       // Admin
-  CheckCircle,  // Moderator
-  Zap,          // Nitro
-  Users,        // Team Button
-  UserMinus,    // Kick Member
+  Shield,
+  CheckCircle,
+  Zap,
+  Users,
+  UserMinus,
   AlertCircle,
   ArrowRight,
-  // File Actions
   Calendar,
   FileDown,
   FileSpreadsheet,
   FileJson,
   ExternalLink,
-  Show: Eye,    // Alias
-  Hide: EyeOff, // Alias
+  Show: Eye,
+  Hide: EyeOff,
   ChevronDown,
   ArrowUpDown,
   Archive,
-  Lock
+  Lock,
+  Activity,              // Requis par Navbar.tsx
+  Crown                  // Requis par Profile.tsx
 };
