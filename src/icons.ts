@@ -1,49 +1,92 @@
 
 import {
-  // General
-  Loader, User, LogOut, Settings, FileText, Search, Menu, X,
-  ChevronRight, ChevronDown, ChevronLeft, ChevronUp,
-  ExternalLink, Plus, Trash, Trash2, Edit, Save, Download, Upload,
-  Check, CheckCircle, AlertTriangle, AlertCircle, Info, HelpCircle,
-  
-  // Navigation & Modules
-  Folder, HardDrive, Activity, Shield, ShieldCheck, Zap,
-  
-  // Files
-  File, FileJson, FileSpreadsheet, Archive, UploadCloud, RefreshCw,
-  ArrowRight, ArrowUpDown, Calendar, Eye, EyeOff,
-  
-  // Auth & Security
-  Key, Lock, Unlock, Crown,
-  
-  // Misc
-  SlidersHorizontal, Filter, XCircle, TrendingUp, Clock, FileSignature
+  Loader,
+  User,
+  LogOut,
+  Settings,
+  FileText,
+  Search,
+  Menu,
+  Home,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Folder,
+  File,
+  UploadCloud,
+  Trash,
+  Plus,
+  Download,
+  RefreshCw,
+  AlertTriangle,
+  Check,
+  Info,
+  MoreVertical,
+  HardDrive,
+  Key,
+  Shield,
+  CheckCircle,
+  Zap,
+  Users,
+  UserMinus,
+  AlertCircle,
+  ArrowRight,
+  Calendar,
+  FileDown,
+  FileSpreadsheet,
+  FileJson,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ArrowUpDown,
+  Archive,
+  Lock
 } from 'lucide-react';
 
 export const Icons = {
-  // Generic
-  Loader, User, LogOut, Settings, FileText, Search, Menu, X,
-  ChevronRight, ChevronDown, ChevronLeft, ChevronUp,
-  ExternalLink, Plus, Trash, Trash2, Edit, Save, Download, Upload,
-  Check, CheckCircle, AlertTriangle, AlertCircle, Info, HelpCircle,
-  
-  // App Specific
-  Folder, HardDrive, Activity, Shield, ShieldCheck, Zap,
-  
-  // Files specific maps (pour compatibilité avec Files.tsx existant)
-  Refresh: RefreshCw,
-  Alert: AlertTriangle,
-  FileDown: Download,
-  Hide: EyeOff,
-  Show: Eye,
-  
-  // File Types
-  File, FileJson, FileSpreadsheet, Archive, UploadCloud,
-  ArrowRight, ArrowUpDown, Calendar,
-  
-  // Security
-  Key, Lock, Unlock, Crown,
-  
-  // Dashboard / Loadflow
-  SlidersHorizontal, Filter, XCircle, TrendingUp, Clock, FileSignature
+  Loader,
+  User,
+  LogOut,
+  Settings,
+  FileText,
+  Search,
+  Menu,
+  Home,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Folder,
+  File,
+  UploadCloud,
+  Trash,
+  Plus,
+  Download,
+  Refresh: RefreshCw, // Alias pour RefreshCw
+  Alert: AlertTriangle, // Alias pour AlertTriangle
+  Check,
+  Info,
+  MoreVertical,
+  HardDrive,
+  Key,
+  // New Icons for Roles & Teams
+  Shield,       // Admin
+  CheckCircle,  // Moderator
+  Zap,          // Nitro
+  Users,        // Team Button
+  UserMinus,    // Kick Member
+  AlertCircle,
+  ArrowRight,
+  // File Actions
+  Calendar,
+  FileDown,
+  FileSpreadsheet,
+  FileJson,
+  ExternalLink,
+  Show: Eye,    // Alias
+  Hide: EyeOff, // Alias
+  ChevronDown,
+  ArrowUpDown,
+  Archive,
+  Lock
 };
