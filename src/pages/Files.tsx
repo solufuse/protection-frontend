@@ -13,9 +13,9 @@ interface SessionFile {
 }
 
 interface Project {
-  id: string;      // Updated V2
-  name: string;    // Updated V2
-  role?: 'owner' | 'member'; // Optional in list view depending on backend
+  id: string;
+  name: string;
+  role?: 'owner' | 'member';
 }
 
 type SortKey = 'filename' | 'uploaded_at' | 'size';
@@ -32,7 +32,10 @@ export default function Files({ user }: { user: any }) {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'filename', order: 'asc' });
+  
+  // [FIX] Default Sort: Uploaded At (DESC) -> Show newest files first
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'uploaded_at', order: 'desc' });
+  
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -69,11 +72,10 @@ export default function Files({ user }: { user: any }) {
     notify("Token Copied");
   };
 
-  // --- API V2 UPDATES ---
+  // --- API ---
   const fetchProjects = async () => {
     try {
       const t = await getToken();
-      // [FIX] V2 Route: /projects/
       const res = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } });
       if (res.ok) {
         const data = await res.json();
@@ -86,7 +88,6 @@ export default function Files({ user }: { user: any }) {
     setLoading(true);
     try {
       const t = await getToken();
-      // Files remain on /session for guests, or project context
       let url = `${API_URL}/session/details`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
@@ -103,19 +104,15 @@ export default function Files({ user }: { user: any }) {
     }
   }, [user, activeProjectId]);
 
-  // --- HANDLERS V2 UPDATES ---
+  // --- HANDLERS ---
   const createProject = async () => {
     if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error");
     if (!newProjectName.trim()) return;
     try {
       const t = await getToken();
-      // [FIX] V2 Route: POST /projects/create (Body JSON)
       const res = await fetch(`${API_URL}/projects/create`, {
         method: 'POST',
-        headers: { 
-            'Authorization': `Bearer ${t}`,
-            'Content-Type': 'application/json' 
-        },
+        headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: newProjectName, name: newProjectName })
       });
       if (!res.ok) throw new Error();
@@ -131,10 +128,8 @@ export default function Files({ user }: { user: any }) {
     if (!confirm(`Delete project "${projId}" permanently?`)) return;
     try {
       const t = await getToken();
-      // [FIX] V2 Route: DELETE /projects/{id}
       const res = await fetch(`${API_URL}/projects/${projId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${t}` }
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` }
       });
       if (!res.ok) throw new Error();
       notify("Project Deleted");
@@ -146,7 +141,7 @@ export default function Files({ user }: { user: any }) {
   const handleUpload = async (fileList: FileList | null) => {
     if (!fileList || !user) return;
     
-    // GUEST RESTRICTIONS
+    // Guest Checks
     if (user.isAnonymous) {
         if (files.length + fileList.length > 10) return notify("Demo Limit: Max 10 files allowed.", "error");
         for (let i = 0; i < fileList.length; i++) {
@@ -156,15 +151,35 @@ export default function Files({ user }: { user: any }) {
 
     setUploading(true);
     const formData = new FormData();
-    Array.from(fileList).forEach(f => formData.append('files', f));
+    // [FIX] Prepare Optimistic UI Data
+    const optimisticFiles: SessionFile[] = [];
+
+    Array.from(fileList).forEach(f => {
+        formData.append('files', f);
+        optimisticFiles.push({
+            filename: f.name,
+            path: f.name,
+            size: f.size,
+            content_type: f.type,
+            uploaded_at: new Date().toISOString() // Show "Just now" basically
+        });
+    });
+
     try {
       const t = await getToken();
       let url = `${API_URL}/session/upload`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
       if (!res.ok) throw new Error("Upload Failed");
+      
       notify(`${fileList.length} Uploaded`);
-      fetchFiles();
+      
+      // [FIX] OPTIMISTIC UPDATE: Add files immediately to the UI
+      setFiles(prev => [...optimisticFiles, ...prev]);
+      
+      // Refresh background to get real server data
+      setTimeout(() => fetchFiles(), 500); 
+
     } catch (e: any) { notify(e.message || "Upload Failed", "error"); } 
     finally { 
         setUploading(false); 
@@ -321,7 +336,6 @@ export default function Files({ user }: { user: any }) {
                             <Icons.Folder className={`w-3.5 h-3.5 ${activeProjectId === (p.id || (p as any).project_id) ? 'text-blue-200' : 'text-slate-400'}`} />
                             <span className="font-bold truncate">{p.id || (p as any).project_id}</span>
                         </div>
-                        {/* Only show delete if user is owner or admin (logic simplified for frontend display) */}
                         <button onClick={(e) => deleteProject(p.id || (p as any).project_id, e)} className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === (p.id || (p as any).project_id) ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}>
                             <Icons.Trash className="w-3 h-3" />
                         </button>
