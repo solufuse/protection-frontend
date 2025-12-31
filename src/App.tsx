@@ -1,13 +1,32 @@
 
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Files from './pages/Files';
-import CookieConsent from './components/CookieConsent';
+import { auth } from './firebase'; // Import direct pour le logout
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from './firebase'; // [FIX] Import direct
+import { Icons } from './icons';
+
+// Components
+import Navbar from './components/Navbar';
+import CookieConsent from './components/CookieConsent';
+
+// Pages
+import Files from './pages/Files';
+import Loadflow from './pages/Loadflow';
+import Protection from './pages/Protection';
+import Config from './pages/Config';
+import Profile from './pages/Profile';
+
+// --- SCREENS ---
+
+const LoadingScreen = () => (
+  <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4">
+    <Icons.Loader className="w-10 h-10 animate-spin text-blue-600" />
+    <span className="text-xs font-bold tracking-widest uppercase">Initializing Solufuse...</span>
+  </div>
+);
 
 const LoginScreen = () => {
     const handleLogin = async () => {
-        // Utilisation de l'instance 'auth' importée
         await signInWithPopup(auth, new GoogleAuthProvider());
     };
 
@@ -28,22 +47,56 @@ const LoginScreen = () => {
                 <span>•</span>
                 <span>Secure Access</span>
             </div>
-            
             <CookieConsent />
         </div>
     );
 };
 
+// --- APP CONTENT (Protected) ---
+
 const AppContent = () => {
-    const { user } = useAuth();
-    if (!user) return <LoginScreen />;
-    return (
-        <>
-            <Files user={user} />
-            <CookieConsent />
-        </>
-    );
+  const { user, loading } = useAuth(); // AuthContext gère l'état
+
+  // 1. Loading State
+  if (loading) return <LoadingScreen />;
+
+  // 2. Unauthenticated State
+  if (!user) return <LoginScreen />;
+
+  // 3. Authenticated State (The Real App)
+  const handleLogout = () => auth.signOut();
+
+  return (
+    <Router>
+      <div className="min-h-screen bg-slate-50">
+        {/* Navbar is back! */}
+        <Navbar user={user} onLogout={handleLogout} />
+        
+        <main>
+          <Routes>
+            <Route path="/" element={<Navigate to="/files" replace />} />
+            
+            {/* Main Routes */}
+            <Route path="/files" element={<Files user={user} />} />
+            <Route path="/loadflow" element={<Loadflow user={user} />} />
+            <Route path="/config" element={<Config user={user} />} />
+            <Route path="/profile" element={<Profile user={user} />} />
+            
+            {/* Protection page (might not need user prop depending on implementation) */}
+            <Route path="/protection" element={<Protection />} />
+            
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/files" replace />} />
+          </Routes>
+        </main>
+        
+        <CookieConsent />
+      </div>
+    </Router>
+  );
 };
+
+// --- ROOT COMPONENT ---
 
 export default function App() {
   return (
