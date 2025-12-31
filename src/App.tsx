@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
-import Sidebar from './components/Sidebar';
+import Navbar from './components/Navbar';
 import Files from './pages/Files';
 import Protection from './pages/Protection';
 import Loadflow from './pages/Loadflow';
@@ -27,13 +27,16 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
-        <Sidebar user={user} />
+      {/* [CHANGE] Flex-col for Top Navbar layout */}
+      <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
+        
+        {/* Navbar is only shown if user is logged in, similar to Sidebar logic */}
+        {user && <Navbar user={user} />}
+        
         <main className="flex-1 overflow-hidden relative">
           <Routes>
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
             
-            {/* [!] [FIX] All these components now receive the user prop */}
             <Route path="/" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             <Route path="/files" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             
