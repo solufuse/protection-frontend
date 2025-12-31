@@ -33,7 +33,7 @@ export default function Files({ user }: { user: any }) {
   const [newProjectName, setNewProjectName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   
-  // [FIX] Default Sort: Uploaded At (DESC) -> Show newest files first
+  // Default Sort: Uploaded At (DESC)
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'uploaded_at', order: 'desc' });
   
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
@@ -88,7 +88,8 @@ export default function Files({ user }: { user: any }) {
     setLoading(true);
     try {
       const t = await getToken();
-      let url = `${API_URL}/session/details`;
+      // [FIX] Clean V2 Route: /files/details
+      let url = `${API_URL}/files/details`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
       if (!res.ok) throw new Error("Failed to fetch");
@@ -112,7 +113,10 @@ export default function Files({ user }: { user: any }) {
       const t = await getToken();
       const res = await fetch(`${API_URL}/projects/create`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
+        headers: { 
+            'Authorization': `Bearer ${t}`,
+            'Content-Type': 'application/json' 
+        },
         body: JSON.stringify({ id: newProjectName, name: newProjectName })
       });
       if (!res.ok) throw new Error();
@@ -129,7 +133,8 @@ export default function Files({ user }: { user: any }) {
     try {
       const t = await getToken();
       const res = await fetch(`${API_URL}/projects/${projId}`, {
-        method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` }
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${t}` }
       });
       if (!res.ok) throw new Error();
       notify("Project Deleted");
@@ -151,7 +156,7 @@ export default function Files({ user }: { user: any }) {
 
     setUploading(true);
     const formData = new FormData();
-    // [FIX] Prepare Optimistic UI Data
+    // Optimistic UI Data
     const optimisticFiles: SessionFile[] = [];
 
     Array.from(fileList).forEach(f => {
@@ -161,23 +166,24 @@ export default function Files({ user }: { user: any }) {
             path: f.name,
             size: f.size,
             content_type: f.type,
-            uploaded_at: new Date().toISOString() // Show "Just now" basically
+            uploaded_at: new Date().toISOString()
         });
     });
 
     try {
       const t = await getToken();
-      let url = `${API_URL}/session/upload`;
+      // [FIX] Clean V2 Route: /files/upload
+      let url = `${API_URL}/files/upload`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
-      if (!res.ok) throw new Error("Upload Failed");
+      if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Upload Failed" }));
+          throw new Error(err.detail || "Upload Failed");
+      }
       
       notify(`${fileList.length} Uploaded`);
-      
-      // [FIX] OPTIMISTIC UPDATE: Add files immediately to the UI
       setFiles(prev => [...optimisticFiles, ...prev]);
       
-      // Refresh background to get real server data
       setTimeout(() => fetchFiles(), 500); 
 
     } catch (e: any) { notify(e.message || "Upload Failed", "error"); } 
@@ -191,7 +197,8 @@ export default function Files({ user }: { user: any }) {
     if (!confirm("Delete file?")) return;
     try {
       const t = await getToken();
-      let url = `${API_URL}/session/file/${path}`;
+      // [FIX] Clean V2 Route: /files/file/{path}
+      let url = `${API_URL}/files/file/${path}`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
       setFiles(p => p.filter(f => f.path !== path));
@@ -203,7 +210,8 @@ export default function Files({ user }: { user: any }) {
     if (!confirm("Clear all files?")) return;
     try {
       const t = await getToken();
-      let url = `${API_URL}/session/clear`;
+      // [FIX] Clean V2 Route: /files/clear
+      let url = `${API_URL}/files/clear`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
       setFiles([]);
@@ -220,6 +228,7 @@ export default function Files({ user }: { user: any }) {
     try {
       const t = await getToken();
       const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
+      // Ingestion routes remain /ingestion/* (Business logic)
       const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`);
       if (!res.ok) throw new Error("Preview unavailable");
       const data = await res.json();
@@ -234,7 +243,8 @@ export default function Files({ user }: { user: any }) {
           const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
           let url = "";
           const encName = encodeURIComponent(filename);
-          if (type === 'raw') url = `${API_URL}/session/download?filename=${encName}&token=${t}${pParam}`;
+          // [FIX] Clean V2 Route: /files/download
+          if (type === 'raw') url = `${API_URL}/files/download?filename=${encName}&token=${t}${pParam}`;
           else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encName}&token=${t}${pParam}`;
           else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}&token=${t}${pParam}`;
           else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encName}&token=${t}${pParam}`;
