@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 import Toast from '../components/Toast';
 
-// --- TYPES ---
 interface Project {
-  project_id: string;
-  role: 'owner' | 'member';
+  id: string; // Updated V2
+  name: string;
+  role?: 'owner' | 'member';
 }
 
 interface StudyCase {
@@ -42,21 +42,18 @@ interface LoadflowResponse {
   results: LoadflowResult[];
 }
 
-// Helper to extract revision number (CH195 -> 195)
 const extractLoadNumber = (rev: string | undefined) => {
     if (!rev) return 0;
     const match = rev.match(/(\d+)/);
     return match ? parseInt(match[0]) : 0;
 };
 
-// Distinct colors for scenarios
 const LINE_COLORS = [
   "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", 
   "#ec4899", "#06b6d4", "#f97316", "#6366f1", "#84cc16"
 ];
 
 export default function Loadflow({ user }: { user: any }) {
-  // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -85,11 +82,12 @@ export default function Loadflow({ user }: { user: any }) {
     return await user.getIdToken(true); 
   };
 
-  // --- NAVIGATION ---
+  // --- API V2 ---
   const fetchProjects = async () => {
     try {
       const t = await getToken();
-      const res = await fetch(`${apiUrl}/session/projects`, { headers: { 'Authorization': `Bearer ${t}` } });
+      // [FIX] /projects/
+      const res = await fetch(`${apiUrl}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } });
       if (res.ok) {
         const data = await res.json();
         setProjects(data);
@@ -101,8 +99,11 @@ export default function Loadflow({ user }: { user: any }) {
     if (!newProjectName.trim()) return;
     try {
       const t = await getToken();
-      const res = await fetch(`${apiUrl}/session/project/create?project_id=${encodeURIComponent(newProjectName)}`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${t}` }
+      // [FIX] POST /projects/create (JSON)
+      const res = await fetch(`${apiUrl}/projects/create`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: newProjectName, name: newProjectName })
       });
       if (!res.ok) throw new Error();
       notify("Project Created");
@@ -117,7 +118,8 @@ export default function Loadflow({ user }: { user: any }) {
     if (!confirm(`Delete project "${projId}"?`)) return;
     try {
       const t = await getToken();
-      const res = await fetch(`${apiUrl}/session/project?project_id=${projId}`, {
+      // [FIX] DELETE /projects/{id}
+      const res = await fetch(`${apiUrl}/projects/${projId}`, {
         method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` }
       });
       if (!res.ok) throw new Error();
@@ -129,23 +131,19 @@ export default function Loadflow({ user }: { user: any }) {
 
   useEffect(() => { if (user) fetchProjects(); }, [user]);
 
-  // --- PROCESSING ---
+  // --- PROCESSING (No Changes Here) ---
   const processResults = (data: LoadflowResponse) => {
       if (!data.results) return;
-
       const groups: Record<string, LoadflowResult[]> = {};
       data.results.forEach(r => {
           const key = r.study_case ? `${r.study_case.id} / ${r.study_case.config}` : "Unknown Scenario";
           if (!groups[key]) groups[key] = [];
           groups[key].push(r);
       });
-
       Object.keys(groups).forEach(k => {
           groups[k].sort((a, b) => extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision));
       });
-
       setScenarioGroups(groups);
-      
       data.results.sort((a, b) => {
           const keyA = a.study_case ? `${a.study_case.id}_${a.study_case.config}` : a.filename;
           const keyB = b.study_case ? `${b.study_case.id}_${b.study_case.config}` : b.filename;
@@ -153,7 +151,6 @@ export default function Loadflow({ user }: { user: any }) {
           if (keyA > keyB) return 1;
           return extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision);
       });
-
       setResults(data);
   };
 
@@ -166,10 +163,8 @@ export default function Loadflow({ user }: { user: any }) {
         const t = await getToken();
         const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
         const jsonFilename = `${baseName}.json`;
-
         const dataRes = await fetch(`${apiUrl}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
         if (!dataRes.ok) throw new Error("No results found.");
-        
         const jsonData: LoadflowResponse = await dataRes.json();
         processResults(jsonData);
         notify(`Loaded: ${jsonData.results.length} files`);
@@ -295,7 +290,10 @@ export default function Loadflow({ user }: { user: any }) {
                                 return (
                                     <g key={i} className="group cursor-pointer">
                                         <circle cx={x} cy={y} r="4" fill={r.is_winner ? "#22c55e" : "white"} stroke={color} strokeWidth="2" className="transition-all hover:r-6"/>
-                                        <title>{`${key}\nRev: ${r.study_case?.revision}\nMW: ${Math.abs(r.mw_flow).toFixed(2)}\nWinner: ${r.is_winner}`}</title>
+                                        <title>{`${key}
+Rev: ${r.study_case?.revision}
+MW: ${Math.abs(r.mw_flow).toFixed(2)}
+Winner: ${r.is_winner}`}</title>
                                     </g>
                                 );
                             })}
@@ -320,8 +318,6 @@ export default function Loadflow({ user }: { user: any }) {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
-      
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Simulation Dashboard</label>
@@ -345,10 +341,7 @@ export default function Loadflow({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
-        
-        {/* SIDEBAR */}
         <div className="w-60 flex flex-col gap-4 flex-shrink-0 overflow-y-auto custom-scrollbar">
             <div onClick={() => setActiveProjectId(null)} className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null ? 'bg-slate-800 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
                 <HardDrive className="w-4 h-4" />
@@ -364,15 +357,15 @@ export default function Loadflow({ user }: { user: any }) {
             )}
             <div className="flex-1 flex flex-col gap-1">
                 {projects.map(p => (
-                    <div key={p.project_id} onClick={() => setActiveProjectId(p.project_id)} className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.project_id ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
-                        <div className="flex items-center gap-2 overflow-hidden"><Folder className="w-3.5 h-3.5" /><span className="font-bold truncate">{p.project_id}</span></div>
-                        {p.role === 'owner' && <button onClick={(e) => deleteProject(p.project_id, e)} className="opacity-0 group-hover:opacity-100 hover:bg-red-400 hover:text-white p-1 rounded"><Trash2 className="w-3 h-3" /></button>}
+                    <div key={p.id} onClick={() => setActiveProjectId(p.id)} className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.id ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-2 overflow-hidden"><Folder className="w-3.5 h-3.5" /><span className="font-bold truncate">{p.id}</span></div>
+                        {/* Simplified check for demo */}
+                        <button onClick={(e) => deleteProject(p.id, e)} className="opacity-0 group-hover:opacity-100 hover:bg-red-400 hover:text-white p-1 rounded"><Trash2 className="w-3 h-3" /></button>
                     </div>
                 ))}
             </div>
         </div>
 
-        {/* DASHBOARD */}
         <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar pr-2">
             {!results ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4 border-2 border-dashed border-slate-100 rounded bg-slate-50/50">
@@ -381,8 +374,6 @@ export default function Loadflow({ user }: { user: any }) {
                 </div>
             ) : (
                 <div className="flex flex-col gap-6 pb-10">
-                    
-                    {/* CHART */}
                     <div>
                         <div className="flex justify-between items-center mb-2">
                             <h2 className="font-black text-slate-700 uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> Scenario Load Curves</h2>
@@ -390,7 +381,6 @@ export default function Loadflow({ user }: { user: any }) {
                         <MultiScenarioChart groups={scenarioGroups} />
                     </div>
 
-                    {/* DETAILED TABLE (COMPACT) */}
                     <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-black text-slate-700 uppercase flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2">

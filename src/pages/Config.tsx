@@ -8,8 +8,9 @@ import {
 import Toast from '../components/Toast';
 
 interface Project {
-  project_id: string;
-  role: 'owner' | 'member';
+  id: string;      // Updated
+  name: string;    // Updated
+  role?: 'owner' | 'member';
 }
 
 export default function Config({ user }: { user: any }) {
@@ -17,7 +18,6 @@ export default function Config({ user }: { user: any }) {
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   
-  // Sections
   const [openSections, setOpenSections] = useState({ 
     info: true,
     inrush: true, 
@@ -27,7 +27,6 @@ export default function Config({ user }: { user: any }) {
     coordination: true 
   });
   
-  // Navigation
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -42,7 +41,6 @@ export default function Config({ user }: { user: any }) {
     setToast({ show: true, msg, type });
   };
 
-  // --- DEFAULT CONFIGURATION ---
   const defaultConfig = {
     project_name: "NEW_PROJECT",
     settings: {
@@ -70,17 +68,17 @@ export default function Config({ user }: { user: any }) {
     plans: []
   };
 
-  // --- API HELPER ---
   const getToken = async () => {
     if (!user) return null;
     return await user.getIdToken(true); 
   };
 
-  // --- PROJECT MANAGEMENT ---
+  // --- PROJECT API V2 ---
   const fetchProjects = async () => {
     try {
       const t = await getToken();
-      const res = await fetch(`${apiUrl}/session/projects`, { headers: { 'Authorization': `Bearer ${t}` } });
+      // [FIX] /projects/
+      const res = await fetch(`${apiUrl}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } });
       if (res.ok) {
         const data = await res.json();
         setProjects(data);
@@ -92,8 +90,11 @@ export default function Config({ user }: { user: any }) {
     if (!newProjectName.trim()) return;
     try {
       const t = await getToken();
-      const res = await fetch(`${apiUrl}/session/project/create?project_id=${encodeURIComponent(newProjectName)}`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${t}` }
+      // [FIX] POST /projects/create (JSON)
+      const res = await fetch(`${apiUrl}/projects/create`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: newProjectName, name: newProjectName })
       });
       if (!res.ok) throw new Error();
       notify("Project Created");
@@ -108,7 +109,8 @@ export default function Config({ user }: { user: any }) {
     if (!confirm(`Delete project "${projId}"?`)) return;
     try {
       const t = await getToken();
-      const res = await fetch(`${apiUrl}/session/project?project_id=${projId}`, {
+      // [FIX] DELETE /projects/{id}
+      const res = await fetch(`${apiUrl}/projects/${projId}`, {
         method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` }
       });
       if (!res.ok) throw new Error();
@@ -118,7 +120,7 @@ export default function Config({ user }: { user: any }) {
     } catch (e) { notify("Delete failed", "error"); }
   };
 
-  // --- CONFIG SYNC ---
+  // --- CONFIG SYNC (Files endpoint logic is unchanged, stays on /session) ---
   const loadFromSession = async () => {
     if (!user) return;
     setLoading(true);
@@ -148,7 +150,6 @@ export default function Config({ user }: { user: any }) {
                     setConfig({ 
                         ...defaultConfig, 
                         ...sessionConfig,
-                        // If user enters a project, force the project name if it's generic
                         project_name: activeProjectId || sessionConfig.project_name || "NEW_PROJECT",
                         settings: {
                             ...defaultConfig.settings,
@@ -164,7 +165,6 @@ export default function Config({ user }: { user: any }) {
                 }
             } catch (e) { throw new Error("Invalid JSON"); }
         } else {
-            // New Session/Project -> Set Name
             const startConfig = { ...defaultConfig };
             if (activeProjectId) startConfig.project_name = activeProjectId;
             setConfig(startConfig);
@@ -204,7 +204,6 @@ export default function Config({ user }: { user: any }) {
     }
   }, [user, activeProjectId]);
 
-  // --- UI ACTIONS ---
   const toggleSection = (s: string) => setOpenSections(p => ({ ...p, [s]: !p[s as keyof typeof p] }));
 
   const handleDownload = () => {
@@ -270,8 +269,6 @@ export default function Config({ user }: { user: any }) {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
-      
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Configuration</label>
@@ -307,13 +304,8 @@ export default function Config({ user }: { user: any }) {
         </div>
       </div>
 
-      {/* MAIN CONTENT SPLIT */}
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
-        
-        {/* SIDEBAR */}
         <div className="w-60 flex flex-col gap-4 flex-shrink-0 overflow-y-auto custom-scrollbar">
-            
-            {/* User Session */}
             <div 
                 onClick={() => setActiveProjectId(null)}
                 className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null 
@@ -329,7 +321,6 @@ export default function Config({ user }: { user: any }) {
 
             <div className="border-t border-slate-200 my-1"></div>
 
-            {/* Projects Header */}
             <div className="flex justify-between items-center px-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span>
                 <button 
@@ -340,7 +331,6 @@ export default function Config({ user }: { user: any }) {
                 </button>
             </div>
 
-            {/* Create Input */}
             {isCreatingProject && (
                 <div className="flex gap-1">
                     <input 
@@ -355,42 +345,34 @@ export default function Config({ user }: { user: any }) {
                 </div>
             )}
 
-            {/* Project List */}
             <div className="flex-1 flex flex-col gap-1">
                 {projects.map(p => (
                     <div 
-                        key={p.project_id}
-                        onClick={() => setActiveProjectId(p.project_id)}
-                        className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.project_id 
+                        key={p.id}
+                        onClick={() => setActiveProjectId(p.id)}
+                        className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.id 
                             ? 'bg-blue-600 text-white border-blue-700 shadow-sm' 
                             : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:border-slate-200'}`}
                     >
                         <div className="flex items-center gap-2 overflow-hidden">
-                            <Folder className={`w-3.5 h-3.5 ${activeProjectId === p.project_id ? 'text-blue-200' : 'text-slate-400'}`} />
-                            <span className="font-bold truncate">{p.project_id}</span>
+                            <Folder className={`w-3.5 h-3.5 ${activeProjectId === p.id ? 'text-blue-200' : 'text-slate-400'}`} />
+                            <span className="font-bold truncate">{p.id}</span>
                         </div>
-                        {p.role === 'owner' && (
-                            <button 
-                                onClick={(e) => deleteProject(p.project_id, e)}
-                                className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.project_id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}
-                            >
-                                <Trash2 className="w-3 h-3" />
-                            </button>
-                        )}
+                        <button 
+                            onClick={(e) => deleteProject(p.id, e)}
+                            className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}
+                        >
+                            <Trash2 className="w-3 h-3" />
+                        </button>
                     </div>
                 ))}
             </div>
         </div>
 
-        {/* RIGHT: CONFIG FORM AREA */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="h-full overflow-y-auto pr-2 custom-scrollbar">
                 <div className="grid grid-cols-12 gap-6 pb-10">
-                    
-                    {/* LEFT COLUMN: FORMS */}
                     <div className="col-span-12 lg:col-span-8 space-y-4">
-                        
-                        {/* 0. PROJECT INFO HEADER */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm p-3 flex items-center gap-4">
                             <FileSignature className="w-5 h-5 text-slate-400" />
                             <div className="flex-1">
@@ -405,7 +387,8 @@ export default function Config({ user }: { user: any }) {
                             </div>
                         </div>
 
-                        {/* 1. INRUSH SECTION */}
+                        {/* SECTIONS */}
+                        {/* INRUSH */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('inrush')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.inrush ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Activity className="w-3.5 h-3.5 text-orange-500" /> Transformers (Inrush)</h2>
@@ -432,7 +415,7 @@ export default function Config({ user }: { user: any }) {
                             )}
                         </div>
 
-                        {/* 2. LINKS SECTION */}
+                        {/* LINKS */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('links')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.links ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <LinkIcon className="w-3.5 h-3.5 text-green-600" /> Network Links / Cables</h2>
@@ -458,7 +441,7 @@ export default function Config({ user }: { user: any }) {
                             )}
                         </div>
 
-                        {/* 3. LOADFLOW SECTION */}
+                        {/* LOADFLOW */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('loadflow')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.loadflow ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Zap className="w-3.5 h-3.5 text-yellow-500" /> Loadflow Analysis</h2>
@@ -472,7 +455,7 @@ export default function Config({ user }: { user: any }) {
                             )}
                         </div>
 
-                        {/* 4. PROTECTION SETTINGS (FULL TABLE DESIGN V4) */}
+                        {/* PROTECTION */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('protection')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.protection ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Protection Settings (ANSI 51)</h2>
@@ -487,7 +470,6 @@ export default function Config({ user }: { user: any }) {
                                                 <Clock className="w-3.5 h-3.5 text-slate-400"/> {category}
                                             </div>
                                             <div className="p-0">
-                                                {/* Header Row */}
                                                 <div className="grid grid-cols-12 gap-1 bg-slate-50/50 px-3 py-1 border-b border-slate-100 text-[9px] text-slate-400 uppercase tracking-widest font-bold">
                                                     <div className="col-span-1">Lvl</div>
                                                     <div className="col-span-2 text-center">Factor (xIn)</div>
@@ -495,8 +477,6 @@ export default function Config({ user }: { user: any }) {
                                                     <div className="col-span-2 text-center">Curve</div>
                                                     <div className="col-span-5">Comment (User Info)</div>
                                                 </div>
-                                                
-                                                {/* Threshold Rows */}
                                                 {['I1', 'I2', 'I4'].map((threshold, idx) => {
                                                     const factorKey = `factor_${threshold}`;
                                                     const timeDialKey = `time_dial_${threshold}`;
@@ -546,7 +526,7 @@ export default function Config({ user }: { user: any }) {
                             )}
                         </div>
 
-                        {/* 5. COORDINATION PLANS */}
+                        {/* COORDINATION */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('coordination')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.coordination ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Settings className="w-3.5 h-3.5 text-indigo-500" /> Coordination Plans</h2>
@@ -585,7 +565,6 @@ export default function Config({ user }: { user: any }) {
                         </div>
                     </div>
 
-                    {/* RIGHT COLUMN: JSON PREVIEW */}
                     <div className="col-span-12 lg:col-span-4">
                         <div className="bg-slate-900 rounded border border-slate-800 p-3 sticky top-0 shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
                             <h3 className="text-[10px] font-bold text-slate-500 uppercase mb-2 flex justify-between">
