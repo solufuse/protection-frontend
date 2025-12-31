@@ -1,6 +1,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, onAuthStateChanged, getAuth } from 'firebase/auth';
+import { User, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebase'; // [FIX] On importe l'instance déjà initialisée
 import { Icons } from '../icons';
 
 interface AuthContextType {
@@ -15,11 +16,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const auth = getAuth();
-    // Cette fonction écoute le "Cookie" Firebase automatiquement
+    // On utilise 'auth' importé de firebase.ts, donc on est sûr qu'il est prêt
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      setLoading(false); // On arrête de charger une fois qu'on sait si tu es connecté ou non
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);

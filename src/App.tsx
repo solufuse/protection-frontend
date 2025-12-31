@@ -1,12 +1,13 @@
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Files from './pages/Files';
-import CookieConsent from './components/CookieConsent'; // Import du composant
-import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import CookieConsent from './components/CookieConsent';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from './firebase'; // [FIX] Import direct
 
 const LoginScreen = () => {
     const handleLogin = async () => {
-        const auth = getAuth();
+        // Utilisation de l'instance 'auth' importée
         await signInWithPopup(auth, new GoogleAuthProvider());
     };
 
@@ -28,7 +29,6 @@ const LoginScreen = () => {
                 <span>Secure Access</span>
             </div>
             
-            {/* Le bandeau s'affiche aussi sur le login */}
             <CookieConsent />
         </div>
     );
@@ -36,13 +36,10 @@ const LoginScreen = () => {
 
 const AppContent = () => {
     const { user } = useAuth();
-
     if (!user) return <LoginScreen />;
-
     return (
         <>
             <Files user={user} />
-            {/* Le bandeau s'affiche aussi dans l'app si pas encore accepté */}
             <CookieConsent />
         </>
     );
