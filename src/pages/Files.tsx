@@ -1,4 +1,3 @@
-import { auth } from '../firebase';
 
 import { useEffect, useState, useRef, Fragment } from 'react';
 import { Icons } from '../icons';
@@ -6,6 +5,7 @@ import Toast from '../components/Toast';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import MembersModal from '../components/MembersModal';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '../firebase'; // Import direct de l'instance
 
 // --- TYPES ---
 interface SessionFile {
@@ -56,6 +56,7 @@ export default function Files({ user }: { user: any }) {
 
   // --- HELPERS ---
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
+  
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -63,8 +64,11 @@ export default function Files({ user }: { user: any }) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
-  const handleGoogleLogin = async () => { // auth imported from ../firebase await signInWithPopup(auth, new GoogleAuthProvider()); };
+  
+  const handleGoogleLogin = async () => { await signInWithPopup(auth, new GoogleAuthProvider()); };
+  
   const handleCopyToken = async () => { const t = await getToken(); if (!t) return notify("No Token", "error"); navigator.clipboard.writeText(t); notify("Token Copied"); };
 
   // --- API ---
