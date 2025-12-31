@@ -13,7 +13,6 @@ export default function Config({ user }: { user: any }) {
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
 
   const [config, setConfig] = useState<any>(null);
-  // [FIX] Removed unused 'loading' state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   

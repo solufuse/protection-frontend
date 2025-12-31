@@ -15,7 +15,6 @@ export default function Navbar({ user }: NavbarProps) {
 
   const handleLogout = () => signOut(auth);
 
-  // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -49,7 +48,6 @@ export default function Navbar({ user }: NavbarProps) {
 
   return (
     <nav className="bg-white border-b border-slate-200 h-14 px-6 flex items-center justify-between shrink-0 z-50 relative">
-      {/* LEFT: LOGO */}
       <div className="flex items-center gap-8">
         <Link to="/" className="flex items-center gap-2 group">
           <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-black text-xs shadow-sm group-hover:bg-blue-700 transition-colors">
@@ -60,7 +58,6 @@ export default function Navbar({ user }: NavbarProps) {
           </span>
         </Link>
 
-        {/* CENTER: NAVIGATION */}
         <div className="hidden md:flex items-center gap-1">
           {links.map(link => (
             <Link key={link.to} to={link.to} className={getLinkClass(link.to)}>
@@ -71,7 +68,6 @@ export default function Navbar({ user }: NavbarProps) {
         </div>
       </div>
 
-      {/* RIGHT: USER PROFILE */}
       <div className="relative" ref={menuRef}>
         <button 
           onClick={() => setShowMenu(!showMenu)}
@@ -94,7 +90,6 @@ export default function Navbar({ user }: NavbarProps) {
           <Icons.ChevronDown className="w-3 h-3 text-slate-400" />
         </button>
 
-        {/* DROPDOWN MENU */}
         {showMenu && (
           <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl p-2 animate-in fade-in slide-in-from-top-2">
             <div className="px-3 py-2 border-b border-slate-50 mb-1">

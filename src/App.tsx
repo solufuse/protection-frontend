@@ -27,25 +27,19 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* [CHANGE] Flex-col for Top Navbar layout */}
       <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
-        
-        {/* Navbar is only shown if user is logged in, similar to Sidebar logic */}
         {user && <Navbar user={user} />}
         
         <main className="flex-1 overflow-hidden relative">
           <Routes>
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
-            
             <Route path="/" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             <Route path="/files" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
-            
             <Route path="/protection" element={user ? <Protection user={user} /> : <Navigate to="/login" />} />
             <Route path="/loadflow" element={user ? <Loadflow user={user} /> : <Navigate to="/login" />} />
             <Route path="/ingestion" element={user ? <Ingestion /> : <Navigate to="/login" />} />
             <Route path="/config" element={user ? <Config user={user} /> : <Navigate to="/login" />} />
             <Route path="/extraction" element={user ? <Extraction /> : <Navigate to="/login" />} />
-            
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
