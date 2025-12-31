@@ -1,72 +1,57 @@
 
-import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-import { auth } from './firebase';
-import Navbar from './components/Navbar';
-import Loadflow from './pages/Loadflow';
-import Protection from './pages/Protection';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Files from './pages/Files';
-import Config from './pages/Config';
-import Profile from './pages/Profile';
+import Navbar from './components/Navbar'; // Assumant que tu as une Navbar
 import { Icons } from './icons';
+import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
-function LoadingScreen() {
+const LoginScreen = () => {
+    const handleLogin = async () => {
+        const auth = getAuth();
+        await signInWithPopup(auth, new GoogleAuthProvider());
+    };
+
+    return (
+        <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-6">
+            <div className="text-center">
+                <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter mb-2">Solufuse Protection</h1>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Secure File Storage & Analysis</p>
+            </div>
+            
+            <button onClick={handleLogin} className="flex items-center gap-3 bg-white px-6 py-3 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group">
+                <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="G" />
+                <span className="text-slate-600 font-bold text-xs group-hover:text-blue-600">CONTINUE WITH GOOGLE</span>
+            </button>
+            
+            <div className="flex gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-8">
+                <span>v2.6.0</span>
+                <span>•</span>
+                <span>Secure Access</span>
+            </div>
+        </div>
+    );
+};
+
+const AppContent = () => {
+    const { user } = useAuth();
+
+    // Si pas connecté, on montre l'écran de login
+    if (!user) return <LoginScreen />;
+
+    // Si connecté, on montre l'app
+    return (
+        <>
+            {/* Si tu as une Navbar, décommente la ligne suivante */}
+            {/* <Navbar user={user} /> */}
+            <Files user={user} />
+        </>
+    );
+};
+
+export default function App() {
   return (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4">
-      <Icons.Loader className="w-10 h-10 animate-spin text-blue-600" />
-      <span className="text-xs font-bold tracking-widest uppercase">Initializing Solufuse...</span>
-    </div>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
-
-function App() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        setLoading(false);
-      } else {
-        console.log("[Auto-Login] No user found, creating Guest session...");
-        signInAnonymously(auth)
-          .then(() => {})
-          .catch((error) => {
-            console.error("[Auto-Login Error]", error);
-            setLoading(false);
-          });
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogout = () => auth.signOut();
-
-  if (loading) return <LoadingScreen />;
-
-  return (
-    <Router>
-      <div className="min-h-screen bg-slate-50">
-        {user && <Navbar user={user} onLogout={handleLogout} />}
-        <main>
-          <Routes>
-            <Route path="/" element={<Navigate to="/files" replace />} />
-            
-            <Route path="/loadflow" element={<Loadflow user={user} />} />
-            <Route path="/files" element={<Files user={user} />} />
-            <Route path="/config" element={<Config user={user} />} />
-            <Route path="/profile" element={<Profile user={user} />} />
-            
-            {/* Protection DOES NOT receive user prop */}
-            <Route path="/protection" element={<Protection />} />
-            
-            <Route path="*" element={<Navigate to="/files" replace />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
-  );
-}
-export default App;
