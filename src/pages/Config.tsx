@@ -8,8 +8,8 @@ import {
 import Toast from '../components/Toast';
 
 interface Project {
-  id: string;      // Updated
-  name: string;    // Updated
+  id: string;
+  name: string;
   role?: 'owner' | 'member';
 }
 
@@ -77,7 +77,6 @@ export default function Config({ user }: { user: any }) {
   const fetchProjects = async () => {
     try {
       const t = await getToken();
-      // [FIX] /projects/
       const res = await fetch(`${apiUrl}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } });
       if (res.ok) {
         const data = await res.json();
@@ -90,7 +89,6 @@ export default function Config({ user }: { user: any }) {
     if (!newProjectName.trim()) return;
     try {
       const t = await getToken();
-      // [FIX] POST /projects/create (JSON)
       const res = await fetch(`${apiUrl}/projects/create`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
@@ -109,7 +107,6 @@ export default function Config({ user }: { user: any }) {
     if (!confirm(`Delete project "${projId}"?`)) return;
     try {
       const t = await getToken();
-      // [FIX] DELETE /projects/{id}
       const res = await fetch(`${apiUrl}/projects/${projId}`, {
         method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` }
       });
@@ -120,7 +117,7 @@ export default function Config({ user }: { user: any }) {
     } catch (e) { notify("Delete failed", "error"); }
   };
 
-  // --- CONFIG SYNC (Files endpoint logic is unchanged, stays on /session) ---
+  // --- CONFIG SYNC (Updated to /files) ---
   const loadFromSession = async () => {
     if (!user) return;
     setLoading(true);
@@ -128,7 +125,8 @@ export default function Config({ user }: { user: any }) {
         const token = await getToken();
         const pParam = activeProjectId ? `?project_id=${activeProjectId}` : "";
         
-        const listRes = await fetch(`${apiUrl}/session/details${pParam}`, { 
+        // [FIX] /files/details
+        const listRes = await fetch(`${apiUrl}/files/details${pParam}`, { 
             headers: { 'Authorization': `Bearer ${token}` } 
         });
         
@@ -138,7 +136,8 @@ export default function Config({ user }: { user: any }) {
         
         if (configFile) {
             const dlParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
-            const fileRes = await fetch(`${apiUrl}/session/download?filename=${encodeURIComponent(configFile.filename)}&token=${token}${dlParam}`);
+            // [FIX] /files/download
+            const fileRes = await fetch(`${apiUrl}/files/download?filename=${encodeURIComponent(configFile.filename)}&token=${token}${dlParam}`);
             
             if (!fileRes.ok) throw new Error("Failed to download config");
 
@@ -187,12 +186,13 @@ export default function Config({ user }: { user: any }) {
       formData.append('files', blob, 'config.json');
       
       const pParam = activeProjectId ? `?project_id=${activeProjectId}` : "";
-      const response = await fetch(`${apiUrl}/session/upload${pParam}`, { 
+      // [FIX] /files/upload
+      const response = await fetch(`${apiUrl}/files/upload${pParam}`, { 
           method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData 
       });
       
       if (!response.ok) throw new Error("Backend error");
-      notify(`Saved to ${activeProjectId || "Session"}`);
+      notify(`Saved to ${activeProjectId || "Storage"}`);
     } catch (e) { notify("Save error", "error"); }
     finally { setLoading(false); }
   };
@@ -204,8 +204,8 @@ export default function Config({ user }: { user: any }) {
     }
   }, [user, activeProjectId]);
 
+  // ... (Rest of Config.tsx remains strictly identical)
   const toggleSection = (s: string) => setOpenSections(p => ({ ...p, [s]: !p[s as keyof typeof p] }));
-
   const handleDownload = () => {
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -214,9 +214,7 @@ export default function Config({ user }: { user: any }) {
     a.click(); URL.revokeObjectURL(url);
     notify("Downloaded !");
   };
-
   const handleImportClick = () => fileInputRef.current?.click();
-  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -230,38 +228,22 @@ export default function Config({ user }: { user: any }) {
     };
     reader.readAsText(file);
   };
-
   const handleCopyToken = async () => {
     const t = await getToken();
     if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); }
   };
-
   const updateProtection = (category: string, threshold: string, field: string, value: any) => {
       const currentSettings = config.settings.ansi_51;
       const currentCategory = currentSettings[category] || {};
-      
       if (field.startsWith('factor')) {
           const newCategory = { ...currentCategory, [field]: parseFloat(value) };
-          setConfig({
-              ...config, 
-              settings: { 
-                  ...config.settings, 
-                  ansi_51: { ...currentSettings, [category]: newCategory } 
-              }
-          });
+          setConfig({ ...config, settings: { ...config.settings, ansi_51: { ...currentSettings, [category]: newCategory } } });
       } else {
           const timeDialKey = `time_dial_${threshold}`;
           const currentTimeDial = currentCategory[timeDialKey] || { value: 0.1, curve: "DT", comment: "" };
           const newTimeDial = { ...currentTimeDial, [field]: field === 'value' ? parseFloat(value) : value };
           const newCategory = { ...currentCategory, [timeDialKey]: newTimeDial };
-          
-          setConfig({
-              ...config, 
-              settings: { 
-                  ...config.settings, 
-                  ansi_51: { ...currentSettings, [category]: newCategory } 
-              }
-          });
+          setConfig({ ...config, settings: { ...config.settings, ansi_51: { ...currentSettings, [category]: newCategory } } });
       }
   };
 
@@ -274,101 +256,44 @@ export default function Config({ user }: { user: any }) {
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Configuration</label>
           <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
             {activeProjectId ? (
-                <>
-                    <Folder className="w-5 h-5 text-blue-600" />
-                    <span>{activeProjectId}</span>
-                    <span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">PROJECT</span>
-                </>
+                <><Folder className="w-5 h-5 text-blue-600" /><span>{activeProjectId}</span><span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">PROJECT</span></>
             ) : (
-                <>
-                    <HardDrive className="w-5 h-5 text-slate-600" />
-                    <span>My Session</span>
-                    <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span>
-                </>
+                <><HardDrive className="w-5 h-5 text-slate-600" /><span>My Session</span><span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span></>
             )}
           </h1>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors">
-            <Key className="w-3.5 h-3.5" /> TOKEN
-          </button>
-          
+          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Key className="w-3.5 h-3.5" /> TOKEN</button>
           <div className="w-px bg-slate-200 mx-1"></div>
-
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
           <button onClick={handleImportClick} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold"><Upload className="w-3.5 h-3.5" /> IMPORT</button>
           <button onClick={handleDownload} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold"><Download className="w-3.5 h-3.5" /> EXPORT</button>
-          <button onClick={handleSaveToSession} disabled={loading} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow-sm disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {loading ? "SAVING..." : "SAVE CLOUD"}
-          </button>
+          <button onClick={handleSaveToSession} disabled={loading} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow-sm disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {loading ? "SAVING..." : "SAVE CLOUD"}</button>
         </div>
       </div>
-
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
         <div className="w-60 flex flex-col gap-4 flex-shrink-0 overflow-y-auto custom-scrollbar">
-            <div 
-                onClick={() => setActiveProjectId(null)}
-                className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null 
-                    ? 'bg-slate-800 text-white border-slate-900 shadow-md' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-            >
+            <div onClick={() => setActiveProjectId(null)} className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null ? 'bg-slate-800 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
                 <HardDrive className="w-4 h-4" />
-                <div className="flex flex-col">
-                    <span className="font-bold uppercase tracking-wide">My Session</span>
-                    <span className={`text-[9px] ${activeProjectId === null ? 'text-slate-400' : 'text-slate-400'}`}>Private Config</span>
-                </div>
+                <div className="flex flex-col"><span className="font-bold uppercase tracking-wide">My Session</span><span className={`text-[9px] ${activeProjectId === null ? 'text-slate-400' : 'text-slate-400'}`}>Private Config</span></div>
             </div>
-
             <div className="border-t border-slate-200 my-1"></div>
-
-            <div className="flex justify-between items-center px-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span>
-                <button 
-                    onClick={() => setIsCreatingProject(!isCreatingProject)}
-                    className="p-1 hover:bg-blue-50 text-blue-600 rounded transition-colors"
-                >
-                    <Plus className="w-3.5 h-3.5" />
-                </button>
-            </div>
-
+            <div className="flex justify-between items-center px-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span><button onClick={() => setIsCreatingProject(!isCreatingProject)} className="p-1 hover:bg-blue-50 text-blue-600 rounded transition-colors"><Plus className="w-3.5 h-3.5" /></button></div>
             {isCreatingProject && (
                 <div className="flex gap-1">
-                    <input 
-                        className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Project ID..."
-                        value={newProjectName}
-                        onChange={(e) => setNewProjectName(e.target.value.toUpperCase())}
-                        onKeyDown={(e) => e.key === 'Enter' && createProject()}
-                        autoFocus
-                    />
+                    <input className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Project ID..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && createProject()} autoFocus />
                     <button onClick={createProject} className="bg-blue-600 text-white px-2 rounded font-bold text-[9px]">OK</button>
                 </div>
             )}
-
             <div className="flex-1 flex flex-col gap-1">
                 {projects.map(p => (
-                    <div 
-                        key={p.id}
-                        onClick={() => setActiveProjectId(p.id)}
-                        className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.id 
-                            ? 'bg-blue-600 text-white border-blue-700 shadow-sm' 
-                            : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:border-slate-200'}`}
-                    >
-                        <div className="flex items-center gap-2 overflow-hidden">
-                            <Folder className={`w-3.5 h-3.5 ${activeProjectId === p.id ? 'text-blue-200' : 'text-slate-400'}`} />
-                            <span className="font-bold truncate">{p.id}</span>
-                        </div>
-                        <button 
-                            onClick={(e) => deleteProject(p.id, e)}
-                            className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}
-                        >
-                            <Trash2 className="w-3 h-3" />
-                        </button>
+                    <div key={p.id} onClick={() => setActiveProjectId(p.id)} className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.id ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:border-slate-200'}`}>
+                        <div className="flex items-center gap-2 overflow-hidden"><Folder className={`w-3.5 h-3.5 ${activeProjectId === p.id ? 'text-blue-200' : 'text-slate-400'}`} /><span className="font-bold truncate">{p.id}</span></div>
+                        <button onClick={(e) => deleteProject(p.id, e)} className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}><Trash2 className="w-3 h-3" /></button>
                     </div>
                 ))}
             </div>
         </div>
-
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="h-full overflow-y-auto pr-2 custom-scrollbar">
                 <div className="grid grid-cols-12 gap-6 pb-10">
@@ -377,18 +302,10 @@ export default function Config({ user }: { user: any }) {
                             <FileSignature className="w-5 h-5 text-slate-400" />
                             <div className="flex-1">
                                 <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Internal Project Name / Case ID</label>
-                                <input 
-                                    type="text" 
-                                    value={config.project_name || ""} 
-                                    onChange={e => setConfig({...config, project_name: e.target.value})} 
-                                    className="w-full text-lg font-black text-slate-800 bg-transparent outline-none border-b border-transparent hover:border-slate-200 focus:border-blue-500 placeholder-slate-300"
-                                    placeholder="PROJECT_NAME"
-                                />
+                                <input type="text" value={config.project_name || ""} onChange={e => setConfig({...config, project_name: e.target.value})} className="w-full text-lg font-black text-slate-800 bg-transparent outline-none border-b border-transparent hover:border-slate-200 focus:border-blue-500 placeholder-slate-300" placeholder="PROJECT_NAME" />
                             </div>
                         </div>
-
-                        {/* SECTIONS */}
-                        {/* INRUSH */}
+                        {/* Sections (Inrush, Links, Loadflow, Protection, Coordination) - Kept identical structure */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('inrush')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.inrush ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Activity className="w-3.5 h-3.5 text-orange-500" /> Transformers (Inrush)</h2>
@@ -414,8 +331,6 @@ export default function Config({ user }: { user: any }) {
                             </div>
                             )}
                         </div>
-
-                        {/* LINKS */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('links')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.links ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <LinkIcon className="w-3.5 h-3.5 text-green-600" /> Network Links / Cables</h2>
@@ -440,8 +355,6 @@ export default function Config({ user }: { user: any }) {
                             </div>
                             )}
                         </div>
-
-                        {/* LOADFLOW */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('loadflow')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.loadflow ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Zap className="w-3.5 h-3.5 text-yellow-500" /> Loadflow Analysis</h2>
@@ -454,8 +367,6 @@ export default function Config({ user }: { user: any }) {
                             </div>
                             )}
                         </div>
-
-                        {/* PROTECTION */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('protection')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.protection ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Protection Settings (ANSI 51)</h2>
@@ -483,38 +394,13 @@ export default function Config({ user }: { user: any }) {
                                                     const factorValue = catData[factorKey] ?? 1.0;
                                                     const timeDialData = catData[timeDialKey] || { value: 0.1, curve: "DT", comment: "" };
                                                     const isLast = idx === 2;
-
                                                     return (
                                                         <div key={threshold} className={`grid grid-cols-12 gap-2 items-center px-3 py-2 ${!isLast ? 'border-b border-slate-50' : ''} hover:bg-slate-50 transition-colors`}>
-                                                            <div className="col-span-1">
-                                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${threshold==='I1'?'bg-blue-100 text-blue-600': threshold==='I2'?'bg-yellow-100 text-yellow-600':'bg-red-100 text-red-600'}`}>
-                                                                    {threshold}
-                                                                </span>
-                                                            </div>
-                                                            <div className="col-span-2">
-                                                                <input type="number" step="0.1" value={factorValue} onChange={e => updateProtection(category, threshold, factorKey, e.target.value)} 
-                                                                    className="w-full text-center bg-white border border-slate-200 rounded p-1 text-[10px] font-bold focus:ring-1 focus:ring-blue-500 outline-none"
-                                                                />
-                                                            </div>
-                                                            <div className="col-span-2">
-                                                                <input type="number" step="0.05" value={timeDialData.value} onChange={e => updateProtection(category, threshold, 'value', e.target.value)} 
-                                                                    className="w-full text-center bg-white border border-slate-200 rounded p-1 text-[10px] font-bold focus:ring-1 focus:ring-blue-500 outline-none"
-                                                                />
-                                                            </div>
-                                                            <div className="col-span-2">
-                                                                <input type="text" value={timeDialData.curve} onChange={e => updateProtection(category, threshold, 'curve', e.target.value)} 
-                                                                    className="w-full text-center bg-white border border-slate-200 rounded p-1 text-[10px] font-bold uppercase focus:ring-1 focus:ring-blue-500 outline-none"
-                                                                />
-                                                            </div>
-                                                            <div className="col-span-5">
-                                                                <input 
-                                                                    type="text" 
-                                                                    value={timeDialData.comment || ""} 
-                                                                    onChange={e => updateProtection(category, threshold, 'comment', e.target.value)}
-                                                                    placeholder="Description..."
-                                                                    className="w-full bg-white border border-slate-200 rounded p-1 px-2 text-[10px] text-slate-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder-slate-300"
-                                                                />
-                                                            </div>
+                                                            <div className="col-span-1"><span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${threshold==='I1'?'bg-blue-100 text-blue-600': threshold==='I2'?'bg-yellow-100 text-yellow-600':'bg-red-100 text-red-600'}`}>{threshold}</span></div>
+                                                            <div className="col-span-2"><input type="number" step="0.1" value={factorValue} onChange={e => updateProtection(category, threshold, factorKey, e.target.value)} className="w-full text-center bg-white border border-slate-200 rounded p-1 text-[10px] font-bold focus:ring-1 focus:ring-blue-500 outline-none"/></div>
+                                                            <div className="col-span-2"><input type="number" step="0.05" value={timeDialData.value} onChange={e => updateProtection(category, threshold, 'value', e.target.value)} className="w-full text-center bg-white border border-slate-200 rounded p-1 text-[10px] font-bold focus:ring-1 focus:ring-blue-500 outline-none"/></div>
+                                                            <div className="col-span-2"><input type="text" value={timeDialData.curve} onChange={e => updateProtection(category, threshold, 'curve', e.target.value)} className="w-full text-center bg-white border border-slate-200 rounded p-1 text-[10px] font-bold uppercase focus:ring-1 focus:ring-blue-500 outline-none"/></div>
+                                                            <div className="col-span-5"><input type="text" value={timeDialData.comment || ""} onChange={e => updateProtection(category, threshold, 'comment', e.target.value)} placeholder="Description..." className="w-full bg-white border border-slate-200 rounded p-1 px-2 text-[10px] text-slate-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder-slate-300"/></div>
                                                         </div>
                                                     );
                                                 })}
@@ -525,8 +411,6 @@ export default function Config({ user }: { user: any }) {
                             </div>
                             )}
                         </div>
-
-                        {/* COORDINATION */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('coordination')}>
                             <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.coordination ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Settings className="w-3.5 h-3.5 text-indigo-500" /> Coordination Plans</h2>
@@ -542,17 +426,8 @@ export default function Config({ user }: { user: any }) {
                                     {(config.plans || []).map((p: any, i: number) => (
                                     <tr key={i} className="hover:bg-slate-50 group">
                                         <td className="py-1 px-1 font-bold text-slate-800"><input value={p.id} onChange={e => { const n = [...config.plans]; n[i].id = e.target.value; setConfig({...config, plans: n}); }} className="w-full bg-transparent outline-none focus:border-b focus:border-indigo-300"/></td>
-                                        <td>
-                                        <select value={p.type} onChange={e => { const n = [...config.plans]; n[i].type = e.target.value; setConfig({...config, plans: n}); }} className="bg-transparent outline-none text-[9px]">
-                                            <option value="TRANSFORMER">TX</option><option value="INCOMER">INC</option><option value="COUPLING">CPL</option>
-                                        </select>
-                                        </td>
-                                        <td>
-                                            <div className="flex gap-1">
-                                                <input placeholder="From" value={p.bus_from || ""} onChange={e => { const n = [...config.plans]; n[i].bus_from = e.target.value; setConfig({...config, plans: n}); }} className="w-1/2 bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-300 outline-none text-[9px] text-center"/>
-                                                <input placeholder="To" value={p.bus_to || ""} onChange={e => { const n = [...config.plans]; n[i].bus_to = e.target.value; setConfig({...config, plans: n}); }} className="w-1/2 bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-300 outline-none text-[9px] text-center"/>
-                                            </div>
-                                        </td>
+                                        <td><select value={p.type} onChange={e => { const n = [...config.plans]; n[i].type = e.target.value; setConfig({...config, plans: n}); }} className="bg-transparent outline-none text-[9px]"><option value="TRANSFORMER">TX</option><option value="INCOMER">INC</option><option value="COUPLING">CPL</option></select></td>
+                                        <td><div className="flex gap-1"><input placeholder="From" value={p.bus_from || ""} onChange={e => { const n = [...config.plans]; n[i].bus_from = e.target.value; setConfig({...config, plans: n}); }} className="w-1/2 bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-300 outline-none text-[9px] text-center"/><input placeholder="To" value={p.bus_to || ""} onChange={e => { const n = [...config.plans]; n[i].bus_to = e.target.value; setConfig({...config, plans: n}); }} className="w-1/2 bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-300 outline-none text-[9px] text-center"/></div></td>
                                         <td><input value={p.ct_primary} onChange={e => { const n = [...config.plans]; n[i].ct_primary = e.target.value; setConfig({...config, plans: n}); }} className="w-full bg-transparent outline-none focus:border-b focus:border-indigo-300"/></td>
                                         <td><input value={p.active_functions?.join(', ')} onChange={e => { const n = [...config.plans]; n[i].active_functions = e.target.value.split(',').map(s => s.trim()); setConfig({...config, plans: n}); }} className="w-full bg-transparent text-indigo-600 outline-none font-bold focus:border-b focus:border-indigo-300"/></td>
                                         <td><button onClick={() => setConfig({...config, plans: config.plans.filter((_:any,idx:number)=>idx!==i)})} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3"/></button></td>
@@ -564,7 +439,6 @@ export default function Config({ user }: { user: any }) {
                             )}
                         </div>
                     </div>
-
                     <div className="col-span-12 lg:col-span-4">
                         <div className="bg-slate-900 rounded border border-slate-800 p-3 sticky top-0 shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
                             <h3 className="text-[10px] font-bold text-slate-500 uppercase mb-2 flex justify-between">
@@ -578,7 +452,6 @@ export default function Config({ user }: { user: any }) {
             </div>
         </div>
       </div>
-
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );

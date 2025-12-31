@@ -8,8 +8,8 @@ import {
 import Toast from '../components/Toast';
 
 interface Project {
-  id: string; // Updated V2
-  name: string;
+  id: string; // V2 Update
+  name: string; // V2 Update
   role?: 'owner' | 'member';
 }
 
@@ -82,7 +82,7 @@ export default function Loadflow({ user }: { user: any }) {
     return await user.getIdToken(true); 
   };
 
-  // --- API V2 ---
+  // --- API V2 UPDATES ---
   const fetchProjects = async () => {
     try {
       const t = await getToken();
@@ -99,7 +99,7 @@ export default function Loadflow({ user }: { user: any }) {
     if (!newProjectName.trim()) return;
     try {
       const t = await getToken();
-      // [FIX] POST /projects/create (JSON)
+      // [FIX] POST /projects/create
       const res = await fetch(`${apiUrl}/projects/create`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
@@ -131,7 +131,7 @@ export default function Loadflow({ user }: { user: any }) {
 
   useEffect(() => { if (user) fetchProjects(); }, [user]);
 
-  // --- PROCESSING (No Changes Here) ---
+  // --- PROCESSING ---
   const processResults = (data: LoadflowResponse) => {
       if (!data.results) return;
       const groups: Record<string, LoadflowResult[]> = {};
@@ -163,6 +163,7 @@ export default function Loadflow({ user }: { user: any }) {
         const t = await getToken();
         const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
         const jsonFilename = `${baseName}.json`;
+        // Ingestion remains standard, uses internal logic
         const dataRes = await fetch(`${apiUrl}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
         if (!dataRes.ok) throw new Error("No results found.");
         const jsonData: LoadflowResponse = await dataRes.json();
@@ -359,7 +360,6 @@ Winner: ${r.is_winner}`}</title>
                 {projects.map(p => (
                     <div key={p.id} onClick={() => setActiveProjectId(p.id)} className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.id ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
                         <div className="flex items-center gap-2 overflow-hidden"><Folder className="w-3.5 h-3.5" /><span className="font-bold truncate">{p.id}</span></div>
-                        {/* Simplified check for demo */}
                         <button onClick={(e) => deleteProject(p.id, e)} className="opacity-0 group-hover:opacity-100 hover:bg-red-400 hover:text-white p-1 rounded"><Trash2 className="w-3 h-3" /></button>
                     </div>
                 ))}
