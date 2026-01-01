@@ -1,10 +1,11 @@
+
 import { useEffect, useState } from 'react';
 import { Icons } from '../icons';
 import Toast from '../components/Toast';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 import MembersModal from '../components/MembersModal';
-import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
+import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import FileToolbar from '../components/FileToolbar';
 import FileTable, { SessionFile, SortKey, SortOrder } from '../components/FileTable';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
@@ -13,7 +14,11 @@ import { auth } from '../firebase';
 export default function Files({ user }: { user: any }) {
   const [files, setFiles] = useState<SessionFile[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  
+  // Navigation States
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
+  const [usersList, setUsersList] = useState<UserSummary[]>([]);
   
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -33,9 +38,13 @@ export default function Files({ user }: { user: any }) {
   
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
-  const currentProjectRole = activeProjectId 
-    ? projects.find(p => p.id === activeProjectId)?.role 
-    : undefined;
+  // Determine Role in Context
+  let currentProjectRole = undefined;
+  if (activeProjectId) {
+      currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;
+  } else if (activeSessionUid) {
+      currentProjectRole = 'admin';
+  }
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   
@@ -54,9 +63,29 @@ export default function Files({ user }: { user: any }) {
   const fetchGlobalProfile = async () => {
      try {
          const t = await getToken();
-         const res = await fetch(`${API_URL}/admin/me`, { headers: { 'Authorization': `Bearer ${t}` } });
-         if (res.ok) setUserGlobalData(await res.json());
+         const res = await fetch(`${API_URL}/users/me`, { headers: { 'Authorization': `Bearer ${t}` } });
+         if (res.ok) {
+             const data = await res.json();
+             setUserGlobalData(data);
+             
+             // [+] [LOGIC] Fetch Users if Staff (Super Admin, Admin, Moderator)
+             if (['super_admin', 'admin', 'moderator'].includes(data.global_role)) {
+                 fetchAllUsers(t);
+             }
+         }
      } catch (e) {}
+  };
+
+  const fetchAllUsers = async (token: string) => {
+      try {
+          const res = await fetch(`${API_URL}/admin/users?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } });
+          if (res.ok) {
+             setUsersList(await res.json());
+          } else {
+             // Silently fail if 403 (e.g., if backend doesn't allow Moderators yet)
+             console.warn("Could not fetch user list. Check backend permissions.");
+          }
+      } catch (e) { console.error("Admin List Error", e); }
   };
 
   const fetchProjects = async () => {
@@ -72,21 +101,30 @@ export default function Files({ user }: { user: any }) {
     try {
       const t = await getToken();
       let url = `${API_URL}/files/details`;
-      if (activeProjectId) url += `?project_id=${activeProjectId}`;
+      
+      if (activeProjectId) {
+          url += `?project_id=${activeProjectId}`;
+      } else if (activeSessionUid) {
+          url += `?project_id=${activeSessionUid}`;
+      }
+      
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setFiles(data.files || []);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+    } catch (e) { console.error(e); setFiles([]); } finally { setLoading(false); }
   };
 
   useEffect(() => {
     if (user) {
       fetchGlobalProfile();
       fetchProjects();
-      fetchFiles();
     }
-  }, [user, activeProjectId]);
+  }, [user]);
+
+  useEffect(() => {
+      if (user) fetchFiles();
+  }, [activeProjectId, activeSessionUid]);
 
   const createProject = async () => {
     if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error");
@@ -141,7 +179,10 @@ export default function Files({ user }: { user: any }) {
     try {
       const t = await getToken();
       let url = `${API_URL}/files/upload`;
+      
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
+      else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+
       const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
       if (!res.ok) {
           const err = await res.json().catch(() => ({ detail: "Upload Failed" }));
@@ -160,6 +201,8 @@ export default function Files({ user }: { user: any }) {
       const t = await getToken();
       let url = `${API_URL}/files/file/${path}`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
+      else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+
       await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
       setFiles(p => p.filter(f => f.path !== path));
       notify("Deleted");
@@ -172,6 +215,8 @@ export default function Files({ user }: { user: any }) {
       const t = await getToken();
       let url = `${API_URL}/files/clear`;
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
+      else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+
       const res = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
       if(!res.ok) throw new Error((await res.json()).detail);
       setFiles([]);
@@ -187,7 +232,10 @@ export default function Files({ user }: { user: any }) {
     setPreviewData(null);
     try {
       const t = await getToken();
-      const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
+      let pParam = "";
+      if (activeProjectId) pParam = `&project_id=${activeProjectId}`;
+      else if (activeSessionUid) pParam = `&project_id=${activeSessionUid}`;
+
       const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`);
       if (!res.ok) throw new Error("Preview unavailable");
       setPreviewData(await res.json());
@@ -198,13 +246,17 @@ export default function Files({ user }: { user: any }) {
   const handleOpenLink = async (type: string, filename: string) => {
       try {
           const t = await getToken();
-          const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
-          let url = "";
+          let pParam = "";
+          if (activeProjectId) pParam = `&project_id=${activeProjectId}`;
+          else if (activeSessionUid) pParam = `&project_id=${activeSessionUid}`;
+
           const encName = encodeURIComponent(filename);
+          let url = "";
           if (type === 'raw') url = `${API_URL}/files/download?filename=${encName}&token=${t}${pParam}`;
           else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encName}&token=${t}${pParam}`;
           else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}&token=${t}${pParam}`;
           else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encName}&token=${t}${pParam}`;
+          
           if (url) window.open(url, '_blank');
       } catch (e) { notify("Link Error", "error"); }
   };
@@ -236,6 +288,11 @@ export default function Files({ user }: { user: any }) {
                         <Icons.Folder className="w-5 h-5 text-blue-600" />
                         <span>{activeProjectId}</span>
                     </>
+                ) : activeSessionUid ? (
+                    <>
+                        <Icons.Shield className="w-5 h-5 text-red-500" />
+                        <span className="text-red-600">Session: {usersList.find(u => u.uid === activeSessionUid)?.username || activeSessionUid.slice(0,6)}</span>
+                    </>
                 ) : (
                     <>
                         <Icons.HardDrive className="w-5 h-5 text-slate-600" />
@@ -244,7 +301,7 @@ export default function Files({ user }: { user: any }) {
                     </>
                 )}
             </h1>
-            <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null} />
+            <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null && activeSessionUid === null} />
           </div>
         </div>
         <div className="flex gap-2">
@@ -275,9 +332,16 @@ export default function Files({ user }: { user: any }) {
       <div className="flex flex-1 gap-6 min-h-0">
         <ProjectsSidebar 
           user={user}
+          userGlobalData={userGlobalData}
           projects={projects}
+          usersList={usersList}
+          
           activeProjectId={activeProjectId}
           setActiveProjectId={setActiveProjectId}
+          
+          activeSessionUid={activeSessionUid}
+          setActiveSessionUid={setActiveSessionUid}
+          
           isCreatingProject={isCreatingProject}
           setIsCreatingProject={setIsCreatingProject}
           newProjectName={newProjectName}
@@ -297,7 +361,7 @@ export default function Files({ user }: { user: any }) {
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
               fileCount={filteredFiles.length}
-              activeProjectId={activeProjectId}
+              activeProjectId={activeProjectId || activeSessionUid} 
               onShowMembers={() => setShowMembers(true)}
               onClear={handleClear}
               uploading={uploading}
