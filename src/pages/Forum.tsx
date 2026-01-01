@@ -16,22 +16,35 @@ interface Message {
 }
 
 export default function Forum({ user }: { user: any }) {
+  // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  
+  // [pagination] States
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null); // To maintain scroll position
+  
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
+  const LIMIT = 50; // Batch size
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
 
   // --- FETCHING ---
+
   const fetchGlobalProfile = async () => {
      try {
          const t = await getToken();
@@ -55,26 +68,82 @@ export default function Forum({ user }: { user: any }) {
     } catch (e) { console.error(e); }
   };
 
-  const fetchMessages = async () => {
+  // 1. Initial Load (Reset)
+  const fetchMessages = async (isRefresh = false) => {
     if (!activeProjectId) return;
     setLoading(true);
     try {
       const t = await getToken();
-      const res = await fetch(`${API_URL}/messages/${activeProjectId}?limit=50`, { 
+      const res = await fetch(`${API_URL}/messages/${activeProjectId}?limit=${LIMIT}&skip=0`, { 
           headers: { 'Authorization': `Bearer ${t}` } 
       });
       if (res.ok) {
           const data = await res.json();
-          setMessages(data.reverse()); 
-      } else { setMessages([]); }
+          // API returns Newest -> Oldest. We reverse for Chat UI (Oldest -> Newest)
+          setMessages(data.reverse());
+          setOffset(LIMIT);
+          setHasMore(data.length === LIMIT);
+          
+          // Scroll to bottom on initial load or refresh
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "auto" }), 100);
+      }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
+  // 2. Load More (Pagination)
+  const loadMoreMessages = async () => {
+      if (!activeProjectId || !hasMore || isLoadingMore) return;
+      setIsLoadingMore(true);
+      
+      // Capture current height before loading to restore position later
+      const currentHeight = scrollRef.current?.scrollHeight || 0;
+      const currentScrollTop = scrollRef.current?.scrollTop || 0;
+
+      try {
+          const t = await getToken();
+          const res = await fetch(`${API_URL}/messages/${activeProjectId}?limit=${LIMIT}&skip=${offset}`, { 
+              headers: { 'Authorization': `Bearer ${t}` } 
+          });
+          
+          if (res.ok) {
+              const data = await res.json();
+              if (data.length > 0) {
+                  // Prepend older messages
+                  setMessages(prev => [...data.reverse(), ...prev]);
+                  setOffset(prev => prev + LIMIT);
+                  setHasMore(data.length === LIMIT);
+                  
+                  // Restore scroll position (conceptually)
+                  // In React, doing this perfectly after render needs layout effect, 
+                  // but we can try basic correction after a tick
+                  setTimeout(() => {
+                      if (scrollRef.current) {
+                          const newHeight = scrollRef.current.scrollHeight;
+                          // Scroll down by the amount of content added
+                          scrollRef.current.scrollTop = newHeight - currentHeight + currentScrollTop;
+                      }
+                  }, 50);
+              } else {
+                  setHasMore(false);
+              }
+          }
+      } catch (e) { console.error(e); } finally { setIsLoadingMore(false); }
+  };
+
+  // --- EFFECTS ---
+
   useEffect(() => { if (user) { fetchGlobalProfile(); fetchProjects(); } }, [user]);
-  useEffect(() => { fetchMessages(); }, [activeProjectId]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  
+  // When changing project, reset everything
+  useEffect(() => { 
+      setMessages([]);
+      setOffset(0);
+      setHasMore(true);
+      fetchMessages(); 
+  }, [activeProjectId]);
 
   // --- ACTIONS ---
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !activeProjectId) return;
     setSending(true);
@@ -91,7 +160,10 @@ export default function Forum({ user }: { user: any }) {
             else notify(err.detail || "Error", "error");
         } else {
             setNewMessage("");
-            fetchMessages(); 
+            // Optimistic update or refresh? Refresh ensures ID and consistency.
+            // But to avoid jumping, maybe simpler to just append locally?
+            // Let's Refresh "Last 50" to be safe and scroll bottom.
+            fetchMessages(true); 
         }
     } catch (e) { notify("Network Error", "error"); }
     finally { setSending(false); }
@@ -106,7 +178,7 @@ export default function Forum({ user }: { user: any }) {
               notify("Message deleted");
               setMessages(prev => prev.filter(m => m.id !== msgId));
           } else {
-              notify("Cannot delete this message", "error");
+              notify("Permission denied", "error");
           }
       } catch(e) { notify("Error", "error"); }
   };
@@ -129,23 +201,13 @@ export default function Forum({ user }: { user: any }) {
       return p ? p.name : activeProjectId;
   };
 
-  // [+] [PERMISSION LOGIC] Updated
   const canDelete = (msg: Message) => {
-      // 1. Author (User)
       if (msg.author_uid === user.uid) return true;
-      
       if (!userGlobalData) return false;
-
-      // 2. Global Staff (Admin+)
       const isGlobalStaff = ['admin', 'super_admin'].includes(userGlobalData.global_role);
       if (isGlobalStaff) return true;
-
-      // 3. Project Staff (Owner/Admin/Mod)
       const currentProject = projects.find(p => p.id === activeProjectId);
-      if (currentProject) {
-          if (['owner', 'admin', 'moderator'].includes(currentProject.role)) return true;
-      }
-      
+      if (currentProject && ['owner', 'admin', 'moderator'].includes(currentProject.role)) return true;
       return false;
   };
 
@@ -176,8 +238,26 @@ export default function Forum({ user }: { user: any }) {
 
         <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden relative">
             
-            {/* MESSAGES LIST (GitHub Style) */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/30 custom-scrollbar">
+            {/* [SCROLL CONTAINER] */}
+            <div 
+                ref={scrollRef} 
+                className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/30 custom-scrollbar"
+            >
+                {/* [LOAD MORE BUTTON] */}
+                {hasMore && !loading && (
+                    <div className="flex justify-center pt-2 pb-4">
+                        <button 
+                            onClick={loadMoreMessages} 
+                            disabled={isLoadingMore}
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold px-4 py-1.5 rounded-full text-[10px] flex items-center gap-2 transition-colors border border-slate-200 shadow-sm"
+                        >
+                            {isLoadingMore ? <Icons.Refresh className="w-3 h-3 animate-spin" /> : <Icons.ArrowUp className="w-3 h-3" />}
+                            Load older messages
+                        </button>
+                    </div>
+                )}
+
+                {/* MESSAGES */}
                 {loading && messages.length === 0 ? <div className="text-center italic text-slate-400 mt-10">Loading discussion...</div> : messages.length === 0 ? (
                     <div className="text-center mt-10">
                         <Icons.MessageSquare className="w-12 h-12 text-slate-200 mx-auto mb-2" />
@@ -190,7 +270,7 @@ export default function Forum({ user }: { user: any }) {
                         const roleColor = msg.author_role === 'super_admin' ? 'bg-red-50 text-red-600 border-red-200' : (msg.author_role === 'admin' ? 'bg-red-50 text-red-500 border-red-200' : (msg.author_role === 'nitro' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' : 'bg-slate-100 text-slate-600 border-slate-200'));
                         
                         return (
-                            <div key={msg.id} className="flex gap-3 group">
+                            <div key={msg.id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300">
                                 <div className="flex-shrink-0 pt-1">
                                     <div className="w-8 h-8 rounded-md bg-white border border-slate-200 shadow-sm flex items-center justify-center font-bold text-slate-500 uppercase select-none">
                                         {getAuthorName(msg)[0]}
