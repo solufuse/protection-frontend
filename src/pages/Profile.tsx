@@ -1,7 +1,9 @@
 
-import { useState } from 'react';
-import { Icons } from '../icons'; // [REF] Clean Import
+import { useState, useEffect } from 'react';
+import { Icons } from '../icons';
 import Toast from '../components/Toast';
+import GlobalRoleBadge from '../components/GlobalRoleBadge';
+import { auth } from '../firebase';
 
 interface ProfileProps {
   user: any;
@@ -10,17 +12,44 @@ interface ProfileProps {
 export default function Profile({ user }: ProfileProps) {
   // --- STATE ---
   const [activeTab, setActiveTab] = useState<'general' | 'roles' | 'security'>('general');
+  const [userGlobalData, setUserGlobalData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
 
-  // --- MOCK ROLES ---
-  const userRole: string = user.isAnonymous ? "GUEST" : (user.email?.includes('admin') ? "ADMIN" : "USER");
+  const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
+
+  // Fetch Real DB Data
+  useEffect(() => {
+      const fetchProfile = async () => {
+          try {
+              if (!user) return;
+              const t = await user.getIdToken();
+              const res = await fetch(`${API_URL}/users/me`, { headers: { 'Authorization': `Bearer ${t}` } });
+              if (res.ok) {
+                  setUserGlobalData(await res.json());
+              }
+          } catch (e) {
+              console.error(e);
+          } finally {
+              setLoading(false);
+          }
+      };
+      fetchProfile();
+  }, [user]);
+
+  // Derived Values
+  const dbRole = userGlobalData?.global_role || (user.isAnonymous ? 'guest' : 'user');
+  const displayName = userGlobalData?.username || user.displayName || "Anonymous User";
   
+  // Permissions Matrix (Visual Only)
   const permissions = [
-    { name: "Access Loadflow", allowed: true },
-    { name: "Create Projects", allowed: !user.isAnonymous },
-    { name: "Delete Projects", allowed: userRole === "ADMIN" || !user.isAnonymous },
-    { name: "Manage Users (Admin)", allowed: userRole === "ADMIN" },
-    { name: "System Config (Mod)", allowed: userRole === "ADMIN" || userRole === "MODERATOR" },
+    { name: "Access Loadflow / Protection", allowed: true },
+    { name: "Read Forum", allowed: true },
+    { name: "Post in Forum", allowed: dbRole !== 'guest' },
+    { name: "Create Projects", allowed: dbRole !== 'guest' },
+    { name: "Upload Files > 10MB", allowed: ['nitro', 'admin', 'super_admin'].includes(dbRole) },
+    { name: "Moderate Users", allowed: ['moderator', 'admin', 'super_admin'].includes(dbRole) },
+    { name: "System Configuration", allowed: ['admin', 'super_admin'].includes(dbRole) },
   ];
 
   return (
@@ -36,11 +65,7 @@ export default function Profile({ user }: ProfileProps) {
           </h1>
         </div>
         <div className="flex gap-2">
-           <div className={`px-3 py-1.5 rounded-full font-bold text-[10px] flex items-center gap-2 border ${userRole === 'GUEST' ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-              {userRole === 'ADMIN' && <Icons.Crown className="w-3.5 h-3.5 text-yellow-500" />}
-              {userRole === 'GUEST' && <Icons.User className="w-3.5 h-3.5" />}
-              <span>ROLE: {userRole}</span>
-           </div>
+           <GlobalRoleBadge role={dbRole} />
         </div>
       </div>
 
@@ -67,7 +92,7 @@ export default function Profile({ user }: ProfileProps) {
                 <Icons.Shield className="w-4 h-4" />
                 <div className="flex flex-col">
                     <span className="font-bold uppercase tracking-wide">Roles & Permissions</span>
-                    <span className="text-[9px] opacity-70">Admin / Mod / User</span>
+                    <span className="text-[9px] opacity-70">Status & Limits</span>
                 </div>
             </button>
 
@@ -86,16 +111,18 @@ export default function Profile({ user }: ProfileProps) {
         {/* RIGHT: CONTENT AREA */}
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
             
+            {loading && <div className="p-4 text-slate-400 italic">Loading Profile...</div>}
+
             {/* --- TAB: GENERAL --- */}
-            {activeTab === 'general' && (
-                <div className="space-y-6">
+            {!loading && activeTab === 'general' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                     {/* Identity Card */}
                     <div className="bg-white border border-slate-200 rounded shadow-sm p-6 flex items-start gap-6">
-                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center border-4 border-white shadow-lg text-slate-300">
-                            {user.photoURL ? <img src={user.photoURL} className="w-full h-full rounded-full" alt="avatar" /> : <Icons.User className="w-10 h-10" />}
+                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center border-4 border-white shadow-lg text-slate-300 overflow-hidden">
+                            {user.photoURL ? <img src={user.photoURL} className="w-full h-full object-cover" alt="avatar" /> : <Icons.User className="w-10 h-10" />}
                         </div>
                         <div className="flex-1">
-                            <h2 className="text-xl font-black text-slate-800 mb-1">{user.displayName || "Guest User"}</h2>
+                            <h2 className="text-xl font-black text-slate-800 mb-1">{displayName}</h2>
                             <p className="text-slate-500 font-mono text-[10px] mb-4">{user.email || "No email linked (Anonymous Session)"}</p>
                             
                             <div className="grid grid-cols-2 gap-4 max-w-md">
@@ -110,19 +137,27 @@ export default function Profile({ user }: ProfileProps) {
                             </div>
                         </div>
                     </div>
+
+                    {/* Bio Section (Placeholder for now) */}
+                    <div className="bg-white border border-slate-200 rounded shadow-sm p-6">
+                        <h3 className="font-bold text-slate-800 mb-2 uppercase text-xs">About Me</h3>
+                        <p className="text-slate-500 italic">
+                            {userGlobalData?.bio || "No bio set yet."}
+                        </p>
+                    </div>
                 </div>
             )}
 
             {/* --- TAB: ROLES --- */}
-            {activeTab === 'roles' && (
-                <div className="space-y-6">
+            {!loading && activeTab === 'roles' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                     <div className="bg-blue-50 border border-blue-200 rounded p-4 flex items-center gap-4">
                         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
                             <Icons.Shield className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="font-black text-blue-800 text-sm uppercase">System Role: {userRole}</h3>
-                            <p className="text-blue-600 text-[10px]">Your permissions are determined by this role globally.</p>
+                            <h3 className="font-black text-blue-800 text-sm uppercase">Active Plan: {dbRole.toUpperCase()}</h3>
+                            <p className="text-blue-600 text-[10px]">Your system permissions are calculated based on this role.</p>
                         </div>
                     </div>
 
@@ -148,11 +183,11 @@ export default function Profile({ user }: ProfileProps) {
                         </div>
                     </div>
                     
-                    {userRole === 'GUEST' && (
+                    {dbRole === 'guest' && (
                         <div className="p-4 border-2 border-dashed border-orange-200 rounded bg-orange-50 text-center">
-                            <p className="text-orange-800 font-bold mb-2">Want more power?</p>
-                            <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded font-bold shadow-sm transition-all">
-                                Upgrade Account
+                            <p className="text-orange-800 font-bold mb-2">Want to unlock full potential?</p>
+                            <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded font-bold shadow-sm transition-all" onClick={() => auth.signOut()}>
+                                Sign Up Now
                             </button>
                         </div>
                     )}
@@ -160,8 +195,8 @@ export default function Profile({ user }: ProfileProps) {
             )}
 
             {/* --- TAB: SECURITY --- */}
-            {activeTab === 'security' && (
-                <div className="space-y-4">
+            {!loading && activeTab === 'security' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
                     <div className="bg-white border border-slate-200 rounded shadow-sm p-6 opacity-70">
                         <div className="flex items-center gap-2 mb-4 text-slate-400">
                             <Icons.Settings className="w-5 h-5" />

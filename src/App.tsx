@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -10,6 +11,8 @@ import Ingestion from './pages/Ingestion';
 import Config from './pages/Config';
 import Extraction from './pages/Extraction';
 import Login from './pages/Login';
+import Forum from './pages/Forum'; // [+] Import Forum
+import Profile from './pages/Profile'; // [+] Import Profile
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -37,6 +40,10 @@ export default function App() {
             
             <Route path="/" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             <Route path="/files" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
+            
+            {/* [+] New Routes */}
+            <Route path="/forum" element={user ? <Forum user={user} /> : <Navigate to="/login" />} />
+            <Route path="/profile" element={user ? <Profile user={user} /> : <Navigate to="/login" />} />
             
             <Route path="/protection" element={user ? <Protection user={user} /> : <Navigate to="/login" />} />
             <Route path="/loadflow" element={user ? <Loadflow user={user} /> : <Navigate to="/login" />} />

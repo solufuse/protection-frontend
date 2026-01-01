@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Icons } from '../icons';
@@ -44,6 +45,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
 
   const navLinks = [
     { to: "/files", icon: Icons.Folder, label: "FILES" },
+    { to: "/forum", icon: Icons.MessageSquare, label: "FORUM" }, // [+] Added Forum Link
     { to: "/loadflow", icon: Icons.Activity, label: "LOADFLOW" },
     { to: "/protection", icon: Icons.Shield, label: "PROTECTION" },
     { to: "/config", icon: Icons.Settings, label: "CONFIG" },
@@ -70,7 +72,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
             {/* GAUCHE : LOGO + NAVIGATION */}
             <div className="flex items-center gap-4 lg:gap-8">
               
-              {/* Mobile Menu Button */}
               <button 
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
@@ -89,7 +90,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                   </span>
               </Link>
 
-              {/* DESKTOP LINKS */}
               <div className="hidden lg:flex items-center gap-1">
                 {navLinks.map(link => (
                     <Link key={link.to} to={link.to} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive(link.to)}`}>
@@ -106,7 +106,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                 <a href="https://api.solufuse.com/docs" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1.5 transition-colors">
                   <Icons.FileText className="w-3.5 h-3.5" /> API DOCS
                 </a>
-                {/* [FIX] Restored ABOUT Link */}
                 <a href="https://solufuse.com" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-orange-600 flex items-center gap-1.5 transition-colors">
                   <Icons.Search className="w-3.5 h-3.5" /> ABOUT
                 </a>
