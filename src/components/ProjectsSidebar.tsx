@@ -73,7 +73,7 @@ export default function ProjectsSidebar({
       const isFav = favorites.includes(p.id);
       const isActive = activeProjectId === p.id;
       return (
-        <div onClick={() => handleSelectProject(p.id)} className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer border transition-all mb-0.5 ${isActive ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+        <div onClick={() => handleSelectProject(p.id)} className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer border transition-all mb-0.5 ${isActive ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
           <div className="flex items-center gap-2 overflow-hidden truncate">
             {p.id.startsWith("PUBLIC_") ? <Icons.Hash className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-400 dark:text-slate-500'}`} /> : p.role === 'owner' ? <span title="Owner" className="text-[10px]">👑</span> : <Icons.Folder className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-300 dark:text-slate-600'}`} />}
             <span className="font-bold truncate text-[10px]">{p.name}</span>
@@ -93,14 +93,13 @@ export default function ProjectsSidebar({
     <div className="w-60 flex flex-col gap-2 h-full flex-shrink-0">
       <div className="relative mb-1">
         <Icons.Search className="absolute left-2 top-1.5 w-3 h-3 text-slate-400" />
-        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded pl-7 pr-2 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400 dark:text-slate-200" />
+        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded pl-7 pr-2 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400 dark:text-slate-200" />
       </div>
 
-      <div onClick={handleSelectMySession} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer border transition-all ${activeProjectId === null && (!activeSessionUid) ? 'bg-slate-800 dark:bg-blue-600 text-white border-slate-900 dark:border-blue-700 shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+      <div onClick={handleSelectMySession} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer border transition-all ${activeProjectId === null && (!activeSessionUid) ? 'bg-slate-800 dark:bg-blue-700 text-white border-slate-900 dark:border-blue-800 shadow-sm' : 'bg-white dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
         <Icons.HardDrive className="w-3.5 h-3.5" /> <span className="font-bold text-[10px]">My Session</span>
       </div>
 
-      {/* [FIX] Separator Line Color */}
       <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
 
       <div className="flex justify-between items-center px-1 mb-1"><span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Community</span></div>
@@ -108,7 +107,7 @@ export default function ProjectsSidebar({
 
       <div className="flex justify-between items-center px-1 mt-3 mb-1 group">
         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">My Workspace</span>
-        <button disabled={user?.isAnonymous} onClick={() => setIsCreatingProject(!isCreatingProject)} className={`p-0.5 rounded transition-colors ${user?.isAnonymous ? 'text-slate-300 cursor-not-allowed' : 'hover:bg-blue-50 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400'}`}><Icons.Plus className="w-3 h-3" /></button>
+        <button disabled={user?.isAnonymous} onClick={() => setIsCreatingProject(!isCreatingProject)} className={`p-0.5 rounded transition-colors ${user?.isAnonymous ? 'text-slate-300 cursor-not-allowed' : 'hover:bg-blue-50 dark:hover:bg-slate-800 text-blue-600 dark:text-blue-400'}`}><Icons.Plus className="w-3 h-3" /></button>
       </div>
       
       {isCreatingProject && (
@@ -125,7 +124,6 @@ export default function ProjectsSidebar({
 
       {filterList(otherProjects).length > 0 && (
           <>
-            {/* [FIX] Separator */}
             <div className="border-t border-slate-100 dark:border-slate-800 my-2"></div>
             <div onClick={() => setIsAdminSectionExpanded(!isAdminSectionExpanded)} className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 rounded p-0.5">
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Shared / Admin ({filterList(otherProjects).length})</span>
@@ -142,7 +140,6 @@ export default function ProjectsSidebar({
 
       {canViewSessions && filteredUsers.length > 0 && (
         <>
-          {/* [FIX] Separator */}
           <div className="border-t border-slate-200 dark:border-slate-800 my-2"></div>
           <div onClick={() => setIsSessionsExpanded(!isSessionsExpanded)} className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 rounded p-0.5 select-none">
             <div className="flex items-center gap-2"><Icons.Shield className="w-3 h-3 text-red-500" /><span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Sessions ({filteredUsers.length})</span></div>
@@ -151,7 +148,7 @@ export default function ProjectsSidebar({
           {isSessionsExpanded && (
               <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 custom-scrollbar pr-1 max-h-[150px] animate-in fade-in slide-in-from-top-1 duration-200">
                 {visibleUsers.map(u => (
-                <div key={u.uid} onClick={() => handleSelectUserSession(u.uid)} className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer border transition-all ${activeSessionUid === u.uid ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-900 text-red-700 dark:text-red-400' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-transparent hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+                <div key={u.uid} onClick={() => handleSelectUserSession(u.uid)} className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer border transition-all ${activeSessionUid === u.uid ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-900 text-red-700 dark:text-red-400' : 'bg-white dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                     <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${u.global_role === 'super_admin' ? 'bg-red-500' : (u.global_role === 'nitro' ? 'bg-yellow-400' : 'bg-slate-300')}`} />
                     <div className="flex flex-col overflow-hidden w-full"><span className="font-bold truncate text-[10px]">{u.username || "User"}</span><span className="truncate text-[8px] opacity-70">{u.email}</span></div>
                 </div>

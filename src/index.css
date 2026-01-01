@@ -7,12 +7,14 @@
 html {
   overflow-y: scroll;
 }
+
 body {
-  @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+  /* Light: Slate-50 | Dark: Darker Slate/Neutral (Colab vibe) */
+  @apply bg-slate-50 text-slate-900 dark:bg-[#0f1117] dark:text-slate-200;
   padding-right: 0 !important;
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar (Darker in dark mode) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -36,20 +38,17 @@ body {
 }
 
 @layer base {
-  /* 1. Default Border Color for Dark Mode (Fixes white lines) */
+  /* [FIX] FORCE DARK BORDERS GLOBALLY */
   *, ::before, ::after {
     @apply dark:border-slate-800;
   }
 
-  /* 2. GLOBAL SMOOTH TRANSITION (Fixes "ugly" switching) 
-     This forces all color-related properties to animate over 300ms 
-     instead of snapping instantly.
-  */
+  /* SMOOTH TRANSITION */
   body, #root, main, nav, div, section, article, header, footer, 
   button, input, select, textarea, table, tr, th, td, span, svg, 
   p, h1, h2, h3, h4, h5, h6, a, label, li, ul {
      transition-property: background-color, border-color, color, fill, stroke;
-     transition-duration: 300ms;
-     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+     transition-duration: 200ms; /* Slightly faster for snappier feel */
+     transition-timing-function: ease-in-out;
   }
 }
