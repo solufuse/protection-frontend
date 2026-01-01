@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Save, Trash2, Settings, Zap, Download, Activity, 
   ChevronDown, ChevronRight, Upload, ShieldCheck,
-  Folder, HardDrive, Plus, Key, Link as LinkIcon, Clock, FileSignature
+  Folder, HardDrive, Key, Link as LinkIcon, Clock, FileSignature
 } from 'lucide-react';
 import Toast from '../components/Toast';
-import ProjectsSidebar, { Project } from '../components/ProjectsSidebar'; // [FIX] Added Sidebar import
-import GlobalRoleBadge from '../components/GlobalRoleBadge'; // [FIX] Added Badge import
+import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
+import GlobalRoleBadge from '../components/GlobalRoleBadge';
 
 export default function Config({ user }: { user: any }) {
   // --- STATE ---
@@ -26,7 +26,7 @@ export default function Config({ user }: { user: any }) {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  const [userGlobalData, setUserGlobalData] = useState<any>(null); // [FIX] Added missing state
+  const [userGlobalData, setUserGlobalData] = useState<any>(null);
 
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -194,7 +194,7 @@ export default function Config({ user }: { user: any }) {
 
   useEffect(() => {
     if (user) {
-        fetchGlobalProfile(); // [FIX] Call added
+        fetchGlobalProfile();
         fetchProjects();
         loadFromSession();
     }
@@ -264,7 +264,7 @@ export default function Config({ user }: { user: any }) {
             <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Key className="w-3.5 h-3.5" /> TOKEN</button>
             <div className="w-px bg-slate-200 mx-1"></div>
             <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleFileChange} />
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded font-bold transition-all text-[10px]">
+            <button onClick={handleImportClick} className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded font-bold transition-all text-[10px]">
                 <Upload className="w-3.5 h-3.5" /> IMPORT
             </button>
             <button onClick={handleDownload} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold"><Download className="w-3.5 h-3.5" /> EXPORT</button>
