@@ -64,7 +64,6 @@ export default function Forum({ user }: { user: any }) {
     } catch (e) { console.error(e); }
   };
 
-  // [FIX] Removed unused parameter 'isRefresh'
   const fetchMessages = async () => {
     if (!activeProjectId) return;
     setLoading(true);
@@ -139,7 +138,6 @@ export default function Forum({ user }: { user: any }) {
             else notify(err.detail || "Error", "error");
         } else {
             setNewMessage("");
-            // [FIX] Updated call to remove argument
             fetchMessages(); 
         }
     } catch (e) { notify("Network Error", "error"); }
@@ -188,7 +186,8 @@ export default function Forum({ user }: { user: any }) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-full flex flex-col">
+    // [FIX] Changed max-w-7xl to w-full to use all available width
+    <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 flex-shrink-0">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
