@@ -11,7 +11,7 @@ interface Message {
   created_at: string;
   author_uid: string;
   author_username?: string;
-  author_email?: string; // [+] Added
+  author_email?: string; 
   author_role: string;
 }
 
@@ -24,12 +24,15 @@ export default function Forum({ user }: { user: any }) {
   const [sending, setSending] = useState(false);
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Use ref to keep scroll position or scroll to bottom
+  const bottomRef = useRef<HTMLDivElement>(null);
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
 
+  // --- FETCHING ---
   const fetchGlobalProfile = async () => {
      try {
          const t = await getToken();
@@ -50,7 +53,7 @@ export default function Forum({ user }: { user: any }) {
               if (pub) setActiveProjectId(pub.id);
           }
       }
-    } catch (e) { console.error("Failed to load projects", e); }
+    } catch (e) { console.error(e); }
   };
 
   const fetchMessages = async () => {
@@ -63,6 +66,9 @@ export default function Forum({ user }: { user: any }) {
       });
       if (res.ok) {
           const data = await res.json();
+          // Keep API order (Newest first) or Reverse?
+          // For "Issue" style, usually Oldest is at top (Question) and Newest at bottom.
+          // Let's reverse to have chronological order (Old -> New)
           setMessages(data.reverse()); 
       } else { setMessages([]); }
     } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -70,8 +76,11 @@ export default function Forum({ user }: { user: any }) {
 
   useEffect(() => { if (user) { fetchGlobalProfile(); fetchProjects(); } }, [user]);
   useEffect(() => { fetchMessages(); }, [activeProjectId]);
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  
+  // Auto-scroll to bottom only on sending new or initial load
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+  // --- ACTIONS ---
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !activeProjectId) return;
     setSending(true);
@@ -84,8 +93,8 @@ export default function Forum({ user }: { user: any }) {
         });
         if (!res.ok) {
             const err = await res.json();
-            if (res.status === 429) notify("Wow! Slow down (Anti-Spam)", "error");
-            else notify(err.detail || "Error sending", "error");
+            if (res.status === 429) notify("Slow down!", "error");
+            else notify(err.detail || "Error", "error");
         } else {
             setNewMessage("");
             fetchMessages(); 
@@ -94,18 +103,27 @@ export default function Forum({ user }: { user: any }) {
     finally { setSending(false); }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } };
-  const getRoleColor = (role: string) => {
-      switch(role) {
-          case 'super_admin': return 'text-red-600';
-          case 'admin': return 'text-red-500';
-          case 'moderator': return 'text-purple-500';
-          case 'nitro': return 'text-yellow-500';
-          default: return 'text-slate-700';
+  const handleDeleteMessage = async (msgId: number) => {
+      if(!confirm("Delete this comment?")) return;
+      try {
+          const t = await getToken();
+          const res = await fetch(`${API_URL}/messages/${msgId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
+          if(res.ok) {
+              notify("Message deleted");
+              setMessages(prev => prev.filter(m => m.id !== msgId));
+          } else {
+              notify("Cannot delete this message", "error");
+          }
+      } catch(e) { notify("Error", "error"); }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => { 
+      // Ctrl+Enter to submit (like GitHub)
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { 
+          e.preventDefault(); handleSendMessage(); 
       }
   };
 
-  // [+] [LOGIC] Name Fallback: Username > Email Prefix > Guest
   const getAuthorName = (msg: Message) => {
       if (msg.author_username) return msg.author_username;
       if (msg.author_email) return msg.author_email.split('@')[0];
@@ -118,51 +136,94 @@ export default function Forum({ user }: { user: any }) {
       return p ? p.name : activeProjectId;
   };
 
+  // Permission Logic
+  const canDelete = (msg: Message) => {
+      if (!userGlobalData) return false;
+      const isMe = msg.author_uid === user.uid;
+      const isStaff = ['admin', 'super_admin', 'moderator'].includes(userGlobalData.global_role);
+      const currentProject = projects.find(p => p.id === activeProjectId);
+      const isOwner = currentProject?.role === 'owner';
+      
+      return isMe || isStaff || isOwner;
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
-            Community {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}
+            Project Discussion Board
+            {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}
           </label>
           <div className="flex items-center gap-2">
              <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
-                <Icons.MessageSquare className="w-5 h-5 text-purple-600" />
+                <Icons.List className="w-5 h-5 text-slate-700" />
                 <span>{getActiveProjectName()}</span>
              </h1>
-             {activeProjectId?.startsWith("PUBLIC_") && (
-                 <span className="bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full text-[9px] font-bold border border-purple-200">PUBLIC CHANNEL</span>
-             )}
+             {activeProjectId?.startsWith("PUBLIC_") && <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-200">PUBLIC</span>}
           </div>
         </div>
       </div>
 
       <div className="flex flex-1 gap-6 min-h-0">
+        {/* SIDEBAR */}
         <ProjectsSidebar 
           user={user} userGlobalData={userGlobalData} projects={projects} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId}
           isCreatingProject={false} setIsCreatingProject={() => {}} newProjectName="" setNewProjectName={() => {}} onCreateProject={() => {}} onDeleteProject={() => {}}
         />
 
+        {/* ISSUES / DISCUSSION AREA */}
         <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden relative">
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 custom-scrollbar">
-                {loading && messages.length === 0 ? <div className="flex justify-center items-center h-full text-slate-400 font-bold italic">Loading messages...</div> : messages.length === 0 ? <div className="flex flex-col justify-center items-center h-full text-slate-300"><Icons.MessageSquare className="w-12 h-12 mb-2 opacity-50" /><span className="font-bold">No messages yet.</span></div> : (
+            
+            {/* MESSAGES LIST (GitHub Style) */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/30 custom-scrollbar">
+                {loading && messages.length === 0 ? <div className="text-center italic text-slate-400 mt-10">Loading discussion...</div> : messages.length === 0 ? (
+                    <div className="text-center mt-10">
+                        <Icons.MessageSquare className="w-12 h-12 text-slate-200 mx-auto mb-2" />
+                        <p className="text-slate-400 font-bold">No issues or comments yet.</p>
+                        <p className="text-slate-300">Start the conversation below.</p>
+                    </div>
+                ) : (
                     messages.map((msg) => {
                         const isMe = msg.author_uid === user.uid;
+                        const roleColor = msg.author_role === 'super_admin' ? 'bg-red-50 text-red-600 border-red-200' : (msg.author_role === 'admin' ? 'bg-red-50 text-red-500 border-red-200' : (msg.author_role === 'nitro' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' : 'bg-slate-100 text-slate-600 border-slate-200'));
+                        
                         return (
-                            <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-sm flex-shrink-0 ${isMe ? 'bg-blue-500' : 'bg-slate-400'}`}>
-                                    {getAuthorName(msg)[0].toUpperCase()}
-                                </div>
-                                <div className={`flex flex-col max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`}>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`font-black text-[10px] ${getRoleColor(msg.author_role)}`}>
-                                            {getAuthorName(msg)}
-                                        </span>
-                                        <span className="text-[9px] text-slate-300">
-                                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}
-                                        </span>
+                            <div key={msg.id} className="flex gap-3 group">
+                                {/* Avatar Column */}
+                                <div className="flex-shrink-0 pt-1">
+                                    <div className="w-8 h-8 rounded-md bg-white border border-slate-200 shadow-sm flex items-center justify-center font-bold text-slate-500 uppercase select-none">
+                                        {getAuthorName(msg)[0]}
                                     </div>
-                                    <div className={`px-3 py-2 rounded-xl text-[11px] leading-relaxed shadow-sm ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'}`}>
+                                </div>
+                                
+                                {/* Content Box */}
+                                <div className="flex-1 min-w-0">
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-t-md px-3 py-1.5">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-700 hover:underline cursor-pointer">{getAuthorName(msg)}</span>
+                                            {msg.author_role !== 'user' && msg.author_role !== 'guest' && (
+                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border uppercase ${roleColor}`}>
+                                                    {msg.author_role.replace('_', ' ')}
+                                                </span>
+                                            )}
+                                            <span className="text-slate-400 text-[9px]">commented {new Date(msg.created_at).toLocaleString()}</span>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2">
+                                            {isMe && <span className="px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 text-[9px] font-bold">YOU</span>}
+                                            {canDelete(msg) && (
+                                                <button onClick={() => handleDeleteMessage(msg.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1" title="Delete">
+                                                    <Icons.Trash className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Body */}
+                                    <div className="bg-white border border-t-0 border-slate-200 rounded-b-md p-3 text-slate-700 leading-relaxed whitespace-pre-wrap font-mono text-[11px]">
                                         {msg.content}
                                     </div>
                                 </div>
@@ -170,15 +231,36 @@ export default function Forum({ user }: { user: any }) {
                         );
                     })
                 )}
-                <div ref={messagesEndRef} />
+                <div ref={bottomRef} />
             </div>
 
-            <div className="p-3 bg-white border-t border-slate-200">
-                <div className="flex gap-2">
-                    <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={handleKeyDown} placeholder={user.isAnonymous ? "Guests cannot post..." : `Message #${getActiveProjectName()}...`} disabled={user.isAnonymous || sending} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all disabled:opacity-50" />
-                    <button onClick={handleSendMessage} disabled={!newMessage.trim() || user.isAnonymous || sending} className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white p-2 rounded-lg transition-colors flex items-center justify-center">{sending ? <Icons.Refresh className="w-4 h-4 animate-spin" /> : <Icons.Send className="w-4 h-4" />}</button>
+            {/* INPUT AREA */}
+            <div className="p-4 bg-white border-t border-slate-200">
+                <div className="relative border border-slate-300 rounded-md shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
+                    <textarea 
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder={user.isAnonymous ? "Sign in to contribute..." : "Leave a comment (Ctrl+Enter to send)..."}
+                        disabled={user.isAnonymous || sending}
+                        className="w-full min-h-[80px] p-3 text-slate-700 resize-y focus:outline-none rounded-t-md disabled:bg-slate-50 disabled:text-slate-400 bg-white text-[11px] font-mono"
+                    />
+                    <div className="bg-slate-50 px-3 py-2 flex justify-between items-center rounded-b-md border-t border-slate-100">
+                         <span className="text-[9px] text-slate-400 hidden sm:inline">
+                             Supports basic text. Be kind and constructive.
+                         </span>
+                         <button 
+                            onClick={handleSendMessage}
+                            disabled={!newMessage.trim() || user.isAnonymous || sending}
+                            className="bg-green-600 hover:bg-green-700 disabled:bg-slate-300 text-white px-4 py-1.5 rounded font-bold text-[10px] shadow-sm transition-colors flex items-center gap-2"
+                        >
+                            {sending ? <Icons.Refresh className="w-3 h-3 animate-spin" /> : <Icons.MessageSquare className="w-3 h-3" />}
+                            Comment
+                        </button>
+                    </div>
                 </div>
             </div>
+
         </div>
       </div>
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
