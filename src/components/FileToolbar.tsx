@@ -17,7 +17,6 @@ export default function FileToolbar({
   onShowMembers, onClear, uploading, onUpload
 }: FileToolbarProps) {
   return (
-    // [FIX] Bottom border to dark:border-slate-800
     <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-wrap justify-between items-center gap-4">
       <div className="flex items-center gap-2 flex-1">
         <div className="relative flex-1 max-w-md">
@@ -44,7 +43,8 @@ export default function FileToolbar({
         </button>
         <label className={`flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded font-black shadow-sm cursor-pointer transition-all text-[10px] ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
             <input type="file" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} disabled={uploading} />
-            {uploading ? <Icons.Refresh className="w-3.5 h-3.5 animate-spin"/> : <Icons.UploadCloud className="w-3.5 h-3.5 fill-current" />}
+            {/* [FIX] Changed UploadCloud to Upload for cleaner look, removed fill-current */}
+            {uploading ? <Icons.Refresh className="w-3.5 h-3.5 animate-spin"/> : <Icons.Upload className="w-3.5 h-3.5" />}
             {uploading ? "UPLOADING..." : "UPLOAD"}
         </label>
       </div>
