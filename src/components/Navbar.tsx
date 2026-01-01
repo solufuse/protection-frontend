@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { Icons } from '../icons';
 import { auth } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { Menu, X } from 'lucide-react'; // Added for Mobile menu
 
 interface NavbarProps {
   user: any;
@@ -68,7 +67,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             
-            {/* GAUCHE */}
+            {/* GAUCHE : LOGO + NAVIGATION */}
             <div className="flex items-center gap-4 lg:gap-8">
               
               {/* Mobile Menu Button */}
@@ -76,7 +75,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
               >
-                {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                {showMobileMenu ? <Icons.X className="w-6 h-6" /> : <Icons.Menu className="w-6 h-6" />}
               </button>
 
               <Link to="/loadflow" className="brand-container flex items-center gap-2 transition-all duration-300">
@@ -100,12 +99,16 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               </div>
             </div>
 
-            {/* DROITE */}
+            {/* DROITE : LIENS + PROFIL */}
             <div className="flex items-center gap-3">
               
               <div className="hidden xl:flex items-center gap-1 mr-2">
                 <a href="https://api.solufuse.com/docs" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1.5 transition-colors">
                   <Icons.FileText className="w-3.5 h-3.5" /> API DOCS
+                </a>
+                {/* [FIX] Restored ABOUT Link */}
+                <a href="https://solufuse.com" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-orange-600 flex items-center gap-1.5 transition-colors">
+                  <Icons.Search className="w-3.5 h-3.5" /> ABOUT
                 </a>
               </div>
 
