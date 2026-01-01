@@ -30,9 +30,9 @@ export default function ContextRoleBadge({ role, isSession = false }: ContextRol
   const icons: Record<string, any> = {
     owner: Icons.Crown,
     admin: Icons.Shield,
-    moderator: Icons.ShieldCheck,
-    editor: Icons.FileText, // Or Edit icon if available
-    viewer: Icons.Eye,
+    moderator: Icons.CheckCircle, // [FIX] Replaced ShieldCheck with CheckCircle (available)
+    editor: Icons.FileText, 
+    viewer: Icons.Show,           // [FIX] Replaced Eye with Show (available alias)
     staff_override: Icons.Zap,
   };
 

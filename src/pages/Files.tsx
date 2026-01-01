@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef, Fragment } from 'react';
+import { useEffect, useState } from 'react';
 import { Icons } from '../icons';
 import Toast from '../components/Toast';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
-import ContextRoleBadge from '../components/ContextRoleBadge'; // [NEW] Import
+import ContextRoleBadge from '../components/ContextRoleBadge';
 import MembersModal from '../components/MembersModal';
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import FileToolbar from '../components/FileToolbar';
@@ -33,7 +33,6 @@ export default function Files({ user }: { user: any }) {
   
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
-  // [NEW] Calculate Context Role
   const currentProjectRole = activeProjectId 
     ? projects.find(p => p.id === activeProjectId)?.role 
     : undefined;
@@ -224,7 +223,6 @@ export default function Files({ user }: { user: any }) {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
@@ -246,7 +244,6 @@ export default function Files({ user }: { user: any }) {
                     </>
                 )}
             </h1>
-            {/* [NEW] Insert Context Badge */}
             <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null} />
           </div>
         </div>
