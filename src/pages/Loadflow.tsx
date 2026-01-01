@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import * as Icons from 'lucide-react'; // [STRATEGY] Universal Import
+import * as Icons from 'lucide-react'; // Universal Import
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 
+// --- TYPES ---
 interface StudyCase {
   id: string;
   config: string;
@@ -34,6 +35,7 @@ interface LoadflowResponse {
   results: LoadflowResult[];
 }
 
+// --- HELPERS ---
 const extractLoadNumber = (rev: string | undefined) => {
     if (!rev) return 0;
     const match = rev.match(/(\d+)/);
@@ -46,6 +48,7 @@ const LINE_COLORS = [
 ];
 
 export default function Loadflow({ user }: { user: any }) {
+  // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -73,6 +76,7 @@ export default function Loadflow({ user }: { user: any }) {
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
 
+  // --- API CALLS ---
   const fetchGlobalProfile = async () => {
      try {
          const t = await getToken();
@@ -120,6 +124,18 @@ export default function Loadflow({ user }: { user: any }) {
     } catch (e) { notify("Delete failed", "error"); }
   };
 
+  // [FIX] Proper Async Handler for Token Copy
+  const handleCopyToken = async () => {
+    const t = await getToken();
+    if (t) { 
+        navigator.clipboard.writeText(t); 
+        notify("Token Copied"); 
+    } else {
+        notify("No token available", "error");
+    }
+  };
+
+  // --- PROCESSING ---
   const processResults = (data: LoadflowResponse) => {
       if (!data.results) return;
       const groups: Record<string, LoadflowResult[]> = {};
@@ -152,9 +168,7 @@ export default function Loadflow({ user }: { user: any }) {
         const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
         const jsonFilename = `${baseName}.json`;
         const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
-        
         if (!dataRes.ok) throw new Error("No results found.");
-        
         const jsonData: LoadflowResponse = await dataRes.json();
         processResults(jsonData);
         notify(`Loaded: ${jsonData.results.length} files`);
@@ -170,21 +184,14 @@ export default function Loadflow({ user }: { user: any }) {
     try {
       const t = await getToken();
       const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
-      
       const runRes = await fetch(`${API_URL}/loadflow/run-and-save?basename=${baseName}${pParam}`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${t}` }
       });
+      if (!runRes.ok) throw new Error("Calculation Failed");
       
-      // [FIX] Explicitly checking Response object
-      if (runRes.status !== 200 && !runRes.ok) {
-          throw new Error("Calculation Failed");
-      }
-
       const jsonFilename = `${baseName}.json`;
       const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
-      
       if (!dataRes.ok) throw new Error("Result file missing");
-      
       const jsonData: LoadflowResponse = await dataRes.json();
       processResults(jsonData);
       notify("Analysis Computed");
@@ -287,7 +294,8 @@ export default function Loadflow({ user }: { user: any }) {
           <input value={baseName} onChange={(e) => setBaseName(e.target.value)} className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 w-32 text-right font-bold text-slate-600 focus:ring-1 focus:ring-yellow-500 outline-none" placeholder="Result Filename"/>
           <span className="text-slate-400 font-bold">.json</span>
           <div className="w-px h-6 bg-slate-200 mx-2"></div>
-          <button onClick={() => { const t = getToken(); if(t) navigator.clipboard.writeText("token"); notify("Copied"); }} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
+          {/* [FIX] Use dedicated handler instead of inline async function */}
+          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
           <button onClick={handleLoadResults} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300"><Icons.Search className="w-3.5 h-3.5" /> LOAD EXISTING</button>
           <button onClick={handleRunAnalysis} disabled={loading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded font-black shadow-sm disabled:opacity-50 transition-all">{loading ? <Icons.Activity className="w-3.5 h-3.5 animate-spin"/> : <Icons.Play className="w-3.5 h-3.5 fill-current" />} {loading ? "CALCULATING..." : "RUN ANALYSIS"}</button>
         </div>
