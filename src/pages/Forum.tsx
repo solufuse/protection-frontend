@@ -25,7 +25,6 @@ export default function Forum({ user }: { user: any }) {
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   
-  // Use ref to keep scroll position or scroll to bottom
   const bottomRef = useRef<HTMLDivElement>(null);
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
@@ -66,9 +65,6 @@ export default function Forum({ user }: { user: any }) {
       });
       if (res.ok) {
           const data = await res.json();
-          // Keep API order (Newest first) or Reverse?
-          // For "Issue" style, usually Oldest is at top (Question) and Newest at bottom.
-          // Let's reverse to have chronological order (Old -> New)
           setMessages(data.reverse()); 
       } else { setMessages([]); }
     } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -76,8 +72,6 @@ export default function Forum({ user }: { user: any }) {
 
   useEffect(() => { if (user) { fetchGlobalProfile(); fetchProjects(); } }, [user]);
   useEffect(() => { fetchMessages(); }, [activeProjectId]);
-  
-  // Auto-scroll to bottom only on sending new or initial load
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   // --- ACTIONS ---
@@ -118,7 +112,6 @@ export default function Forum({ user }: { user: any }) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => { 
-      // Ctrl+Enter to submit (like GitHub)
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { 
           e.preventDefault(); handleSendMessage(); 
       }
@@ -136,15 +129,24 @@ export default function Forum({ user }: { user: any }) {
       return p ? p.name : activeProjectId;
   };
 
-  // Permission Logic
+  // [+] [PERMISSION LOGIC] Updated
   const canDelete = (msg: Message) => {
-      if (!userGlobalData) return false;
-      const isMe = msg.author_uid === user.uid;
-      const isStaff = ['admin', 'super_admin', 'moderator'].includes(userGlobalData.global_role);
-      const currentProject = projects.find(p => p.id === activeProjectId);
-      const isOwner = currentProject?.role === 'owner';
+      // 1. Author (User)
+      if (msg.author_uid === user.uid) return true;
       
-      return isMe || isStaff || isOwner;
+      if (!userGlobalData) return false;
+
+      // 2. Global Staff (Admin+)
+      const isGlobalStaff = ['admin', 'super_admin'].includes(userGlobalData.global_role);
+      if (isGlobalStaff) return true;
+
+      // 3. Project Staff (Owner/Admin/Mod)
+      const currentProject = projects.find(p => p.id === activeProjectId);
+      if (currentProject) {
+          if (['owner', 'admin', 'moderator'].includes(currentProject.role)) return true;
+      }
+      
+      return false;
   };
 
   return (
@@ -167,13 +169,11 @@ export default function Forum({ user }: { user: any }) {
       </div>
 
       <div className="flex flex-1 gap-6 min-h-0">
-        {/* SIDEBAR */}
         <ProjectsSidebar 
           user={user} userGlobalData={userGlobalData} projects={projects} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId}
           isCreatingProject={false} setIsCreatingProject={() => {}} newProjectName="" setNewProjectName={() => {}} onCreateProject={() => {}} onDeleteProject={() => {}}
         />
 
-        {/* ISSUES / DISCUSSION AREA */}
         <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden relative">
             
             {/* MESSAGES LIST (GitHub Style) */}
@@ -191,16 +191,13 @@ export default function Forum({ user }: { user: any }) {
                         
                         return (
                             <div key={msg.id} className="flex gap-3 group">
-                                {/* Avatar Column */}
                                 <div className="flex-shrink-0 pt-1">
                                     <div className="w-8 h-8 rounded-md bg-white border border-slate-200 shadow-sm flex items-center justify-center font-bold text-slate-500 uppercase select-none">
                                         {getAuthorName(msg)[0]}
                                     </div>
                                 </div>
                                 
-                                {/* Content Box */}
                                 <div className="flex-1 min-w-0">
-                                    {/* Header */}
                                     <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-t-md px-3 py-1.5">
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-slate-700 hover:underline cursor-pointer">{getAuthorName(msg)}</span>
@@ -221,8 +218,6 @@ export default function Forum({ user }: { user: any }) {
                                             )}
                                         </div>
                                     </div>
-                                    
-                                    {/* Body */}
                                     <div className="bg-white border border-t-0 border-slate-200 rounded-b-md p-3 text-slate-700 leading-relaxed whitespace-pre-wrap font-mono text-[11px]">
                                         {msg.content}
                                     </div>
@@ -234,7 +229,6 @@ export default function Forum({ user }: { user: any }) {
                 <div ref={bottomRef} />
             </div>
 
-            {/* INPUT AREA */}
             <div className="p-4 bg-white border-t border-slate-200">
                 <div className="relative border border-slate-300 rounded-md shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
                     <textarea 
