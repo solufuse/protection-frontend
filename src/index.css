@@ -13,91 +13,102 @@ body {
   padding-right: 0 !important;
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar (Colab Style) */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full;
+  @apply bg-slate-300 rounded-full border-2 border-transparent bg-clip-content;
 }
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-400;
 }
 
-/* --- DARK MODE OVERRIDES (The "Magic" Part) --- */
-/* Cette section force les couleurs sombres même si les composants demandent du blanc */
+/* --- DARK MODE OVERRIDES (The "Colab" Palette) --- */
 
+/* 1. Global Page Background (Le fond principal) */
 .dark body {
-  @apply bg-[#0f1117] text-slate-200; /* Fond style Colab/Github Dark */
+  background-color: #1e1e1e !important; /* Gris Colab/VSCode */
+  color: #e0e0e0 !important; /* Texte gris clair (pas blanc pur) */
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  @apply bg-slate-700;
+  background-color: #424242; /* Scrollbar plus sombre */
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-600;
+  background-color: #4f4f4f;
 }
 
-/* On surcharge les classes utilitaires de base quand on est en .dark */
 @layer utilities {
   
-  /* 1. Backgrounds : Le blanc devient gris foncé */
+  /* 2. Containers / Cards (Le fond des blocs) */
+  /* On remplace bg-white par un gris légèrement plus clair que le fond */
   .dark .bg-white {
-    background-color: #1e293b !important; /* slate-800 */
-    border-color: #334155 !important;     /* slate-700 */
+    background-color: #252526 !important; /* Gris "Surface" */
+    border-color: #383838 !important;     /* Bordures très subtiles */
   }
   
-  .dark .bg-slate-50 {
-    background-color: #0f172a !important; /* slate-900 (Fond de page) */
-  }
-  
+  /* 3. Page Backgrounds (Si bg-slate-50 est utilisé ailleurs) */
+  .dark .bg-slate-50, 
   .dark .bg-slate-100 {
-    background-color: #1e293b !important; /* slate-800 (Boutons/Inputs) */
+    background-color: #1e1e1e !important; /* Fond uni */
   }
 
-  /* 2. Textes : Le gris foncé devient clair */
+  /* 4. Text Colors (Adoucir le contraste) */
   .dark .text-slate-900, 
   .dark .text-slate-800, 
   .dark .text-slate-700, 
   .dark .text-gray-700 {
-    color: #e2e8f0 !important; /* slate-200 */
+    color: #e0e0e0 !important; /* Blanc cassé */
   }
   
   .dark .text-slate-600,
   .dark .text-slate-500 {
-    color: #94a3b8 !important; /* slate-400 */
+    color: #a0a0a0 !important; /* Gris moyen */
   }
 
   .dark .text-slate-400 {
-    color: #64748b !important; /* slate-500 (plus discret) */
+    color: #757575 !important; /* Gris discret */
   }
 
-  /* 3. Bordures : Le gris clair devient gris nuit */
+  /* 5. Borders & Dividers (Le point crucial pour les lignes blanches) */
+  /* On force une couleur très proche du fond pour qu'elles se fondent */
+  .dark .border-slate-100,
   .dark .border-slate-200,
   .dark .border-slate-300,
-  .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
-  .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
-    border-color: #334155 !important; /* slate-700 */
+  .dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #383838 !important; /* Gris foncé subtil */
   }
 
-  /* 4. Cas Spéciaux (Ombres, Inputs) */
+  /* 6. Inputs & Selects (Style "Champs de code") */
   .dark input, .dark select, .dark textarea {
-    background-color: #0f172a !important; /* Fond très sombre pour les champs */
-    color: white !important;
-    border-color: #334155 !important;
+    background-color: #2d2d2d !important; /* Gris plus clair pour l'input */
+    color: #e0e0e0 !important;
+    border-color: #383838 !important;
+  }
+  
+  .dark input:focus, .dark select:focus, .dark textarea:focus {
+    border-color: #f59e0b !important; /* Focus orange (Solufuse) ou bleu (#3b82f6) */
+    ring-color: #f59e0b !important;
+  }
+
+  /* 7. Hover States (Survol des lignes) */
+  .dark .hover\:bg-slate-50:hover {
+    background-color: #2a2d2e !important; /* Légère surbrillance au survol */
   }
   
   .dark .shadow-sm, .dark .shadow-md {
-    box-shadow: none !important; /* On retire les ombres en dark mode, ça fait sale */
-    background-color: #1e293b !important; /* On s'assure que les cartes "flottent" par la couleur */
+    box-shadow: none !important; /* Pas d'ombres en flat design sombre */
   }
 }
 
-/* Global Smooth Transition pour tout le monde */
+/* Global Smooth Transition */
 *, ::before, ::after {
    transition-property: background-color, border-color, color, fill, stroke;
    transition-duration: 200ms;
