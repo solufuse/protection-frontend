@@ -5,6 +5,9 @@ import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 
+// --- CONFIG ---
+const MAX_HISTORY = 5; // [LOGIC] Keep only the 5 most recent files for a given scenario name
+
 // --- TYPES ---
 interface StudyCase {
   id: string;
@@ -40,6 +43,13 @@ const extractLoadNumber = (rev: string | undefined) => {
     if (!rev) return 0;
     const match = rev.match(/(\d+)/);
     return match ? parseInt(match[0]) : 0;
+};
+
+// YYYYMMDD_HHMM
+const getTimestampSuffix = () => {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 };
 
 const LINE_COLORS = [
@@ -131,6 +141,46 @@ export default function Loadflow({ user }: { user: any }) {
     else { notify("No token available", "error"); }
   };
 
+  // --- CLEANUP LOGIC ---
+  const cleanOldScenarios = async (rootName: string) => {
+      if (!activeProjectId) return; // Only clean in projects, not session
+      try {
+          const t = await getToken();
+          // 1. List all files
+          const listRes = await fetch(`${API_URL}/files/details?project_id=${activeProjectId}`, { 
+              headers: { 'Authorization': `Bearer ${t}` } 
+          });
+          if (!listRes.ok) return;
+          const listData = await listRes.json();
+          
+          // 2. Filter files that match "rootName_YYYYMMDD..."
+          const historyFiles = (listData.files || []).filter((f: any) => 
+              f.filename.startsWith(rootName + "_") && 
+              f.filename.endsWith(".json")
+          );
+
+          // 3. Sort by Upload Date (Newest First)
+          historyFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
+
+          // 4. If more than MAX, delete the rest
+          if (historyFiles.length > MAX_HISTORY) {
+              const filesToDelete = historyFiles.slice(MAX_HISTORY);
+              
+              for (const file of filesToDelete) {
+                  console.log("Auto-cleaning old file:", file.filename);
+                  await fetch(`${API_URL}/files/file/${file.filename}?project_id=${activeProjectId}`, { 
+                      method: 'DELETE', 
+                      headers: { 'Authorization': `Bearer ${t}` } 
+                  });
+              }
+              // Optional: notify user but maybe too verbose
+              // notify(`Cleaned ${filesToDelete.length} old versions`);
+          }
+      } catch (e) {
+          console.warn("Cleanup failed", e);
+      }
+  };
+
   // --- PROCESSING ---
   const processResults = (data: LoadflowResponse) => {
       if (!data.results) return;
@@ -157,10 +207,7 @@ export default function Loadflow({ user }: { user: any }) {
   // --- SMART AUTO-LOAD LOGIC ---
   const detectAndLoadResults = useCallback(async () => {
     if (!user) return;
-    
-    if (!activeProjectId) {
-        return; // Session mode: don't auto-scan
-    }
+    if (!activeProjectId) return;
 
     setLoading(true);
     setResults(null);
@@ -168,7 +215,6 @@ export default function Loadflow({ user }: { user: any }) {
     try {
         const t = await getToken();
         
-        // 1. Get file list
         const listRes = await fetch(`${API_URL}/files/details?project_id=${activeProjectId}`, { 
             headers: { 'Authorization': `Bearer ${t}` } 
         });
@@ -178,8 +224,6 @@ export default function Loadflow({ user }: { user: any }) {
         const listData = await listRes.json();
         const files = listData.files || [];
 
-        // 2. Filter: JSON only + Exclude 'config.json'
-        // [CRITICAL CHECK] Filtering out config.json
         const jsonFiles = files.filter((f: any) => 
             f.filename.toLowerCase().endsWith('.json') && 
             f.filename.toLowerCase() !== 'config.json'
@@ -190,40 +234,33 @@ export default function Loadflow({ user }: { user: any }) {
             return;
         }
 
-        // 3. Sort by Newest First
         jsonFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
         
-        // 4. Iterate to find a VALID loadflow file
-        let validFileFound = false;
-
         for (const candidate of jsonFiles) {
             try {
-                // Try to fetch this candidate
                 const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}&project_id=${activeProjectId}`);
-                
                 if (dataRes.ok) {
                     const jsonData = await dataRes.json();
-                    
-                    // [CRITICAL CHECK] Structure Validation
-                    // Must contain 'results' array AND items must have 'mw_flow' or 'study_case'
                     if (jsonData && Array.isArray(jsonData.results) && jsonData.results.length > 0) {
                         const firstItem = jsonData.results[0];
                         if (firstItem.mw_flow !== undefined || firstItem.transformers !== undefined) {
                             
-                            // It's a match!
-                            setBaseName(candidate.filename.replace('.json', ''));
+                            // Clean display name (remove timestamp for UX input, but keep track of actual file?)
+                            // Actually, let's show the cleaned prefix so user knows what "family" of files they are on
+                            const rawName = candidate.filename.replace('.json', '');
+                            // Try to strip timestamp if it exists to show base name
+                            const cleanName = rawName.replace(/_\d{8}_\d{6}$/, "");
+                            
+                            setBaseName(cleanName); 
+                            
                             processResults(jsonData as LoadflowResponse);
                             notify(`Auto-loaded: ${candidate.filename}`);
-                            validFileFound = true;
-                            break; // Stop searching
+                            break; 
                         }
                     }
                 }
-            } catch (err) {
-                console.warn(`Skipping invalid file: ${candidate.filename}`);
-            }
+            } catch (err) { }
         }
-
     } catch (e: any) { 
         console.warn("Auto-load failed", e);
     } finally { 
@@ -231,30 +268,36 @@ export default function Loadflow({ user }: { user: any }) {
     }
   }, [user, activeProjectId, API_URL]);
 
-  // [UX] Trigger Auto-Detection when Project changes
   useEffect(() => {
       let mounted = true;
       if (user && mounted) {
-          if (activeProjectId) {
-              detectAndLoadResults();
-          }
+          if (activeProjectId) detectAndLoadResults();
       }
       return () => { mounted = false; };
   }, [activeProjectId, user]); 
 
   // Manual Load
-  const handleManualLoad = async () => {
+  const handleManualLoad = async (overrideName?: string) => {
       if (!user) return;
       setLoading(true);
       try {
         const t = await getToken();
         const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
-        const jsonFilename = `${baseName}.json`;
+        const targetName = overrideName || baseName;
+        
+        // Use preview which does not need exact filename match if we search? 
+        // No, backend requires filename. 
+        // Note: Manual load of "baseName" without timestamp might fail if file doesn't exist.
+        // But for "Run Analysis", we pass the exact uniqueName.
+        const jsonFilename = `${targetName}.json`;
+        
         const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
         if (!dataRes.ok) throw new Error("No results found.");
+        
         const jsonData: LoadflowResponse = await dataRes.json();
         processResults(jsonData);
         notify(`Loaded: ${jsonData.results.length} files`);
+        
       } catch (e: any) { notify(e.message, "error"); }
       finally { setLoading(false); }
   };
@@ -268,7 +311,11 @@ export default function Loadflow({ user }: { user: any }) {
       const t = await getToken();
       const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
       
-      const runRes = await fetch(`${API_URL}/loadflow/run-and-save?basename=${baseName}${pParam}`, {
+      const timestamp = getTimestampSuffix();
+      const cleanBaseName = baseName.replace(/_\d{8}_\d{6}$/, ""); 
+      const uniqueName = `${cleanBaseName}_${timestamp}`;
+      
+      const runRes = await fetch(`${API_URL}/loadflow/run-and-save?basename=${uniqueName}${pParam}`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${t}` }
       });
       
@@ -276,9 +323,14 @@ export default function Loadflow({ user }: { user: any }) {
           throw new Error("Calculation Failed");
       }
 
-      // Re-fetch immediately after run
-      await handleManualLoad();
-      notify("Analysis Computed");
+      await handleManualLoad(uniqueName);
+      
+      // [NEW] Trigger cleanup of old versions
+      if (activeProjectId) {
+          cleanOldScenarios(cleanBaseName);
+      }
+
+      notify("Analysis Computed & Saved");
     } catch (e) { notify("Error during analysis", "error"); }
     finally { setLoading(false); }
   };
@@ -375,12 +427,12 @@ export default function Loadflow({ user }: { user: any }) {
           </div>
         </div>
         <div className="flex gap-2 items-center">
-          <input value={baseName} onChange={(e) => setBaseName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleManualLoad()} className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 w-32 text-right font-bold text-slate-600 focus:ring-1 focus:ring-yellow-500 outline-none" placeholder="Result Filename"/>
-          <span className="text-slate-400 font-bold">.json</span>
+          <input value={baseName} onChange={(e) => setBaseName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleManualLoad()} className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 w-40 text-right font-bold text-slate-600 focus:ring-1 focus:ring-yellow-500 outline-none" placeholder="Analysis Name"/>
+          <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wide mr-2">_TIMESTAMP.json</span>
           <div className="w-px h-6 bg-slate-200 mx-2"></div>
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
-          <button onClick={handleManualLoad} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300"><Icons.Search className="w-3.5 h-3.5" /> LOAD EXISTING</button>
-          <button onClick={handleRunAnalysis} disabled={loading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded font-black shadow-sm disabled:opacity-50 transition-all">{loading ? <Icons.Activity className="w-3.5 h-3.5 animate-spin"/> : <Icons.Play className="w-3.5 h-3.5 fill-current" />} {loading ? "CALCULATING..." : "RUN ANALYSIS"}</button>
+          <button onClick={() => handleManualLoad()} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300"><Icons.Search className="w-3.5 h-3.5" /> LOAD</button>
+          <button onClick={handleRunAnalysis} disabled={loading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded font-black shadow-sm disabled:opacity-50 transition-all">{loading ? <Icons.Activity className="w-3.5 h-3.5 animate-spin"/> : <Icons.Play className="w-3.5 h-3.5 fill-current" />} {loading ? "CALCULATING..." : "RUN"}</button>
         </div>
       </div>
 
