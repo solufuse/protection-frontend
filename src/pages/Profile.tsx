@@ -73,8 +73,8 @@ export default function Profile({ user }: ProfileProps) {
   ];
 
   return (
-    // [FIX] Changed h-screen to h-full
-    <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-full flex flex-col">
+    // [FIX] w-full + h-full
+    <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 flex-shrink-0">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Account Management</label>

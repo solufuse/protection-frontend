@@ -42,8 +42,8 @@ export default function App() {
       <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
         {user && <Navbar user={user} onLogout={() => auth.signOut()} />}
         
-        {/* [FIX] Changed overflow-hidden to overflow-auto to allow scrolling if content overflows */}
-        <main className="flex-1 overflow-auto relative flex flex-col">
+        {/* [FIX] overflow-y-scroll forces scrollbar track visible always (prevents layout shift) */}
+        <main className="flex-1 overflow-y-scroll relative flex flex-col w-full">
           <Routes>
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
             
