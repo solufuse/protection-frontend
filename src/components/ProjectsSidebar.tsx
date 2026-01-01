@@ -54,11 +54,21 @@ export default function ProjectsSidebar({
     
   const [searchTerm, setSearchTerm] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
+  
+  // [+] STATE: Pour ouvrir/fermer la liste des sessions
+  const [isSessionsExpanded, setIsSessionsExpanded] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('solufuse_favorites');
     if (saved) setFavorites(JSON.parse(saved));
   }, []);
+
+  // [+] INTELLIGENCE: Si on cherche, on ouvre automatiquement la liste
+  useEffect(() => {
+    if (searchTerm.trim() !== "") {
+        setIsSessionsExpanded(true);
+    }
+  }, [searchTerm]);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -151,7 +161,7 @@ export default function ProjectsSidebar({
         </div>
       )}
 
-      {/* 4. PROJECTS LIST (FIXED LAYOUT) */}
+      {/* 4. PROJECTS LIST */}
       <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 custom-scrollbar pr-1 min-h-[100px]">
         {filteredProjects.map(p => {
           const isFav = favorites.includes(p.id);
@@ -161,10 +171,8 @@ export default function ProjectsSidebar({
             <div 
               key={p.id} 
               onClick={() => handleSelectProject(p.id)} 
-              // [+] Removed 'relative', changed to justify-between for clear separation
               className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50'}`}
             >
-              {/* LEFT SIDE: Icon & Name */}
               <div className="flex items-center gap-2 overflow-hidden truncate">
                 {p.id.startsWith("PUBLIC_") ? (
                     <Icons.Hash className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-400'}`} />
@@ -176,9 +184,7 @@ export default function ProjectsSidebar({
                 <span className="font-bold truncate text-[10px]">{p.name}</span>
               </div>
 
-              {/* RIGHT SIDE: Actions Container (Star + Delete) */}
               <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                  {/* Star Icon */}
                   <button 
                       onClick={(e) => toggleFavorite(p.id, e)}
                       className={`${isFav ? 'opacity-100 text-yellow-400' : 'opacity-0 group-hover:opacity-100 text-slate-300 hover:text-yellow-400'} transition-opacity`}
@@ -186,7 +192,6 @@ export default function ProjectsSidebar({
                       <Icons.Star className="w-3 h-3 fill-current" />
                   </button>
 
-                  {/* Delete Button (Removed absolute positioning) */}
                   {p.role !== 'moderator' && !isActive && (
                     <button 
                       onClick={(e) => onDeleteProject(p.id, e)} 
@@ -204,30 +209,42 @@ export default function ProjectsSidebar({
         )}
       </div>
 
-      {/* 5. USER SESSIONS (ADMIN) */}
+      {/* 5. USER SESSIONS (SMART COLLAPSIBLE) */}
       {canViewSessions && filteredUsers && (
         <>
           <div className="border-t border-slate-200 my-1"></div>
-          <div className="flex items-center gap-2 px-1 mb-1">
-            <Icons.Shield className="w-3 h-3 text-red-500" />
-            <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Sessions ({filteredUsers.length})</span>
+          
+          {/* Header Clickable */}
+          <div 
+            onClick={() => setIsSessionsExpanded(!isSessionsExpanded)}
+            className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 rounded p-0.5 select-none"
+          >
+            <div className="flex items-center gap-2">
+                <Icons.Shield className="w-3 h-3 text-red-500" />
+                <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Sessions ({filteredUsers.length})</span>
+            </div>
+            {/* Rotate Arrow to simulate Chevron */}
+            <Icons.ArrowRight className={`w-3 h-3 text-slate-300 transition-transform duration-200 ${isSessionsExpanded ? 'rotate-90' : ''}`} />
           </div>
           
-          <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 custom-scrollbar pr-1 max-h-[150px]">
-             {filteredUsers.map(u => (
-               <div 
-                 key={u.uid}
-                 onClick={() => handleSelectUserSession(u.uid)}
-                 className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer border transition-all ${activeSessionUid === u.uid ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white text-slate-500 border-transparent hover:bg-slate-50'}`}
-               >
-                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${u.global_role === 'super_admin' ? 'bg-red-500' : (u.global_role === 'nitro' ? 'bg-yellow-400' : 'bg-slate-300')}`} />
-                 <div className="flex flex-col overflow-hidden w-full">
-                    <span className="font-bold truncate text-[10px]">{u.username || "User"}</span>
-                    <span className="truncate text-[8px] opacity-70">{u.email}</span>
-                 </div>
-               </div>
-             ))}
-          </div>
+          {/* List (Conditional) */}
+          {isSessionsExpanded && (
+              <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 custom-scrollbar pr-1 max-h-[150px] animate-in fade-in slide-in-from-top-1 duration-200">
+                {filteredUsers.map(u => (
+                <div 
+                    key={u.uid}
+                    onClick={() => handleSelectUserSession(u.uid)}
+                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer border transition-all ${activeSessionUid === u.uid ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white text-slate-500 border-transparent hover:bg-slate-50'}`}
+                >
+                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${u.global_role === 'super_admin' ? 'bg-red-500' : (u.global_role === 'nitro' ? 'bg-yellow-400' : 'bg-slate-300')}`} />
+                    <div className="flex flex-col overflow-hidden w-full">
+                        <span className="font-bold truncate text-[10px]">{u.username || "User"}</span>
+                        <span className="truncate text-[8px] opacity-70">{u.email}</span>
+                    </div>
+                </div>
+                ))}
+            </div>
+          )}
         </>
       )}
     </div>
