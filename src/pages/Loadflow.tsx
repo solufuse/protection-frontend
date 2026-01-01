@@ -58,7 +58,6 @@ export default function Loadflow({ user }: { user: any }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<LoadflowResponse | null>(null);
   
-  // [UX] Persist filename or default to lf_results
   const [baseName, setBaseName] = useState("lf_results");
   
   const [scenarioGroups, setScenarioGroups] = useState<Record<string, LoadflowResult[]>>({});
@@ -155,55 +154,110 @@ export default function Loadflow({ user }: { user: any }) {
       setResults(data);
   };
 
-  // --- CORE FETCH LOGIC (Reused by Auto-Load and Manual Click) ---
-  const attemptFetchResults = useCallback(async (isManual: boolean = false) => {
+  // --- SMART AUTO-LOAD LOGIC ---
+  const detectAndLoadResults = useCallback(async () => {
     if (!user) return;
     
-    // If auto-loading, show loading state but don't clear results immediately to avoid flicker
-    if (isManual) {
-        setLoading(true);
-        setResults(null); 
-    } else {
-        // Optional: you can set a small 'refreshing' indicator here
+    if (!activeProjectId) {
+        return; // Session mode: don't auto-scan
     }
+
+    setLoading(true);
+    setResults(null);
 
     try {
         const t = await getToken();
-        const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
-        const jsonFilename = `${baseName}.json`;
         
-        const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
+        // 1. Get file list
+        const listRes = await fetch(`${API_URL}/files/details?project_id=${activeProjectId}`, { 
+            headers: { 'Authorization': `Bearer ${t}` } 
+        });
         
-        if (!dataRes.ok) {
-            // [UX] If auto-loading and file not found, just reset silently (new project or no run yet)
-            if (!isManual) {
-                setResults(null); 
-                setScenarioGroups({});
-                return;
-            }
-            throw new Error("No results found.");
+        if (!listRes.ok) throw new Error("Failed to list files");
+        
+        const listData = await listRes.json();
+        const files = listData.files || [];
+
+        // 2. Filter: JSON only + Exclude 'config.json'
+        // [CRITICAL CHECK] Filtering out config.json
+        const jsonFiles = files.filter((f: any) => 
+            f.filename.toLowerCase().endsWith('.json') && 
+            f.filename.toLowerCase() !== 'config.json'
+        );
+        
+        if (jsonFiles.length === 0) {
+            setLoading(false);
+            return;
         }
+
+        // 3. Sort by Newest First
+        jsonFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
         
-        const jsonData: LoadflowResponse = await dataRes.json();
-        processResults(jsonData);
-        if (isManual) notify(`Loaded: ${jsonData.results.length} files`);
-        
+        // 4. Iterate to find a VALID loadflow file
+        let validFileFound = false;
+
+        for (const candidate of jsonFiles) {
+            try {
+                // Try to fetch this candidate
+                const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}&project_id=${activeProjectId}`);
+                
+                if (dataRes.ok) {
+                    const jsonData = await dataRes.json();
+                    
+                    // [CRITICAL CHECK] Structure Validation
+                    // Must contain 'results' array AND items must have 'mw_flow' or 'study_case'
+                    if (jsonData && Array.isArray(jsonData.results) && jsonData.results.length > 0) {
+                        const firstItem = jsonData.results[0];
+                        if (firstItem.mw_flow !== undefined || firstItem.transformers !== undefined) {
+                            
+                            // It's a match!
+                            setBaseName(candidate.filename.replace('.json', ''));
+                            processResults(jsonData as LoadflowResponse);
+                            notify(`Auto-loaded: ${candidate.filename}`);
+                            validFileFound = true;
+                            break; // Stop searching
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn(`Skipping invalid file: ${candidate.filename}`);
+            }
+        }
+
     } catch (e: any) { 
-        if (isManual) notify(e.message, "error");
-        // If auto-load fails (e.g. 404), we just stay in empty state
+        console.warn("Auto-load failed", e);
     } finally { 
         setLoading(false); 
     }
-  }, [user, activeProjectId, baseName, API_URL]);
+  }, [user, activeProjectId, API_URL]);
 
-  // [UX] Auto-load when Project OR Filename changes
+  // [UX] Trigger Auto-Detection when Project changes
   useEffect(() => {
       let mounted = true;
       if (user && mounted) {
-          attemptFetchResults(false); // False = Silent mode
+          if (activeProjectId) {
+              detectAndLoadResults();
+          }
       }
       return () => { mounted = false; };
-  }, [activeProjectId, user]); // Removed baseName dependency to avoid reloading while typing
+  }, [activeProjectId, user]); 
+
+  // Manual Load
+  const handleManualLoad = async () => {
+      if (!user) return;
+      setLoading(true);
+      try {
+        const t = await getToken();
+        const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
+        const jsonFilename = `${baseName}.json`;
+        const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
+        if (!dataRes.ok) throw new Error("No results found.");
+        const jsonData: LoadflowResponse = await dataRes.json();
+        processResults(jsonData);
+        notify(`Loaded: ${jsonData.results.length} files`);
+      } catch (e: any) { notify(e.message, "error"); }
+      finally { setLoading(false); }
+  };
 
   const handleRunAnalysis = async () => {
     if (!user) return;
@@ -223,7 +277,7 @@ export default function Loadflow({ user }: { user: any }) {
       }
 
       // Re-fetch immediately after run
-      await attemptFetchResults(false);
+      await handleManualLoad();
       notify("Analysis Computed");
     } catch (e) { notify("Error during analysis", "error"); }
     finally { setLoading(false); }
@@ -321,21 +375,11 @@ export default function Loadflow({ user }: { user: any }) {
           </div>
         </div>
         <div className="flex gap-2 items-center">
-          {/* [UX] Enter triggers reload of that specific file */}
-          <input 
-            value={baseName} 
-            onChange={(e) => setBaseName(e.target.value)} 
-            onKeyDown={(e) => e.key === 'Enter' && attemptFetchResults(true)}
-            className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 w-32 text-right font-bold text-slate-600 focus:ring-1 focus:ring-yellow-500 outline-none" 
-            placeholder="Result Filename"
-          />
+          <input value={baseName} onChange={(e) => setBaseName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleManualLoad()} className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 w-32 text-right font-bold text-slate-600 focus:ring-1 focus:ring-yellow-500 outline-none" placeholder="Result Filename"/>
           <span className="text-slate-400 font-bold">.json</span>
           <div className="w-px h-6 bg-slate-200 mx-2"></div>
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
-          
-          {/* [UX] Load Existing calls attemptFetchResults(true) for verbose manual mode */}
-          <button onClick={() => attemptFetchResults(true)} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300"><Icons.Search className="w-3.5 h-3.5" /> LOAD EXISTING</button>
-          
+          <button onClick={handleManualLoad} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300"><Icons.Search className="w-3.5 h-3.5" /> LOAD EXISTING</button>
           <button onClick={handleRunAnalysis} disabled={loading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded font-black shadow-sm disabled:opacity-50 transition-all">{loading ? <Icons.Activity className="w-3.5 h-3.5 animate-spin"/> : <Icons.Play className="w-3.5 h-3.5 fill-current" />} {loading ? "CALCULATING..." : "RUN ANALYSIS"}</button>
         </div>
       </div>
