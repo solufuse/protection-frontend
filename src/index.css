@@ -3,34 +3,53 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* [CRITICAL] Prevent Layout Shift */
+html {
+  overflow-y: scroll;
+}
+body {
+  @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+  padding-right: 0 !important;
 }
 
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
   @apply bg-slate-300 dark:bg-slate-700 rounded-full;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-400 dark:bg-slate-600;
 }
 
-/* [FIX] GLOBAL DARK MODE BORDERS 
-   This forces all default borders (like divide-y or plain border)
-   to use a dark color when in dark mode, eliminating the "white lines".
-*/
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 @layer base {
+  /* 1. Default Border Color for Dark Mode (Fixes white lines) */
   *, ::before, ::after {
     @apply dark:border-slate-800;
   }
 
-  body {
-    @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+  /* 2. GLOBAL SMOOTH TRANSITION (Fixes "ugly" switching) 
+     This forces all color-related properties to animate over 300ms 
+     instead of snapping instantly.
+  */
+  body, #root, main, nav, div, section, article, header, footer, 
+  button, input, select, textarea, table, tr, th, td, span, svg, 
+  p, h1, h2, h3, h4, h5, h6, a, label, li, ul {
+     transition-property: background-color, border-color, color, fill, stroke;
+     transition-duration: 300ms;
+     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
