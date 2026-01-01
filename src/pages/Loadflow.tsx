@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Icons } from '../icons'; // [FIX] Only one import needed now!
+import * as Icons from 'lucide-react'; // [STRATEGY] Universal Import
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 
-// --- TYPES ---
 interface StudyCase {
   id: string;
   config: string;
@@ -35,7 +34,6 @@ interface LoadflowResponse {
   results: LoadflowResult[];
 }
 
-// --- HELPERS ---
 const extractLoadNumber = (rev: string | undefined) => {
     if (!rev) return 0;
     const match = rev.match(/(\d+)/);
@@ -48,7 +46,6 @@ const LINE_COLORS = [
 ];
 
 export default function Loadflow({ user }: { user: any }) {
-  // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -60,7 +57,6 @@ export default function Loadflow({ user }: { user: any }) {
   const [baseName, setBaseName] = useState("lf_results");
   
   const [scenarioGroups, setScenarioGroups] = useState<Record<string, LoadflowResult[]>>({});
-  
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [filterSearch, setFilterSearch] = useState("");
   const [filterWinner, setFilterWinner] = useState(false);
@@ -77,7 +73,6 @@ export default function Loadflow({ user }: { user: any }) {
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
 
-  // --- API CALLS ---
   const fetchGlobalProfile = async () => {
      try {
          const t = await getToken();
@@ -125,7 +120,6 @@ export default function Loadflow({ user }: { user: any }) {
     } catch (e) { notify("Delete failed", "error"); }
   };
 
-  // --- PROCESSING ---
   const processResults = (data: LoadflowResponse) => {
       if (!data.results) return;
       const groups: Record<string, LoadflowResult[]> = {};
@@ -158,7 +152,9 @@ export default function Loadflow({ user }: { user: any }) {
         const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
         const jsonFilename = `${baseName}.json`;
         const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
+        
         if (!dataRes.ok) throw new Error("No results found.");
+        
         const jsonData: LoadflowResponse = await dataRes.json();
         processResults(jsonData);
         notify(`Loaded: ${jsonData.results.length} files`);
@@ -174,14 +170,21 @@ export default function Loadflow({ user }: { user: any }) {
     try {
       const t = await getToken();
       const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
+      
       const runRes = await fetch(`${API_URL}/loadflow/run-and-save?basename=${baseName}${pParam}`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${t}` }
       });
-      if (!runRes.ok) throw new Error("Calculation Failed");
       
+      // [FIX] Explicitly checking Response object
+      if (runRes.status !== 200 && !runRes.ok) {
+          throw new Error("Calculation Failed");
+      }
+
       const jsonFilename = `${baseName}.json`;
       const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
+      
       if (!dataRes.ok) throw new Error("Result file missing");
+      
       const jsonData: LoadflowResponse = await dataRes.json();
       processResults(jsonData);
       notify("Analysis Computed");
@@ -322,7 +325,7 @@ export default function Loadflow({ user }: { user: any }) {
                                                     <td className="px-2 py-1 font-mono font-black text-blue-600">{r.study_case?.revision}</td>
                                                     <td className="px-2 py-1 text-right font-mono text-slate-700">{Math.abs(r.mw_flow).toFixed(2)}</td>
                                                     <td className="px-2 py-1 text-right font-mono text-slate-400">{Math.abs(r.mvar_flow).toFixed(2)}</td>
-                                                    <td className="px-2 py-1 text-right"><button onClick={(e) => {e.stopPropagation(); toggleRow(i);}} className={`p-0.5 rounded ${isExpanded ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100 text-slate-400'}`}>{isExpanded ? <Icons.Hide className="w-3.5 h-3.5"/> : <Icons.Show className="w-3.5 h-3.5"/>}</button></td>
+                                                    <td className="px-2 py-1 text-right"><button onClick={(e) => {e.stopPropagation(); toggleRow(i);}} className={`p-0.5 rounded ${isExpanded ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100 text-slate-400'}`}>{isExpanded ? <Icons.EyeOff className="w-3.5 h-3.5"/> : <Icons.Eye className="w-3.5 h-3.5"/>}</button></td>
                                                 </tr>
                                                 {isExpanded && (
                                                     <tr className="bg-slate-50/50"><td colSpan={6} className="px-4 py-2 border-b border-slate-100"><div className="flex flex-wrap gap-2">{Object.entries(r.transformers || {}).map(([name, data]) => (<div key={name} className="flex items-center gap-1.5 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[8.5px] shadow-sm"><span className="font-black text-slate-700">{name}</span><div className="h-2 w-px bg-slate-200"></div><span className="text-slate-500">Tap: <b className="text-slate-800">{data.Tap}</b></span><span className="text-blue-600 font-bold">{data.LFMW.toFixed(1)} MW</span><span className="text-slate-400">{data.LFMvar.toFixed(1)} MVar</span></div>))}</div></td></tr>
