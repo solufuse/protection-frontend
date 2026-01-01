@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth'; // [+] Added signInAnonymously
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { auth } from './firebase';
 import Navbar from './components/Navbar';
 import Files from './pages/Files';
@@ -21,15 +21,13 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
-        // Utilisateur connecté (Google ou Invité)
         setUser(currentUser);
         setLoading(false);
       } else {
-        // Personne ? On connecte automatiquement en Invité pour l'accès public
         console.log("No user detected. Signing in as Guest...");
         signInAnonymously(auth).catch((error) => {
             console.error("Auto-Guest failed:", error);
-            setLoading(false); // Stop loading even if fail, to show Login page fallback
+            setLoading(false);
         });
       }
     });
@@ -44,9 +42,9 @@ export default function App() {
       <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
         {user && <Navbar user={user} onLogout={() => auth.signOut()} />}
         
-        <main className="flex-1 overflow-hidden relative">
+        {/* [FIX] Changed overflow-hidden to overflow-auto to allow scrolling if content overflows */}
+        <main className="flex-1 overflow-auto relative flex flex-col">
           <Routes>
-            {/* Si l'auto-guest fonctionne, on n'a presque plus besoin de la route /login, mais on la garde au cas où */}
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
             
             <Route path="/" element={user ? <Files user={user} /> : <Navigate to="/login" />} />

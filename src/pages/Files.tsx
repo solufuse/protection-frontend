@@ -14,7 +14,6 @@ import { auth } from '../firebase';
 export default function Files({ user }: { user: any }) {
   const [files, setFiles] = useState<SessionFile[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
   const [usersList, setUsersList] = useState<UserSummary[]>([]);
@@ -37,19 +36,14 @@ export default function Files({ user }: { user: any }) {
   
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
-  // Determine Role in Context
   let currentProjectRole = undefined;
-  if (activeProjectId) {
-      currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;
-  } else if (activeSessionUid) {
-      currentProjectRole = 'admin';
-  }
+  if (activeProjectId) currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;
+  else if (activeSessionUid) currentProjectRole = 'admin';
 
-  // [+] Helper to get CLEAN project name for Header
   const getActiveProjectName = () => {
       if (!activeProjectId) return null;
       const proj = projects.find(p => p.id === activeProjectId);
-      return proj ? proj.name : activeProjectId; // Show Name if found, else ID
+      return proj ? proj.name : activeProjectId; 
   };
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
@@ -73,9 +67,7 @@ export default function Files({ user }: { user: any }) {
          if (res.ok) {
              const data = await res.json();
              setUserGlobalData(data);
-             if (['super_admin', 'admin', 'moderator'].includes(data.global_role)) {
-                 fetchAllUsers(t);
-             }
+             if (['super_admin', 'admin', 'moderator'].includes(data.global_role)) fetchAllUsers(t);
          }
      } catch (e) {}
   };
@@ -110,16 +102,8 @@ export default function Files({ user }: { user: any }) {
     } catch (e) { console.error(e); setFiles([]); } finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    if (user) {
-      fetchGlobalProfile();
-      fetchProjects();
-    }
-  }, [user]);
-
-  useEffect(() => {
-      if (user) fetchFiles();
-  }, [activeProjectId, activeSessionUid]);
+  useEffect(() => { if (user) { fetchGlobalProfile(); fetchProjects(); } }, [user]);
+  useEffect(() => { if (user) fetchFiles(); }, [activeProjectId, activeSessionUid]);
 
   const createProject = async () => {
     if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error");
@@ -268,8 +252,9 @@ export default function Files({ user }: { user: any }) {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
-      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
+    // [FIX] Changed h-screen to h-full
+    <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-full flex flex-col">
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 flex-shrink-0">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
             Workspace
@@ -284,7 +269,6 @@ export default function Files({ user }: { user: any }) {
                         ) : (
                             <Icons.Folder className="w-5 h-5 text-blue-600" />
                         )}
-                        {/* [+] DISPLAY CLEAN NAME */}
                         <span>{getActiveProjectName()}</span>
                     </>
                 ) : activeSessionUid ? (
@@ -296,7 +280,6 @@ export default function Files({ user }: { user: any }) {
                     <>
                         <Icons.HardDrive className="w-5 h-5 text-slate-600" />
                         <span>My Session</span>
-                        {/* [+] RENAMED RAM TO PRIVATE */}
                         <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">PRIVATE</span>
                     </>
                 )}
@@ -320,7 +303,7 @@ export default function Files({ user }: { user: any }) {
       </div>
 
       {user?.isAnonymous && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm flex-shrink-0">
             <div className="flex items-center gap-4">
                 <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shrink-0"><Icons.Alert className="w-4 h-4" /></div>
                 <div><h3 className="font-bold text-blue-900 text-xs">Guest Mode (Demo)</h3><p className="text-blue-700 text-[10px] mt-0.5">Limits: Max 10 files. Projects disabled.</p></div>

@@ -16,14 +16,12 @@ interface Message {
 }
 
 export default function Forum({ user }: { user: any }) {
-  // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   
-  // [pagination] States
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -35,15 +33,13 @@ export default function Forum({ user }: { user: any }) {
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   
   const bottomRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null); // To maintain scroll position
+  const scrollRef = useRef<HTMLDivElement>(null); 
   
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
-  const LIMIT = 50; // Batch size
+  const LIMIT = 50; 
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
-
-  // --- FETCHING ---
 
   const fetchGlobalProfile = async () => {
      try {
@@ -68,7 +64,6 @@ export default function Forum({ user }: { user: any }) {
     } catch (e) { console.error(e); }
   };
 
-  // 1. Initial Load (Reset)
   const fetchMessages = async (isRefresh = false) => {
     if (!activeProjectId) return;
     setLoading(true);
@@ -79,23 +74,17 @@ export default function Forum({ user }: { user: any }) {
       });
       if (res.ok) {
           const data = await res.json();
-          // API returns Newest -> Oldest. We reverse for Chat UI (Oldest -> Newest)
           setMessages(data.reverse());
           setOffset(LIMIT);
           setHasMore(data.length === LIMIT);
-          
-          // Scroll to bottom on initial load or refresh
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "auto" }), 100);
       }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  // 2. Load More (Pagination)
   const loadMoreMessages = async () => {
       if (!activeProjectId || !hasMore || isLoadingMore) return;
       setIsLoadingMore(true);
-      
-      // Capture current height before loading to restore position later
       const currentHeight = scrollRef.current?.scrollHeight || 0;
       const currentScrollTop = scrollRef.current?.scrollTop || 0;
 
@@ -108,18 +97,12 @@ export default function Forum({ user }: { user: any }) {
           if (res.ok) {
               const data = await res.json();
               if (data.length > 0) {
-                  // Prepend older messages
                   setMessages(prev => [...data.reverse(), ...prev]);
                   setOffset(prev => prev + LIMIT);
                   setHasMore(data.length === LIMIT);
-                  
-                  // Restore scroll position (conceptually)
-                  // In React, doing this perfectly after render needs layout effect, 
-                  // but we can try basic correction after a tick
                   setTimeout(() => {
                       if (scrollRef.current) {
                           const newHeight = scrollRef.current.scrollHeight;
-                          // Scroll down by the amount of content added
                           scrollRef.current.scrollTop = newHeight - currentHeight + currentScrollTop;
                       }
                   }, 50);
@@ -130,19 +113,14 @@ export default function Forum({ user }: { user: any }) {
       } catch (e) { console.error(e); } finally { setIsLoadingMore(false); }
   };
 
-  // --- EFFECTS ---
-
   useEffect(() => { if (user) { fetchGlobalProfile(); fetchProjects(); } }, [user]);
   
-  // When changing project, reset everything
   useEffect(() => { 
       setMessages([]);
       setOffset(0);
       setHasMore(true);
       fetchMessages(); 
   }, [activeProjectId]);
-
-  // --- ACTIONS ---
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !activeProjectId) return;
@@ -160,9 +138,6 @@ export default function Forum({ user }: { user: any }) {
             else notify(err.detail || "Error", "error");
         } else {
             setNewMessage("");
-            // Optimistic update or refresh? Refresh ensures ID and consistency.
-            // But to avoid jumping, maybe simpler to just append locally?
-            // Let's Refresh "Last 50" to be safe and scroll bottom.
             fetchMessages(true); 
         }
     } catch (e) { notify("Network Error", "error"); }
@@ -212,9 +187,9 @@ export default function Forum({ user }: { user: any }) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-screen flex flex-col">
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200">
+    // [FIX] Changed h-screen to h-full to fit within parent flex container
+    <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-full flex flex-col">
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 flex-shrink-0">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
             Project Discussion Board
@@ -238,12 +213,10 @@ export default function Forum({ user }: { user: any }) {
 
         <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden relative">
             
-            {/* [SCROLL CONTAINER] */}
             <div 
                 ref={scrollRef} 
                 className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/30 custom-scrollbar"
             >
-                {/* [LOAD MORE BUTTON] */}
                 {hasMore && !loading && (
                     <div className="flex justify-center pt-2 pb-4">
                         <button 
@@ -257,7 +230,6 @@ export default function Forum({ user }: { user: any }) {
                     </div>
                 )}
 
-                {/* MESSAGES */}
                 {loading && messages.length === 0 ? <div className="text-center italic text-slate-400 mt-10">Loading discussion...</div> : messages.length === 0 ? (
                     <div className="text-center mt-10">
                         <Icons.MessageSquare className="w-12 h-12 text-slate-200 mx-auto mb-2" />
@@ -309,7 +281,7 @@ export default function Forum({ user }: { user: any }) {
                 <div ref={bottomRef} />
             </div>
 
-            <div className="p-4 bg-white border-t border-slate-200">
+            <div className="p-4 bg-white border-t border-slate-200 flex-shrink-0">
                 <div className="relative border border-slate-300 rounded-md shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
                     <textarea 
                         value={newMessage}
