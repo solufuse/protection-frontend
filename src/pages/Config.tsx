@@ -1,9 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { 
-  Save, Trash2, Settings, Zap, Download, Activity, 
-  ChevronDown, ChevronRight, Upload, ShieldCheck,
-  Folder, HardDrive, Plus, Key, Link as LinkIcon, Clock, FileSignature
-} from 'lucide-react';
+import { Icons } from '../icons'; // [FIX] Centralized Import
 import Toast from '../components/Toast';
 
 interface Project {
@@ -13,7 +9,6 @@ interface Project {
 }
 
 export default function Config({ user }: { user: any }) {
-  // --- STATE ---
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   
@@ -72,7 +67,6 @@ export default function Config({ user }: { user: any }) {
     return await user.getIdToken(true); 
   };
 
-  // --- PROJECT API V2 ---
   const fetchProjects = async () => {
     try {
       const t = await getToken();
@@ -116,28 +110,22 @@ export default function Config({ user }: { user: any }) {
     } catch (e) { notify("Delete failed", "error"); }
   };
 
-  // --- CONFIG SYNC (Updated to /files) ---
   const loadFromSession = async () => {
     if (!user) return;
     setLoading(true);
     try {
         const token = await getToken();
         const pParam = activeProjectId ? `?project_id=${activeProjectId}` : "";
-        
-        // [FIX] /files/details
         const listRes = await fetch(`${apiUrl}/files/details${pParam}`, { 
             headers: { 'Authorization': `Bearer ${token}` } 
         });
-        
         if (!listRes.ok) throw new Error("Failed to list files");
         const listData = await listRes.json();
         const configFile = listData.files?.find((f: any) => f.filename.toLowerCase() === 'config.json');
         
         if (configFile) {
             const dlParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
-            // [FIX] /files/download
             const fileRes = await fetch(`${apiUrl}/files/download?filename=${encodeURIComponent(configFile.filename)}&token=${token}${dlParam}`);
-            
             if (!fileRes.ok) throw new Error("Failed to download config");
 
             const blob = await fileRes.blob();
@@ -183,13 +171,10 @@ export default function Config({ user }: { user: any }) {
       const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
       const formData = new FormData();
       formData.append('files', blob, 'config.json');
-      
       const pParam = activeProjectId ? `?project_id=${activeProjectId}` : "";
-      // [FIX] /files/upload
       const response = await fetch(`${apiUrl}/files/upload${pParam}`, { 
           method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData 
       });
-      
       if (!response.ok) throw new Error("Backend error");
       notify(`Saved to ${activeProjectId || "Storage"}`);
     } catch (e) { notify("Save error", "error"); }
@@ -254,29 +239,29 @@ export default function Config({ user }: { user: any }) {
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Configuration</label>
           <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
             {activeProjectId ? (
-                <><Folder className="w-5 h-5 text-blue-600" /><span>{activeProjectId}</span><span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">PROJECT</span></>
+                <><Icons.Folder className="w-5 h-5 text-blue-600" /><span>{activeProjectId}</span><span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">PROJECT</span></>
             ) : (
-                <><HardDrive className="w-5 h-5 text-slate-600" /><span>My Session</span><span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span></>
+                <><Icons.HardDrive className="w-5 h-5 text-slate-600" /><span>My Session</span><span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span></>
             )}
           </h1>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Key className="w-3.5 h-3.5" /> TOKEN</button>
+          <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
           <div className="w-px bg-slate-200 mx-1"></div>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
-          <button onClick={handleImportClick} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold"><Upload className="w-3.5 h-3.5" /> IMPORT</button>
-          <button onClick={handleDownload} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold"><Download className="w-3.5 h-3.5" /> EXPORT</button>
-          <button onClick={handleSaveToSession} disabled={loading} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow-sm disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {loading ? "SAVING..." : "SAVE CLOUD"}</button>
+          <button onClick={handleImportClick} className="flex items-center gap-1 bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold"><Icons.Upload className="w-3.5 h-3.5" /> IMPORT</button>
+          <button onClick={handleDownload} className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded border border-slate-300 text-slate-600 font-bold"><Icons.Download className="w-3.5 h-3.5" /> EXPORT</button>
+          <button onClick={handleSaveToSession} disabled={loading} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow-sm disabled:opacity-50"><Icons.Save className="w-3.5 h-3.5" /> {loading ? "SAVING..." : "SAVE CLOUD"}</button>
         </div>
       </div>
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
         <div className="w-60 flex flex-col gap-4 flex-shrink-0 overflow-y-auto custom-scrollbar">
             <div onClick={() => setActiveProjectId(null)} className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null ? 'bg-slate-800 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
-                <HardDrive className="w-4 h-4" />
+                <Icons.HardDrive className="w-4 h-4" />
                 <div className="flex flex-col"><span className="font-bold uppercase tracking-wide">My Session</span><span className={`text-[9px] ${activeProjectId === null ? 'text-slate-400' : 'text-slate-400'}`}>Private Config</span></div>
             </div>
             <div className="border-t border-slate-200 my-1"></div>
-            <div className="flex justify-between items-center px-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span><button onClick={() => setIsCreatingProject(!isCreatingProject)} className="p-1 hover:bg-blue-50 text-blue-600 rounded transition-colors"><Plus className="w-3.5 h-3.5" /></button></div>
+            <div className="flex justify-between items-center px-1"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shared Projects</span><button onClick={() => setIsCreatingProject(!isCreatingProject)} className="p-1 hover:bg-blue-50 text-blue-600 rounded transition-colors"><Icons.Plus className="w-3.5 h-3.5" /></button></div>
             {isCreatingProject && (
                 <div className="flex gap-1">
                     <input className="w-full text-[10px] p-1.5 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Project ID..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && createProject()} autoFocus />
@@ -286,8 +271,8 @@ export default function Config({ user }: { user: any }) {
             <div className="flex-1 flex flex-col gap-1">
                 {projects.map(p => (
                     <div key={p.id} onClick={() => setActiveProjectId(p.id)} className={`group flex justify-between items-center p-2 rounded cursor-pointer border transition-all ${activeProjectId === p.id ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:border-slate-200'}`}>
-                        <div className="flex items-center gap-2 overflow-hidden"><Folder className={`w-3.5 h-3.5 ${activeProjectId === p.id ? 'text-blue-200' : 'text-slate-400'}`} /><span className="font-bold truncate">{p.id}</span></div>
-                        <button onClick={(e) => deleteProject(p.id, e)} className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}><Trash2 className="w-3 h-3" /></button>
+                        <div className="flex items-center gap-2 overflow-hidden"><Icons.Folder className={`w-3.5 h-3.5 ${activeProjectId === p.id ? 'text-blue-200' : 'text-slate-400'}`} /><span className="font-bold truncate">{p.id}</span></div>
+                        <button onClick={(e) => deleteProject(p.id, e)} className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${activeProjectId === p.id ? 'hover:bg-blue-700 text-white' : 'hover:bg-red-100 text-red-400'}`}><Icons.Trash2 className="w-3 h-3" /></button>
                     </div>
                 ))}
             </div>
@@ -297,16 +282,15 @@ export default function Config({ user }: { user: any }) {
                 <div className="grid grid-cols-12 gap-6 pb-10">
                     <div className="col-span-12 lg:col-span-8 space-y-4">
                         <div className="bg-white border border-slate-200 rounded shadow-sm p-3 flex items-center gap-4">
-                            <FileSignature className="w-5 h-5 text-slate-400" />
+                            <Icons.FileSignature className="w-5 h-5 text-slate-400" />
                             <div className="flex-1">
                                 <label className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Internal Project Name / Case ID</label>
                                 <input type="text" value={config.project_name || ""} onChange={e => setConfig({...config, project_name: e.target.value})} className="w-full text-lg font-black text-slate-800 bg-transparent outline-none border-b border-transparent hover:border-slate-200 focus:border-blue-500 placeholder-slate-300" placeholder="PROJECT_NAME" />
                             </div>
                         </div>
-                        {/* Sections (Inrush, Links, Loadflow, Protection, Coordination) - Kept identical structure */}
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('inrush')}>
-                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.inrush ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Activity className="w-3.5 h-3.5 text-orange-500" /> Transformers (Inrush)</h2>
+                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.inrush ? <Icons.ChevronDown className="w-3 h-3"/> : <Icons.ChevronRight className="w-3 h-3"/>} <Icons.Activity className="w-3.5 h-3.5 text-orange-500" /> Transformers (Inrush)</h2>
                             {openSections.inrush && <button onClick={e => { e.stopPropagation(); setConfig({...config, transformers: [...(config.transformers || []), {name: "TX-NEW", sn_kva: 0, u_kv: 0, ratio_iencl: 8, tau_ms: 400}]})}} className="text-[9px] font-bold bg-white text-orange-600 px-2 py-0.5 rounded border border-orange-200 hover:bg-orange-50 transition-colors">+ ADD TX</button>}
                             </div>
                             {openSections.inrush && (
@@ -321,7 +305,7 @@ export default function Config({ user }: { user: any }) {
                                         <td><input type="number" value={tx.u_kv} onChange={e => { const n = [...config.transformers]; n[i].u_kv = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none focus:border-b focus:border-blue-300"/></td>
                                         <td><input type="number" value={tx.ratio_iencl} onChange={e => { const n = [...config.transformers]; n[i].ratio_iencl = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none focus:border-b focus:border-blue-300"/></td>
                                         <td><input type="number" value={tx.tau_ms} onChange={e => { const n = [...config.transformers]; n[i].tau_ms = parseFloat(e.target.value); setConfig({...config, transformers: n}); }} className="w-full text-center bg-transparent outline-none focus:border-b focus:border-blue-300"/></td>
-                                        <td><button onClick={() => setConfig({...config, transformers: config.transformers.filter((_:any,idx:number)=>idx!==i)})} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3"/></button></td>
+                                        <td><button onClick={() => setConfig({...config, transformers: config.transformers.filter((_:any,idx:number)=>idx!==i)})} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Icons.Trash2 className="w-3 h-3"/></button></td>
                                     </tr>
                                     ))}
                                 </tbody>
@@ -331,7 +315,7 @@ export default function Config({ user }: { user: any }) {
                         </div>
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('links')}>
-                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.links ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <LinkIcon className="w-3.5 h-3.5 text-green-600" /> Network Links / Cables</h2>
+                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.links ? <Icons.ChevronDown className="w-3 h-3"/> : <Icons.ChevronRight className="w-3 h-3"/>} <Icons.Link className="w-3.5 h-3.5 text-green-600" /> Network Links / Cables</h2>
                             {openSections.links && <button onClick={e => { e.stopPropagation(); setConfig({...config, links_data: [...(config.links_data || []), {id: "LINK-1", length_km: 1.0, impedance_zd: "0+j0", impedance_z0: "0+j0"}]})}} className="text-[9px] font-bold bg-white text-green-600 px-2 py-0.5 rounded border border-green-200 hover:bg-green-50 transition-colors">+ ADD LINK</button>}
                             </div>
                             {openSections.links && (
@@ -345,7 +329,7 @@ export default function Config({ user }: { user: any }) {
                                         <td><input type="number" value={l.length_km} onChange={e => { const n = [...config.links_data]; n[i].length_km = parseFloat(e.target.value); setConfig({...config, links_data: n}); }} className="w-full text-center bg-transparent outline-none focus:border-b focus:border-green-300"/></td>
                                         <td><input value={l.impedance_zd} onChange={e => { const n = [...config.links_data]; n[i].impedance_zd = e.target.value; setConfig({...config, links_data: n}); }} className="w-full text-center bg-transparent outline-none focus:border-b focus:border-green-300"/></td>
                                         <td><input value={l.impedance_z0} onChange={e => { const n = [...config.links_data]; n[i].impedance_z0 = e.target.value; setConfig({...config, links_data: n}); }} className="w-full text-center bg-transparent outline-none focus:border-b focus:border-green-300"/></td>
-                                        <td><button onClick={() => setConfig({...config, links_data: config.links_data.filter((_:any,idx:number)=>idx!==i)})} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3"/></button></td>
+                                        <td><button onClick={() => setConfig({...config, links_data: config.links_data.filter((_:any,idx:number)=>idx!==i)})} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Icons.Trash2 className="w-3 h-3"/></button></td>
                                     </tr>
                                     ))}
                                 </tbody>
@@ -355,7 +339,7 @@ export default function Config({ user }: { user: any }) {
                         </div>
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('loadflow')}>
-                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.loadflow ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Zap className="w-3.5 h-3.5 text-yellow-500" /> Loadflow Analysis</h2>
+                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.loadflow ? <Icons.ChevronDown className="w-3 h-3"/> : <Icons.ChevronRight className="w-3 h-3"/>} <Icons.Zap className="w-3.5 h-3.5 text-yellow-500" /> Loadflow Analysis</h2>
                             </div>
                             {openSections.loadflow && (
                             <div className="p-3 border-t border-slate-100 grid grid-cols-3 gap-4">
@@ -367,7 +351,7 @@ export default function Config({ user }: { user: any }) {
                         </div>
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('protection')}>
-                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.protection ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Protection Settings (ANSI 51)</h2>
+                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.protection ? <Icons.ChevronDown className="w-3 h-3"/> : <Icons.ChevronRight className="w-3 h-3"/>} <Icons.ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Protection Settings (ANSI 51)</h2>
                             </div>
                             {openSections.protection && config.settings?.ansi_51 && (
                             <div className="p-4 border-t border-slate-100 flex flex-col gap-6">
@@ -376,7 +360,7 @@ export default function Config({ user }: { user: any }) {
                                     return (
                                         <div key={category} className="border border-slate-200 rounded overflow-hidden">
                                             <div className="bg-slate-50 px-3 py-1.5 font-black text-slate-700 uppercase text-[10px] flex items-center gap-2 border-b border-slate-200">
-                                                <Clock className="w-3.5 h-3.5 text-slate-400"/> {category}
+                                                <Icons.Clock className="w-3.5 h-3.5 text-slate-400"/> {category}
                                             </div>
                                             <div className="p-0">
                                                 <div className="grid grid-cols-12 gap-1 bg-slate-50/50 px-3 py-1 border-b border-slate-100 text-[9px] text-slate-400 uppercase tracking-widest font-bold">
@@ -411,7 +395,7 @@ export default function Config({ user }: { user: any }) {
                         </div>
                         <div className="bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold">
                             <div className="flex justify-between items-center p-2 bg-slate-50 cursor-pointer" onClick={() => toggleSection('coordination')}>
-                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.coordination ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>} <Settings className="w-3.5 h-3.5 text-indigo-500" /> Coordination Plans</h2>
+                            <h2 className="font-bold flex items-center gap-1.5 text-slate-700 uppercase">{openSections.coordination ? <Icons.ChevronDown className="w-3 h-3"/> : <Icons.ChevronRight className="w-3 h-3"/>} <Icons.Settings className="w-3.5 h-3.5 text-indigo-500" /> Coordination Plans</h2>
                             {openSections.coordination && <button onClick={e => { e.stopPropagation(); setConfig({...config, plans: [...(config.plans || []), {id: "ID_NEW", title: "New Plan", type: "TRANSFORMER", ct_primary: "CT 0/1 A", related_source: "TX-1", active_functions: ["51"]}]})}} className="text-[9px] font-bold bg-white text-indigo-600 px-2 py-0.5 rounded border border-indigo-200 hover:bg-indigo-50 font-bold">+ ADD PLAN</button>}
                             </div>
                             {openSections.coordination && (
@@ -428,7 +412,7 @@ export default function Config({ user }: { user: any }) {
                                         <td><div className="flex gap-1"><input placeholder="From" value={p.bus_from || ""} onChange={e => { const n = [...config.plans]; n[i].bus_from = e.target.value; setConfig({...config, plans: n}); }} className="w-1/2 bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-300 outline-none text-[9px] text-center"/><input placeholder="To" value={p.bus_to || ""} onChange={e => { const n = [...config.plans]; n[i].bus_to = e.target.value; setConfig({...config, plans: n}); }} className="w-1/2 bg-transparent border-b border-dashed border-slate-200 focus:border-indigo-300 outline-none text-[9px] text-center"/></div></td>
                                         <td><input value={p.ct_primary} onChange={e => { const n = [...config.plans]; n[i].ct_primary = e.target.value; setConfig({...config, plans: n}); }} className="w-full bg-transparent outline-none focus:border-b focus:border-indigo-300"/></td>
                                         <td><input value={p.active_functions?.join(', ')} onChange={e => { const n = [...config.plans]; n[i].active_functions = e.target.value.split(',').map(s => s.trim()); setConfig({...config, plans: n}); }} className="w-full bg-transparent text-indigo-600 outline-none font-bold focus:border-b focus:border-indigo-300"/></td>
-                                        <td><button onClick={() => setConfig({...config, plans: config.plans.filter((_:any,idx:number)=>idx!==i)})} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 className="w-3 h-3"/></button></td>
+                                        <td><button onClick={() => setConfig({...config, plans: config.plans.filter((_:any,idx:number)=>idx!==i)})} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Icons.Trash2 className="w-3 h-3"/></button></td>
                                     </tr>
                                     ))}
                                 </tbody>

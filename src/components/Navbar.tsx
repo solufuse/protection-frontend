@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { Icons } from '../icons';
 import { auth } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { Menu, X } from 'lucide-react';
 
 interface NavbarProps {
   user: any;
@@ -34,8 +33,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
     ? "bg-slate-900 text-white shadow-md" 
     : "text-slate-500 hover:bg-slate-100 hover:text-slate-900";
 
-  // [FIX] This function caused the build error because it was unused.
-  // We now use it in the dropdown menu below.
   const handleGoogleLogin = async () => {
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
@@ -71,11 +68,12 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
             
             {/* LEFT */}
             <div className="flex items-center gap-4 lg:gap-8">
+              {/* [FIX] Used Icons.Menu and Icons.X instead of direct import */}
               <button 
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
               >
-                {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                {showMobileMenu ? <Icons.X className="w-6 h-6" /> : <Icons.Menu className="w-6 h-6" />}
               </button>
 
               <Link to="/loadflow" className="brand-container flex items-center gap-2 transition-all duration-300">
@@ -130,7 +128,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                         </Link>
                     </div>
                     
-                    {/* [FIX] Restored Login Button to use handleGoogleLogin */}
                     <div className="p-2 flex flex-col gap-1">
                       {user.isAnonymous ? (
                         <button onClick={handleGoogleLogin} className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-slate-700 hover:text-blue-700 transition-colors group">
