@@ -4,7 +4,7 @@ import { Icons } from '../icons';
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
-import { auth } from '../firebase';
+// [FIX] Removed unused 'auth' import to satisfy TypeScript compiler
 
 // Types pour les messages
 interface Message {
@@ -144,8 +144,6 @@ export default function Forum({ user }: { user: any }) {
       }
   };
 
-  // --- RENDER ---
-  
   // Helper to display nice names
   const getActiveProjectName = () => {
       if (!activeProjectId) return "Select a Channel";
@@ -183,7 +181,7 @@ export default function Forum({ user }: { user: any }) {
           projects={projects}
           activeProjectId={activeProjectId}
           setActiveProjectId={setActiveProjectId}
-          // On désactive les fonctions inutiles pour le Forum (pas de création/suppression depuis ici pour l'instant)
+          // On désactive les fonctions inutiles pour le Forum
           isCreatingProject={false}
           setIsCreatingProject={() => {}}
           newProjectName=""
