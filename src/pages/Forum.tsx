@@ -64,7 +64,8 @@ export default function Forum({ user }: { user: any }) {
     } catch (e) { console.error(e); }
   };
 
-  const fetchMessages = async (isRefresh = false) => {
+  // [FIX] Removed unused parameter 'isRefresh'
+  const fetchMessages = async () => {
     if (!activeProjectId) return;
     setLoading(true);
     try {
@@ -138,14 +139,14 @@ export default function Forum({ user }: { user: any }) {
             else notify(err.detail || "Error", "error");
         } else {
             setNewMessage("");
-            fetchMessages(true); 
+            // [FIX] Updated call to remove argument
+            fetchMessages(); 
         }
     } catch (e) { notify("Network Error", "error"); }
     finally { setSending(false); }
   };
 
   const handleDeleteMessage = async (msgId: number) => {
-      // [FIX] Removed confirmation check for instant deletion
       try {
           const t = await getToken();
           const res = await fetch(`${API_URL}/messages/${msgId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
