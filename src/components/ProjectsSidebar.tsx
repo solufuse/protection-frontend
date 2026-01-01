@@ -54,16 +54,22 @@ export default function ProjectsSidebar({
     
   const [searchTerm, setSearchTerm] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
+  
+  // States for collapsible sections
   const [isSessionsExpanded, setIsSessionsExpanded] = useState(false);
+  const [isAdminSectionExpanded, setIsAdminSectionExpanded] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('solufuse_favorites');
     if (saved) setFavorites(JSON.parse(saved));
   }, []);
 
-  // [!] UX FIX: Auto-expand if searching OR if viewing a user session
+  // Auto-expand logic
   useEffect(() => {
-    if (searchTerm.trim() !== "" || activeSessionUid) {
+    if (searchTerm.trim() !== "") {
+        setIsSessionsExpanded(true);
+        setIsAdminSectionExpanded(true);
+    } else if (activeSessionUid) {
         setIsSessionsExpanded(true);
     }
   }, [searchTerm, activeSessionUid]);
@@ -94,35 +100,92 @@ export default function ProjectsSidebar({
 
   const canViewSessions = ['super_admin', 'admin', 'moderator'].includes(userGlobalData?.global_role);
 
-  const filteredProjects = projects
-    .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort((a, b) => {
-        const aFav = favorites.includes(a.id);
-        const bFav = favorites.includes(b.id);
-        if (aFav && !bFav) return -1;
-        if (!aFav && bFav) return 1;
-        return a.name.localeCompare(b.name);
-    });
+  // --- SMART GROUPING LOGIC ---
+  
+  // 1. PUBLIC PROJECTS (Always Top)
+  const publicProjects = projects.filter(p => p.id.startsWith("PUBLIC_"));
+
+  // 2. MY WORKSPACE (Favorites + Owned + Not Public)
+  const myWorkspaceProjects = projects.filter(p => {
+      if (p.id.startsWith("PUBLIC_")) return false;
+      // It's mine if I'm owner OR if I starred it
+      return p.role === 'owner' || favorites.includes(p.id);
+  });
+
+  // 3. OTHER / ADMIN VIEW (Everything else)
+  const otherProjects = projects.filter(p => {
+      if (p.id.startsWith("PUBLIC_")) return false;
+      return p.role !== 'owner' && !favorites.includes(p.id);
+  });
+
+  // Filter function for search
+  const filterList = (list: Project[]) => {
+      return list.filter(p => 
+          p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+          p.id.toLowerCase().includes(searchTerm.toLowerCase())
+      ).sort((a, b) => a.name.localeCompare(b.name));
+  };
 
   const filteredUsers = (usersList || [])
     .filter(u => (u.username || "").toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  // Reusable Project Item Component
+  const ProjectItem = ({ p }: { p: Project }) => {
+      const isFav = favorites.includes(p.id);
+      const isActive = activeProjectId === p.id;
+      return (
+        <div 
+          onClick={() => handleSelectProject(p.id)} 
+          className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer border transition-all mb-0.5 ${isActive ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50'}`}
+        >
+          <div className="flex items-center gap-2 overflow-hidden truncate">
+            {p.id.startsWith("PUBLIC_") ? (
+                <Icons.Hash className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-400'}`} />
+            ) : p.role === 'owner' ? (
+                <span title="Owner" className="text-[10px]">👑</span>
+            ) : (
+                <Icons.Folder className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-300'}`} />
+            )}
+            <span className="font-bold truncate text-[10px]">{p.name}</span>
+          </div>
+
+          <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+              <button 
+                  onClick={(e) => toggleFavorite(p.id, e)}
+                  className={`${isFav ? 'opacity-100 text-yellow-400' : 'opacity-0 group-hover:opacity-100 text-slate-300 hover:text-yellow-400'} transition-opacity`}
+              >
+                  <Icons.Star className="w-3 h-3 fill-current" />
+              </button>
+
+              {p.role !== 'moderator' && (
+                <button 
+                  onClick={(e) => onDeleteProject(p.id, e)} 
+                  className={`p-0.5 rounded transition-opacity ${isActive ? 'text-blue-200 hover:bg-blue-700' : 'opacity-0 group-hover:opacity-100 hover:bg-red-100 text-red-400'}`}
+                >
+                  <Icons.Trash className="w-2.5 h-2.5" />
+                </button>
+              )}
+          </div>
+        </div>
+      );
+  };
+
   return (
     <div className="w-60 flex flex-col gap-2 h-full">
       
-      {/* 1. SEARCH BAR */}
-      <div className="relative mb-2">
+      {/* SEARCH */}
+      <div className="relative mb-1">
         <Icons.Search className="absolute left-2 top-1.5 w-3 h-3 text-slate-400" />
         <input 
             type="text" 
-            placeholder="Search projects..." 
+            placeholder="Search..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded pl-7 pr-2 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
         />
       </div>
 
-      {/* 2. MY SESSION */}
+      {/* MY SESSION */}
       <div 
         onClick={handleSelectMySession} 
         className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer border transition-all ${activeProjectId === null && (!activeSessionUid) ? 'bg-slate-800 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50'}`}
@@ -133,9 +196,17 @@ export default function ProjectsSidebar({
 
       <div className="border-t border-slate-100 my-1"></div>
 
-      {/* 3. PROJECTS HEADER */}
-      <div className="flex justify-between items-center px-1 group">
-        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Projects</span>
+      {/* --- SECTION 1: COMMUNITY (Public) --- */}
+      <div className="flex justify-between items-center px-1 mb-1">
+        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Community</span>
+      </div>
+      <div className="flex flex-col">
+          {filterList(publicProjects).map(p => <ProjectItem key={p.id} p={p} />)}
+      </div>
+
+      {/* --- SECTION 2: MY WORKSPACE (Owner + Favorites) --- */}
+      <div className="flex justify-between items-center px-1 mt-3 mb-1 group">
+        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">My Workspace</span>
         <button 
           disabled={user?.isAnonymous} 
           onClick={() => setIsCreatingProject(!isCreatingProject)} 
@@ -144,12 +215,12 @@ export default function ProjectsSidebar({
           <Icons.Plus className="w-3 h-3" />
         </button>
       </div>
-
+      
       {isCreatingProject && (
         <div className="flex gap-1 mb-2">
           <input 
             className="w-full text-[10px] p-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" 
-            placeholder="Name..." 
+            placeholder="New Project Name..." 
             value={newProjectName} 
             onChange={(e) => setNewProjectName(e.target.value)} 
             onKeyDown={(e) => e.key === 'Enter' && onCreateProject()} 
@@ -159,59 +230,39 @@ export default function ProjectsSidebar({
         </div>
       )}
 
-      {/* 4. PROJECTS LIST */}
-      <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 custom-scrollbar pr-1 min-h-[100px]">
-        {filteredProjects.map(p => {
-          const isFav = favorites.includes(p.id);
-          const isActive = activeProjectId === p.id;
-          
-          return (
-            <div 
-              key={p.id} 
-              onClick={() => handleSelectProject(p.id)} 
-              className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50'}`}
-            >
-              <div className="flex items-center gap-2 overflow-hidden truncate">
-                {p.id.startsWith("PUBLIC_") ? (
-                    <Icons.Hash className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-400'}`} />
-                ) : p.role === 'owner' ? (
-                    <span title="Owner" className="text-[10px]">👑</span>
-                ) : (
-                    <Icons.Folder className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-300'}`} />
-                )}
-                <span className="font-bold truncate text-[10px]">{p.name}</span>
-              </div>
-
-              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                  <button 
-                      onClick={(e) => toggleFavorite(p.id, e)}
-                      className={`${isFav ? 'opacity-100 text-yellow-400' : 'opacity-0 group-hover:opacity-100 text-slate-300 hover:text-yellow-400'} transition-opacity`}
-                  >
-                      <Icons.Star className="w-3 h-3 fill-current" />
-                  </button>
-
-                  {/* [!] FIX: Show delete button even if active, but style it differently */}
-                  {p.role !== 'moderator' && (
-                    <button 
-                      onClick={(e) => onDeleteProject(p.id, e)} 
-                      className={`p-0.5 rounded transition-opacity ${isActive ? 'text-blue-200 hover:bg-blue-700' : 'opacity-0 group-hover:opacity-100 hover:bg-red-100 text-red-400'}`}
-                    >
-                      <Icons.Trash className="w-2.5 h-2.5" />
-                    </button>
-                  )}
-              </div>
-            </div>
-          );
-        })}
-        {filteredProjects.length === 0 && (
-            <div className="text-[9px] text-slate-300 text-center py-2 italic">No projects found</div>
-        )}
+      <div className="flex flex-col min-h-[50px]">
+          {filterList(myWorkspaceProjects).length === 0 && !isCreatingProject && (
+              <div className="text-[9px] text-slate-300 px-2 italic">No personal projects</div>
+          )}
+          {filterList(myWorkspaceProjects).map(p => <ProjectItem key={p.id} p={p} />)}
       </div>
 
-      {/* 5. USER SESSIONS */}
-      {canViewSessions && (
+      {/* --- SECTION 3: SHARED / ADMIN (Collapsible) --- */}
+      {filterList(otherProjects).length > 0 && (
+          <>
+            <div className="border-t border-slate-100 my-2"></div>
+            <div 
+                onClick={() => setIsAdminSectionExpanded(!isAdminSectionExpanded)}
+                className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 rounded p-0.5"
+            >
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                    Shared / Admin ({filterList(otherProjects).length})
+                </span>
+                <Icons.ArrowRight className={`w-3 h-3 text-slate-300 transition-transform ${isAdminSectionExpanded ? 'rotate-90' : ''}`} />
+            </div>
+            
+            {isAdminSectionExpanded && (
+                <div className="flex flex-col animate-in fade-in slide-in-from-top-1 duration-200">
+                    {filterList(otherProjects).map(p => <ProjectItem key={p.id} p={p} />)}
+                </div>
+            )}
+          </>
+      )}
+
+      {/* --- SECTION 4: USER SESSIONS (Collapsible Admin) --- */}
+      {canViewSessions && filteredUsers && (
         <>
-          <div className="border-t border-slate-200 my-1"></div>
+          <div className="border-t border-slate-200 my-2"></div>
           
           <div 
             onClick={() => setIsSessionsExpanded(!isSessionsExpanded)}
@@ -219,7 +270,7 @@ export default function ProjectsSidebar({
           >
             <div className="flex items-center gap-2">
                 <Icons.Shield className="w-3 h-3 text-red-500" />
-                <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Sessions ({filteredUsers.length})</span>
+                <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">User Sessions ({filteredUsers.length})</span>
             </div>
             <Icons.ArrowRight className={`w-3 h-3 text-slate-300 transition-transform duration-200 ${isSessionsExpanded ? 'rotate-90' : ''}`} />
           </div>
