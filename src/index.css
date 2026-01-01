@@ -9,6 +9,8 @@ html {
 }
 
 body {
+  /* Base size increased to 14px (text-sm equivalent) for better reading */
+  font-size: 14px; 
   @apply bg-slate-50 text-slate-900 transition-colors duration-300;
   padding-right: 0 !important;
 }
@@ -28,7 +30,7 @@ body {
   @apply bg-slate-400;
 }
 
-/* --- DARK MODE OVERRIDES (The "Colab" Palette) --- */
+/* --- DARK MODE OVERRIDES --- */
 .dark body {
   background-color: #1e1e1e !important;
   color: #e0e0e0 !important;
@@ -38,50 +40,46 @@ body {
 
 @layer utilities {
   
-  /* --- [NEW] GOOGLE COLAB / MATERIAL ROUNDING --- */
+  /* --- [NEW] FONT SIZE UPSCALING (LISIBILITÉ) --- */
+  /* On redéfinit les classes "micro" pour qu'elles soient lisibles */
   
-  /* 1. Containers & Inputs (Soft Squares) - Increased from 6px to 12px */
-  .rounded,
-  .rounded-md,
-  .rounded-lg,
-  .rounded-xl,
-  .rounded-2xl,
+  /* 8px devient 10px (Badges minuscules) */
+  .text-\[8px\] { font-size: 10px !important; }
+  
+  /* 9px devient 11px (Dates, métadonnées) */
+  .text-\[9px\] { font-size: 11px !important; }
+  
+  /* 10px devient 12px (Contenu dense, Sidebar) */
+  .text-\[10px\] { font-size: 12px !important; }
+  
+  /* 11px devient 13px (Corps de texte secondaire) */
+  .text-\[11px\] { font-size: 13px !important; }
+  
+  /* text-xs (12px) passe à 13px pour plus de confort */
+  .text-xs { font-size: 13px !important; }
+
+  /* ---------------------------------------------- */
+
+  /* --- GOOGLE COLAB / MATERIAL ROUNDING --- */
+  .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl,
   input, select, textarea {
-      border-radius: 12px !important; /* Beaucoup plus doux */
+      border-radius: 12px !important;
   }
+  button { border-radius: 9999px !important; }
+  input[type="checkbox"], input[type="radio"] { border-radius: 4px !important; }
+  .rounded-full { border-radius: 9999px !important; }
 
-  /* 2. Buttons (Pill / Capsule Shape) - Force full roundness for buttons */
-  button {
-      border-radius: 9999px !important; /* Style "Pilule" typique Google */
-  }
-
-  /* Exception: Checkboxes or tiny elements shouldn't be pills */
-  input[type="checkbox"], input[type="radio"] {
-      border-radius: 4px !important;
-  }
-
-  /* IMPORTANT : Protéger les éléments déjà ronds */
-  .rounded-full {
-      border-radius: 9999px !important;
-  }
-  /* ---------------------------------------- */
-
-
-  /* 2. Containers / Cards (Fond) */
+  /* --- DARK MODE FIXES --- */
   .dark .bg-white {
     background-color: #252526 !important;
     border-color: #383838 !important;
   }
-  
-  /* 3. Page Backgrounds */
   .dark .bg-slate-50, .dark .bg-slate-100 { background-color: #1e1e1e !important; }
 
-  /* 4. Text Colors */
   .dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700, .dark .text-gray-700 { color: #e0e0e0 !important; }
   .dark .text-slate-600, .dark .text-slate-500 { color: #a0a0a0 !important; }
-  .dark .text-slate-400 { color: #757575 !important; }
+  .dark .text-slate-400 { color: #858585 !important; } /* Eclairci légèrement pour le contraste */
 
-  /* 5. Borders & Dividers */
   .dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-300,
   .dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]),
   .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
@@ -89,26 +87,23 @@ body {
     border-color: #383838 !important;
   }
 
-  /* 6. Inputs & Selects */
   .dark input, .dark select, .dark textarea {
     background-color: #2d2d2d !important;
     color: #e0e0e0 !important;
     border-color: #383838 !important;
   }
-  
   .dark input:focus, .dark select:focus, .dark textarea:focus {
     border-color: #f59e0b !important;
     ring-color: #f59e0b !important;
   }
 
-  /* 7. Hover States */
   .dark .hover\:bg-slate-50:hover { background-color: #2a2d2e !important; }
   .dark .shadow-sm, .dark .shadow-md { box-shadow: none !important; }
 }
 
 /* Global Smooth Transition */
 *, ::before, ::after {
-   transition-property: background-color, border-color, color, fill, stroke, border-radius;
+   transition-property: background-color, border-color, color, fill, stroke, border-radius, font-size;
    transition-duration: 200ms;
    transition-timing-function: ease-in-out;
 }
