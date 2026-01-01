@@ -54,8 +54,6 @@ export default function ProjectsSidebar({
     
   const [searchTerm, setSearchTerm] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
-  
-  // [+] STATE: Pour ouvrir/fermer la liste des sessions
   const [isSessionsExpanded, setIsSessionsExpanded] = useState(false);
 
   useEffect(() => {
@@ -63,12 +61,12 @@ export default function ProjectsSidebar({
     if (saved) setFavorites(JSON.parse(saved));
   }, []);
 
-  // [+] INTELLIGENCE: Si on cherche, on ouvre automatiquement la liste
+  // [!] UX FIX: Auto-expand if searching OR if viewing a user session
   useEffect(() => {
-    if (searchTerm.trim() !== "") {
+    if (searchTerm.trim() !== "" || activeSessionUid) {
         setIsSessionsExpanded(true);
     }
-  }, [searchTerm]);
+  }, [searchTerm, activeSessionUid]);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -192,10 +190,11 @@ export default function ProjectsSidebar({
                       <Icons.Star className="w-3 h-3 fill-current" />
                   </button>
 
-                  {p.role !== 'moderator' && !isActive && (
+                  {/* [!] FIX: Show delete button even if active, but style it differently */}
+                  {p.role !== 'moderator' && (
                     <button 
                       onClick={(e) => onDeleteProject(p.id, e)} 
-                      className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-100 text-red-400 rounded transition-opacity"
+                      className={`p-0.5 rounded transition-opacity ${isActive ? 'text-blue-200 hover:bg-blue-700' : 'opacity-0 group-hover:opacity-100 hover:bg-red-100 text-red-400'}`}
                     >
                       <Icons.Trash className="w-2.5 h-2.5" />
                     </button>
@@ -209,12 +208,11 @@ export default function ProjectsSidebar({
         )}
       </div>
 
-      {/* 5. USER SESSIONS (SMART COLLAPSIBLE) */}
-      {canViewSessions && filteredUsers && (
+      {/* 5. USER SESSIONS */}
+      {canViewSessions && (
         <>
           <div className="border-t border-slate-200 my-1"></div>
           
-          {/* Header Clickable */}
           <div 
             onClick={() => setIsSessionsExpanded(!isSessionsExpanded)}
             className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 rounded p-0.5 select-none"
@@ -223,11 +221,9 @@ export default function ProjectsSidebar({
                 <Icons.Shield className="w-3 h-3 text-red-500" />
                 <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Sessions ({filteredUsers.length})</span>
             </div>
-            {/* Rotate Arrow to simulate Chevron */}
             <Icons.ArrowRight className={`w-3 h-3 text-slate-300 transition-transform duration-200 ${isSessionsExpanded ? 'rotate-90' : ''}`} />
           </div>
           
-          {/* List (Conditional) */}
           {isSessionsExpanded && (
               <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 custom-scrollbar pr-1 max-h-[150px] animate-in fade-in slide-in-from-top-1 duration-200">
                 {filteredUsers.map(u => (
