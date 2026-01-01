@@ -17,8 +17,24 @@ import Profile from './pages/Profile';
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // [+] Dark Mode State
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // [+] Init Theme
   useEffect(() => {
+    // Check LocalStorage or System Preference
+    const savedTheme = localStorage.getItem('solufuse_theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+        setIsDarkMode(true);
+        document.documentElement.classList.add('dark');
+    } else {
+        setIsDarkMode(false);
+        document.documentElement.classList.remove('dark');
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
@@ -34,15 +50,27 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 text-slate-400 font-bold text-xs">LOADING SYSTEM...</div>;
+  // [+] Toggle Function
+  const toggleTheme = () => {
+      const newMode = !isDarkMode;
+      setIsDarkMode(newMode);
+      if (newMode) {
+          document.documentElement.classList.add('dark');
+          localStorage.setItem('solufuse_theme', 'dark');
+      } else {
+          document.documentElement.classList.remove('dark');
+          localStorage.setItem('solufuse_theme', 'light');
+      }
+  };
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 font-bold text-xs">LOADING SYSTEM...</div>;
 
   return (
     <BrowserRouter>
-      {/* Top Navbar Layout */}
-      <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
-        {user && <Navbar user={user} onLogout={() => auth.signOut()} />}
+      {/* Top Navbar Layout with Dark Mode support */}
+      <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+        {user && <Navbar user={user} onLogout={() => auth.signOut()} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />}
         
-        {/* [FIX] overflow-y-scroll forces scrollbar track visible always (prevents layout shift) */}
         <main className="flex-1 overflow-y-scroll relative flex flex-col w-full">
           <Routes>
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
