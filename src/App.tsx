@@ -11,33 +11,30 @@ import Ingestion from './pages/Ingestion';
 import Config from './pages/Config';
 import Extraction from './pages/Extraction';
 import Login from './pages/Login';
-import Forum from './pages/Forum';
-import Profile from './pages/Profile';
+import Forum from './pages/Forum'; // [RESTORED]
+import Profile from './pages/Profile'; // [RESTORED]
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // Initialize state based on localStorage or System Pref
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-      const saved = localStorage.getItem('solufuse_theme');
-      if (saved) return saved === 'dark';
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
+  // Dark Mode State
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // [FIX] Sync Logic: Updates DOM whenever 'isDarkMode' changes
   useEffect(() => {
-    const root = document.documentElement;
-    if (isDarkMode) {
-      root.classList.add('dark');
-      localStorage.setItem('solufuse_theme', 'dark');
+    // Init Theme
+    const savedTheme = localStorage.getItem('solufuse_theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+        setIsDarkMode(true);
+        document.documentElement.classList.add('dark');
     } else {
-      root.classList.remove('dark');
-      localStorage.setItem('solufuse_theme', 'light');
+        setIsDarkMode(false);
+        document.documentElement.classList.remove('dark');
     }
-  }, [isDarkMode]);
 
-  useEffect(() => {
+    // Auth Listener
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
@@ -54,7 +51,15 @@ export default function App() {
   }, []);
 
   const toggleTheme = () => {
-      setIsDarkMode(prev => !prev);
+      const newMode = !isDarkMode;
+      setIsDarkMode(newMode);
+      if (newMode) {
+          document.documentElement.classList.add('dark');
+          localStorage.setItem('solufuse_theme', 'dark');
+      } else {
+          document.documentElement.classList.remove('dark');
+          localStorage.setItem('solufuse_theme', 'light');
+      }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 font-bold text-xs">LOADING SYSTEM...</div>;
@@ -72,6 +77,7 @@ export default function App() {
             <Route path="/" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             <Route path="/files" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             
+            {/* [RESTORED ROUTES] */}
             <Route path="/forum" element={user ? <Forum user={user} /> : <Navigate to="/login" />} />
             <Route path="/profile" element={user ? <Profile user={user} /> : <Navigate to="/login" />} />
             

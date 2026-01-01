@@ -38,6 +38,7 @@ export default function Navbar({ user, onLogout, isDarkMode, toggleTheme }: Navb
 
   const navLinks = [
     { to: "/files", icon: Icons.Folder, label: "FILES" },
+    { to: "/forum", icon: Icons.MessageSquare, label: "FORUM" }, // [RESTORED]
     { to: "/loadflow", icon: Icons.Activity, label: "LOADFLOW" },
     { to: "/protection", icon: Icons.Shield, label: "PROTECTION" },
     { to: "/config", icon: Icons.Settings, label: "CONFIG" },
@@ -53,18 +54,14 @@ export default function Navbar({ user, onLogout, isDarkMode, toggleTheme }: Navb
       <nav className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 backdrop-blur-sm bg-white/90 dark:bg-slate-900/90 shadow-sm transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            
-            {/* LEFT */}
             <div className="flex items-center gap-4 lg:gap-8">
               <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="lg:hidden p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
                 {showMobileMenu ? <Icons.X className="w-6 h-6" /> : <Icons.Menu className="w-6 h-6" />}
               </button>
-
               <Link to="/loadflow" className="brand-container flex items-center gap-2 transition-all duration-300">
                   <img src="/logo.svg" alt="Solufuse Logo" className="brand-logo w-8 h-8 lg:w-9 lg:h-9 object-contain transition-all duration-300 ease-out"/>
                   <span className="brand-text font-black text-lg lg:text-xl tracking-tighter text-slate-800 dark:text-white uppercase transition-all duration-300 ease-out hidden sm:block">SOLUFUSE</span>
               </Link>
-
               <div className="hidden lg:flex items-center gap-1">
                 {navLinks.map(link => (
                     <Link key={link.to} to={link.to} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-2 ${isActive(link.to)}`}>
@@ -73,22 +70,17 @@ export default function Navbar({ user, onLogout, isDarkMode, toggleTheme }: Navb
                 ))}
               </div>
             </div>
-
-            {/* RIGHT */}
             <div className="flex items-center gap-3">
               <div className="hidden xl:flex items-center gap-1 mr-2">
                 <a href="https://api.solufuse.com/docs" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-blue-600 dark:text-slate-500 dark:hover:text-blue-400 flex items-center gap-1.5 transition-colors"><Icons.FileText className="w-3.5 h-3.5" /> API DOCS</a>
                 <a href="https://solufuse.com" target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-orange-600 dark:text-slate-500 dark:hover:text-orange-400 flex items-center gap-1.5 transition-colors"><Icons.Search className="w-3.5 h-3.5" /> ABOUT</a>
               </div>
-
               {toggleTheme && (
                   <button onClick={toggleTheme} className="p-2 rounded-full text-slate-400 hover:bg-slate-100 hover:text-yellow-500 dark:hover:bg-slate-800 dark:hover:text-yellow-400 transition-all" title="Toggle Theme">
                       {isDarkMode ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}
                   </button>
               )}
-
               <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden xl:block"></div>
-
               <div className="relative" ref={menuRef}>
                 <button onClick={() => setShowMenu(!showMenu)} className={`flex items-center gap-3 pl-2 pr-2 lg:pl-3 lg:py-1.5 rounded-full border transition-all ${user.isAnonymous ? 'bg-slate-50 border-slate-200 hover:border-blue-300 dark:bg-slate-800 dark:border-slate-700 dark:hover:border-blue-500' : 'bg-blue-50 border-blue-200 hover:border-blue-300 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:border-blue-600'}`}>
                   <div className="text-right hidden md:block">
@@ -97,7 +89,6 @@ export default function Navbar({ user, onLogout, isDarkMode, toggleTheme }: Navb
                   </div>
                   {user.photoURL ? <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-white dark:border-slate-600 shadow-sm" referrerPolicy="no-referrer" /> : <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm ${user.isAnonymous ? 'bg-slate-400' : 'bg-blue-600'}`}><Icons.User className="w-4 h-4" /></div>}
                 </button>
-
                 {showMenu && (
                   <div className="absolute right-0 top-12 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-50">
                     <div className="p-4 border-b border-slate-50 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">

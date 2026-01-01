@@ -186,20 +186,20 @@ export default function Forum({ user }: { user: any }) {
   };
 
   return (
-    // [FIX] Changed max-w-7xl to w-full to use all available width
     <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
-      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 flex-shrink-0">
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
             Project Discussion Board
             {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}
           </label>
           <div className="flex items-center gap-2">
-             <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
-                <Icons.List className="w-5 h-5 text-slate-700" />
+             <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">
+                <Icons.List className="w-5 h-5 text-slate-700 dark:text-slate-300" />
                 <span>{getActiveProjectName()}</span>
              </h1>
-             {activeProjectId?.startsWith("PUBLIC_") && <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-200">PUBLIC</span>}
+             {activeProjectId?.startsWith("PUBLIC_") && <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-200 dark:border-slate-700">PUBLIC</span>}
           </div>
         </div>
       </div>
@@ -210,18 +210,19 @@ export default function Forum({ user }: { user: any }) {
           isCreatingProject={false} setIsCreatingProject={() => {}} newProjectName="" setNewProjectName={() => {}} onCreateProject={() => {}} onDeleteProject={() => {}}
         />
 
-        <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden relative">
+        {/* MESSAGES CONTAINER */}
+        <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden relative">
             
             <div 
                 ref={scrollRef} 
-                className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/30 custom-scrollbar"
+                className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/30 dark:bg-slate-900/30 custom-scrollbar"
             >
                 {hasMore && !loading && (
                     <div className="flex justify-center pt-2 pb-4">
                         <button 
                             onClick={loadMoreMessages} 
                             disabled={isLoadingMore}
-                            className="bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold px-4 py-1.5 rounded-full text-[10px] flex items-center gap-2 transition-colors border border-slate-200 shadow-sm"
+                            className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-4 py-1.5 rounded-full text-[10px] flex items-center gap-2 transition-colors border border-slate-200 dark:border-slate-600 shadow-sm"
                         >
                             {isLoadingMore ? <Icons.Refresh className="w-3 h-3 animate-spin" /> : <Icons.ArrowUp className="w-3 h-3" />}
                             Load older messages
@@ -231,37 +232,40 @@ export default function Forum({ user }: { user: any }) {
 
                 {loading && messages.length === 0 ? <div className="text-center italic text-slate-400 mt-10">Loading discussion...</div> : messages.length === 0 ? (
                     <div className="text-center mt-10">
-                        <Icons.MessageSquare className="w-12 h-12 text-slate-200 mx-auto mb-2" />
-                        <p className="text-slate-400 font-bold">No issues or comments yet.</p>
-                        <p className="text-slate-300">Start the conversation below.</p>
+                        <Icons.MessageSquare className="w-12 h-12 text-slate-200 dark:text-slate-700 mx-auto mb-2" />
+                        <p className="text-slate-400 dark:text-slate-500 font-bold">No issues or comments yet.</p>
+                        <p className="text-slate-300 dark:text-slate-600">Start the conversation below.</p>
                     </div>
                 ) : (
                     messages.map((msg) => {
                         const isMe = msg.author_uid === user.uid;
-                        const roleColor = msg.author_role === 'super_admin' ? 'bg-red-50 text-red-600 border-red-200' : (msg.author_role === 'admin' ? 'bg-red-50 text-red-500 border-red-200' : (msg.author_role === 'nitro' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' : 'bg-slate-100 text-slate-600 border-slate-200'));
+                        const roleColor = msg.author_role === 'super_admin' ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900' : 
+                                          (msg.author_role === 'admin' ? 'bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 border-red-200 dark:border-red-900' : 
+                                          (msg.author_role === 'nitro' ? 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900' : 
+                                          'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600'));
                         
                         return (
                             <div key={msg.id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300">
                                 <div className="flex-shrink-0 pt-1">
-                                    <div className="w-8 h-8 rounded-md bg-white border border-slate-200 shadow-sm flex items-center justify-center font-bold text-slate-500 uppercase select-none">
+                                    <div className="w-8 h-8 rounded-md bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 shadow-sm flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 uppercase select-none">
                                         {getAuthorName(msg)[0]}
                                     </div>
                                 </div>
                                 
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-t-md px-3 py-1.5">
+                                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-t-md px-3 py-1.5">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-700 hover:underline cursor-pointer">{getAuthorName(msg)}</span>
+                                            <span className="font-bold text-slate-700 dark:text-slate-200 hover:underline cursor-pointer">{getAuthorName(msg)}</span>
                                             {msg.author_role !== 'user' && msg.author_role !== 'guest' && (
                                                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border uppercase ${roleColor}`}>
                                                     {msg.author_role.replace('_', ' ')}
                                                 </span>
                                             )}
-                                            <span className="text-slate-400 text-[9px]">commented {new Date(msg.created_at).toLocaleString()}</span>
+                                            <span className="text-slate-400 dark:text-slate-500 text-[9px]">commented {new Date(msg.created_at).toLocaleString()}</span>
                                         </div>
                                         
                                         <div className="flex items-center gap-2">
-                                            {isMe && <span className="px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 text-[9px] font-bold">YOU</span>}
+                                            {isMe && <span className="px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] font-bold">YOU</span>}
                                             {canDelete(msg) && (
                                                 <button onClick={() => handleDeleteMessage(msg.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1" title="Delete">
                                                     <Icons.Trash className="w-3 h-3" />
@@ -269,7 +273,7 @@ export default function Forum({ user }: { user: any }) {
                                             )}
                                         </div>
                                     </div>
-                                    <div className="bg-white border border-t-0 border-slate-200 rounded-b-md p-3 text-slate-700 leading-relaxed whitespace-pre-wrap font-mono text-[11px]">
+                                    <div className="bg-white dark:bg-slate-800 border border-t-0 border-slate-200 dark:border-slate-600 rounded-b-md p-3 text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap font-mono text-[11px]">
                                         {msg.content}
                                     </div>
                                 </div>
@@ -280,24 +284,24 @@ export default function Forum({ user }: { user: any }) {
                 <div ref={bottomRef} />
             </div>
 
-            <div className="p-4 bg-white border-t border-slate-200 flex-shrink-0">
-                <div className="relative border border-slate-300 rounded-md shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
+            <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
+                <div className="relative border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
                     <textarea 
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder={user.isAnonymous ? "Sign in to contribute..." : "Leave a comment (Ctrl+Enter to send)..."}
                         disabled={user.isAnonymous || sending}
-                        className="w-full min-h-[80px] p-3 text-slate-700 resize-y focus:outline-none rounded-t-md disabled:bg-slate-50 disabled:text-slate-400 bg-white text-[11px] font-mono"
+                        className="w-full min-h-[80px] p-3 text-slate-700 dark:text-slate-200 resize-y focus:outline-none rounded-t-md disabled:bg-slate-50 dark:disabled:bg-slate-900 disabled:text-slate-400 bg-white dark:bg-slate-800 text-[11px] font-mono"
                     />
-                    <div className="bg-slate-50 px-3 py-2 flex justify-between items-center rounded-b-md border-t border-slate-100">
-                         <span className="text-[9px] text-slate-400 hidden sm:inline">
+                    <div className="bg-slate-50 dark:bg-slate-900 px-3 py-2 flex justify-between items-center rounded-b-md border-t border-slate-100 dark:border-slate-700">
+                         <span className="text-[9px] text-slate-400 dark:text-slate-500 hidden sm:inline">
                              Supports basic text. Be kind and constructive.
                          </span>
                          <button 
                             onClick={handleSendMessage}
                             disabled={!newMessage.trim() || user.isAnonymous || sending}
-                            className="bg-green-600 hover:bg-green-700 disabled:bg-slate-300 text-white px-4 py-1.5 rounded font-bold text-[10px] shadow-sm transition-colors flex items-center gap-2"
+                            className="bg-green-600 hover:bg-green-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white px-4 py-1.5 rounded font-bold text-[10px] shadow-sm transition-colors flex items-center gap-2"
                         >
                             {sending ? <Icons.Refresh className="w-3 h-3 animate-spin" /> : <Icons.MessageSquare className="w-3 h-3" />}
                             Comment
