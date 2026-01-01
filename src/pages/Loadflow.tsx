@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { 
-  Play, Activity, Folder, HardDrive, Key, Trash2, CheckCircle, AlertTriangle, 
-  TrendingUp, Zap, Search, Eye, EyeOff, Filter, RefreshCw
-} from 'lucide-react'; // [FIX] Direct imports for missing icons
+  Play, Activity, Folder, HardDrive, Key, CheckCircle, AlertTriangle, 
+  TrendingUp, Zap, Search, Eye, EyeOff, Filter
+} from 'lucide-react';
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
@@ -69,7 +69,7 @@ export default function Loadflow({ user }: { user: any }) {
   const [filterSearch, setFilterSearch] = useState("");
   const [filterWinner, setFilterWinner] = useState(false);
   const [filterValid, setFilterValid] = useState(false);
-  // [FIX] Removed unused 'selectedCase' state causing TS6133
+  const [selectedCase, setSelectedCase] = useState<LoadflowResult | null>(null);
 
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
@@ -183,15 +183,18 @@ export default function Loadflow({ user }: { user: any }) {
     if (!user) return;
     setLoading(true);
     setResults(null);
+    setSelectedCase(null);
     try {
       const t = await getToken();
       const pParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
       
+      // 1. Trigger Run & Save
       const runRes = await fetch(`${API_URL}/loadflow/run-and-save?basename=${baseName}${pParam}`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${t}` }
       });
       if (!runRes.ok) throw new Error("Calculation Failed");
 
+      // 2. Fetch Resulting JSON
       const jsonFilename = `${baseName}.json`;
       const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`);
       if (!dataRes.ok) throw new Error("Result file missing");
@@ -432,7 +435,7 @@ export default function Loadflow({ user }: { user: any }) {
                                             const isExpanded = expandedRows.has(i);
                                             return (
                                             <div key={i} style={{ display: 'contents' }}>
-                                                <tr className={`hover:bg-slate-50 ${r.is_winner ? 'bg-green-50/30' : ''} ${!r.is_valid ? 'opacity-70' : ''}`}>
+                                                <tr className={`hover:bg-slate-50 ${r.is_winner ? 'bg-green-50/30' : ''} ${!r.is_valid ? 'opacity-70' : ''}`} onClick={() => setSelectedCase(r)}>
                                                     <td className="px-2 py-1 text-center">
                                                         {r.is_winner ? <CheckCircle className="w-3.5 h-3.5 text-green-500 mx-auto" /> : r.is_valid ? <AlertTriangle className="w-3.5 h-3.5 text-red-400 mx-auto" /> : <AlertTriangle className="w-3.5 h-3.5 text-slate-300 mx-auto" />}
                                                     </td>
@@ -447,7 +450,7 @@ export default function Loadflow({ user }: { user: any }) {
                                                     <td className="px-2 py-1 text-right font-mono text-slate-700">{Math.abs(r.mw_flow).toFixed(2)}</td>
                                                     <td className="px-2 py-1 text-right font-mono text-slate-400">{Math.abs(r.mvar_flow).toFixed(2)}</td>
                                                     <td className="px-2 py-1 text-right">
-                                                        <button onClick={() => toggleRow(i)} className={`p-0.5 rounded ${isExpanded ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100 text-slate-400'}`}>
+                                                        <button onClick={(e) => {e.stopPropagation(); toggleRow(i);}} className={`p-0.5 rounded ${isExpanded ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100 text-slate-400'}`}>
                                                             {isExpanded ? <EyeOff className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}
                                                         </button>
                                                     </td>
