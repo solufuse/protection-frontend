@@ -30,7 +30,7 @@ body {
 
 /* --- DARK MODE OVERRIDES (The "Colab" Palette) --- */
 .dark body {
-  background-color: #1e1e1e !important; /* Gris Colab/VSCode */
+  background-color: #1e1e1e !important;
   color: #e0e0e0 !important;
 }
 .dark ::-webkit-scrollbar-thumb { background-color: #424242; }
@@ -38,28 +38,38 @@ body {
 
 @layer utilities {
   
-  /* --- [NEW] COLAB UNIFIED BORDER RADIUS --- */
-  /* Force les conteneurs et inputs à utiliser un arrondi subtil uniforme (6px) */
-  /* On cible les classes Tailwind courantes pour les écraser */
+  /* --- [NEW] GOOGLE COLAB / MATERIAL ROUNDING --- */
+  
+  /* 1. Containers & Inputs (Soft Squares) - Increased from 6px to 12px */
   .rounded,
   .rounded-md,
   .rounded-lg,
   .rounded-xl,
   .rounded-2xl,
-  input, select, textarea, button {
-      border-radius: 6px !important; /* Le "sweet spot" du style Colab */
+  input, select, textarea {
+      border-radius: 12px !important; /* Beaucoup plus doux */
   }
 
-  /* IMPORTANT : On protège les éléments parfaitement ronds (avatars, switchs) */
+  /* 2. Buttons (Pill / Capsule Shape) - Force full roundness for buttons */
+  button {
+      border-radius: 9999px !important; /* Style "Pilule" typique Google */
+  }
+
+  /* Exception: Checkboxes or tiny elements shouldn't be pills */
+  input[type="checkbox"], input[type="radio"] {
+      border-radius: 4px !important;
+  }
+
+  /* IMPORTANT : Protéger les éléments déjà ronds */
   .rounded-full {
       border-radius: 9999px !important;
   }
   /* ---------------------------------------- */
 
 
-  /* 2. Containers / Cards (Le fond des blocs) */
+  /* 2. Containers / Cards (Fond) */
   .dark .bg-white {
-    background-color: #252526 !important; /* Gris "Surface" */
+    background-color: #252526 !important;
     border-color: #383838 !important;
   }
   
@@ -87,11 +97,11 @@ body {
   }
   
   .dark input:focus, .dark select:focus, .dark textarea:focus {
-    border-color: #f59e0b !important; /* Focus orange */
+    border-color: #f59e0b !important;
     ring-color: #f59e0b !important;
   }
 
-  /* 7. Hover States & Shadows */
+  /* 7. Hover States */
   .dark .hover\:bg-slate-50:hover { background-color: #2a2d2e !important; }
   .dark .shadow-sm, .dark .shadow-md { box-shadow: none !important; }
 }
