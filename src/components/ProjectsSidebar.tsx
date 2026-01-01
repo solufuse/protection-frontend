@@ -17,15 +17,15 @@ export interface UserSummary {
 
 interface ProjectsSidebarProps {
   user: any;
-  userGlobalData: any;
+  userGlobalData?: any; // [+] Made Optional (?) to fix build on other pages
   projects: Project[];
-  usersList: UserSummary[];
+  usersList?: UserSummary[]; // [+] Made Optional
   
   activeProjectId: string | null;
   setActiveProjectId: (id: string | null) => void;
   
-  activeSessionUid: string | null;
-  setActiveSessionUid: (uid: string | null) => void;
+  activeSessionUid?: string | null; // [+] Made Optional
+  setActiveSessionUid?: (uid: string | null) => void; // [+] Made Optional
 
   isCreatingProject: boolean;
   setIsCreatingProject: (val: boolean) => void;
@@ -53,18 +53,19 @@ export default function ProjectsSidebar({
 }: ProjectsSidebarProps) {
     
   const handleSelectProject = (id: string) => {
-      setActiveSessionUid(null);
+      // [+] Safety check
+      if (setActiveSessionUid) setActiveSessionUid(null);
       setActiveProjectId(id);
   };
 
   const handleSelectMySession = () => {
-      setActiveSessionUid(null);
+      if (setActiveSessionUid) setActiveSessionUid(null);
       setActiveProjectId(null);
   };
 
   const handleSelectUserSession = (uid: string) => {
       setActiveProjectId(null);
-      setActiveSessionUid(uid);
+      if (setActiveSessionUid) setActiveSessionUid(uid);
   };
 
   const getOwnerDisplay = (proj: Project) => {
@@ -72,14 +73,15 @@ export default function ProjectsSidebar({
       if (proj.id.startsWith("PUBLIC_")) return "System / Public";
       if (proj.id.includes("_")) {
           const possibleUid = proj.id.split("_")[0];
-          const knownUser = usersList.find(u => u.uid === possibleUid);
+          // [+] Safety check for usersList
+          const knownUser = (usersList || []).find(u => u.uid === possibleUid);
           if (knownUser) return `By ${knownUser.username || knownUser.email}`;
           return `By ${possibleUid.slice(0, 6)}...`;
       }
       return "Shared";
   };
 
-  // [+] [LOGIC] Allowed Roles: Super Admin, Admin, Moderator
+  // Logic: Allowed Roles: Super Admin, Admin, Moderator
   const canViewSessions = ['super_admin', 'admin', 'moderator'].includes(userGlobalData?.global_role);
 
   return (
@@ -87,7 +89,7 @@ export default function ProjectsSidebar({
       {/* --- ZONE 1 : MA SESSION --- */}
       <div 
         onClick={handleSelectMySession} 
-        className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null && activeSessionUid === null ? 'bg-slate-800 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+        className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${activeProjectId === null && (!activeSessionUid) ? 'bg-slate-800 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
       >
         <Icons.HardDrive className="w-4 h-4" />
         <div className="flex flex-col">
@@ -153,7 +155,8 @@ export default function ProjectsSidebar({
       </div>
 
       {/* --- ZONE 3 : USER SESSIONS (STAFF) --- */}
-      {canViewSessions && (
+      {/* [+] Added safety check: only show if usersList provided */}
+      {canViewSessions && usersList && (
         <>
           <div className="border-t border-slate-200 my-1"></div>
           <div className="flex items-center gap-2 px-1 mb-1">
