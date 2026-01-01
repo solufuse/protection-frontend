@@ -145,7 +145,7 @@ export default function Forum({ user }: { user: any }) {
   };
 
   const handleDeleteMessage = async (msgId: number) => {
-      if(!confirm("Delete this comment?")) return;
+      // [FIX] Removed confirmation check for instant deletion
       try {
           const t = await getToken();
           const res = await fetch(`${API_URL}/messages/${msgId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
@@ -187,7 +187,6 @@ export default function Forum({ user }: { user: any }) {
   };
 
   return (
-    // [FIX] Changed h-screen to h-full to fit within parent flex container
     <div className="max-w-7xl mx-auto px-6 py-6 text-[11px] font-sans h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 flex-shrink-0">
         <div className="flex flex-col">
