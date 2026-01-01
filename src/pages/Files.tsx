@@ -17,23 +17,19 @@ export default function Files({ user }: { user: any }) {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
   const [usersList, setUsersList] = useState<UserSummary[]>([]);
-  
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
-  
   const [newProjectName, setNewProjectName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
-  
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'uploaded_at', order: 'desc' });
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
-  
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
   let currentProjectRole = undefined;
@@ -84,7 +80,7 @@ export default function Files({ user }: { user: any }) {
           </div>
         </div>
         <div className="flex gap-2">
-          {userGlobalData && userGlobalData.global_role === 'super_admin' && <button onClick={() => window.open(`${API_URL}/docs`, '_blank')} className="flex items-center gap-1 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded border border-red-200 text-red-600 font-bold transition-colors"><Icons.Shield className="w-3.5 h-3.5" /> API</button>}
+          {userGlobalData && userGlobalData.global_role === 'super_admin' && <button onClick={() => window.open(`${API_URL}/docs`, '_blank')} className="flex items-center gap-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300 px-3 py-1.5 rounded border border-red-200 dark:border-red-900 text-red-600 font-bold transition-colors"><Icons.Shield className="w-3.5 h-3.5" /> API</button>}
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
           <button onClick={() => fetchFiles()} className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-bold transition-colors"><Icons.Refresh className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> REFRESH</button>
         </div>
@@ -103,7 +99,8 @@ export default function Files({ user }: { user: any }) {
       <div className="flex flex-1 gap-6 min-h-0">
         <ProjectsSidebar user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid} isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} newProjectName={newProjectName} setNewProjectName={setNewProjectName} onCreateProject={createProject} onDeleteProject={deleteProject} />
 
-        <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden font-bold relative transition-all" onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); }}>
+        {/* [FIX] Container is now dark in dark mode */}
+        <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden font-bold relative transition-all" onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); }}>
             {isDragging && <div className="absolute inset-0 z-50 bg-blue-50/90 dark:bg-blue-900/90 border-2 border-dashed border-blue-500 rounded flex flex-col items-center justify-center pointer-events-none"><Icons.UploadCloud className="w-12 h-12 text-blue-600 dark:text-blue-400 mb-2" /><span className="text-lg font-black text-blue-700 dark:text-blue-300 uppercase tracking-widest">Drop files to upload</span></div>}
             
             <FileToolbar searchTerm={searchTerm} setSearchTerm={setSearchTerm} fileCount={filteredFiles.length} activeProjectId={activeProjectId || activeSessionUid} onShowMembers={() => setShowMembers(true)} onClear={handleClear} uploading={uploading} onUpload={handleUpload} />

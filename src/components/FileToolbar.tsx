@@ -1,9 +1,9 @@
-import { useRef } from 'react';
+
 import { Icons } from '../icons';
 
 interface FileToolbarProps {
   searchTerm: string;
-  setSearchTerm: (term: string) => void;
+  setSearchTerm: (val: string) => void;
   fileCount: number;
   activeProjectId: string | null;
   onShowMembers: () => void;
@@ -13,56 +13,39 @@ interface FileToolbarProps {
 }
 
 export default function FileToolbar({
-  searchTerm,
-  setSearchTerm,
-  fileCount,
-  activeProjectId,
-  onShowMembers,
-  onClear,
-  uploading,
-  onUpload
+  searchTerm, setSearchTerm, fileCount, activeProjectId,
+  onShowMembers, onClear, uploading, onUpload
 }: FileToolbarProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   return (
-    <div className="flex justify-between items-center p-2 bg-slate-50 border-b border-slate-100 gap-4">
+    <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-wrap justify-between items-center gap-4">
       <div className="flex items-center gap-2 flex-1">
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative flex-1 max-w-md">
           <Icons.Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
           <input 
             type="text" 
-            placeholder="Search files..." 
+            placeholder="Filter files..." 
             value={searchTerm} 
             onChange={(e) => setSearchTerm(e.target.value)} 
-            className="w-full pl-8 pr-2 py-1.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:border-blue-400 text-slate-600" 
+            className="w-full pl-8 pr-2 py-1.5 text-[10px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded focus:outline-none focus:border-blue-400 text-slate-600 dark:text-slate-300 placeholder-slate-400" 
           />
         </div>
-        <span className="text-[9px] text-slate-400 font-bold">{fileCount} FILES</span>
-        {activeProjectId && (
-          <button onClick={onShowMembers} className="flex items-center gap-1 ml-2 bg-white hover:bg-slate-100 px-2 py-1 rounded border border-slate-200 text-slate-500 hover:text-blue-600 font-bold transition-colors">
-            <Icons.Users className="w-3.5 h-3.5" /> TEAM
-          </button>
-        )}
+        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{fileCount} ITEMS</span>
       </div>
+
       <div className="flex gap-2">
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          multiple 
-          onChange={(e) => onUpload(e.target.files)} 
-        />
-        <button onClick={onClear} className="flex items-center gap-1 bg-white hover:bg-red-50 px-2 py-1 rounded border border-slate-200 text-slate-500 hover:text-red-500 font-bold transition-colors">
-          <Icons.Trash className="w-3 h-3" /> CLEAR
+        {activeProjectId && (
+            <button onClick={onShowMembers} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded font-bold transition-all text-[10px]">
+                <Icons.Users className="w-3.5 h-3.5" /> MEMBERS
+            </button>
+        )}
+        <button onClick={onClear} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 hover:border-red-200 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded font-bold transition-all text-[10px]">
+            <Icons.Trash className="w-3.5 h-3.5" /> CLEAR
         </button>
-        <button 
-          onClick={() => fileInputRef.current?.click()} 
-          disabled={uploading} 
-          className="flex items-center gap-1 text-[9px] font-bold bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          {uploading ? <Icons.Refresh className="w-3 h-3 animate-spin"/> : <Icons.UploadCloud className="w-3 h-3"/>} 
-          {uploading ? "UPLOADING..." : "UPLOAD"}
-        </button>
+        <label className={`flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded font-black shadow-sm cursor-pointer transition-all text-[10px] ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
+            <input type="file" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} disabled={uploading} />
+            {uploading ? <Icons.Refresh className="w-3.5 h-3.5 animate-spin"/> : <Icons.UploadCloud className="w-3.5 h-3.5 fill-current" />}
+            {uploading ? "UPLOADING..." : "UPLOAD"}
+        </label>
       </div>
     </div>
   );
