@@ -55,24 +55,47 @@ export default function ProjectsSidebar({
   const [searchTerm, setSearchTerm] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
   
-  // States for collapsible sections
+  // [+] STATE: Section Visibility (Loaded from localStorage later)
   const [isSessionsExpanded, setIsSessionsExpanded] = useState(false);
   const [isAdminSectionExpanded, setIsAdminSectionExpanded] = useState(false);
 
+  // [+] STATE: Pagination Limits (Show 20 by default)
+  const [adminLimit, setAdminLimit] = useState(20);
+  const [sessionLimit, setSessionLimit] = useState(20);
+
+  // 1. Load Favorites & Expanded State from LocalStorage
   useEffect(() => {
-    const saved = localStorage.getItem('solufuse_favorites');
-    if (saved) setFavorites(JSON.parse(saved));
+    const savedFavs = localStorage.getItem('solufuse_favorites');
+    if (savedFavs) setFavorites(JSON.parse(savedFavs));
+
+    const savedState = localStorage.getItem('solufuse_sidebar_state');
+    if (savedState) {
+        const state = JSON.parse(savedState);
+        setIsSessionsExpanded(state.sessions);
+        setIsAdminSectionExpanded(state.admin);
+    }
   }, []);
 
-  // Auto-expand logic
+  // 2. Save Expanded State to LocalStorage whenever it changes
+  useEffect(() => {
+    const state = { sessions: isSessionsExpanded, admin: isAdminSectionExpanded };
+    localStorage.setItem('solufuse_sidebar_state', JSON.stringify(state));
+  }, [isSessionsExpanded, isAdminSectionExpanded]);
+
+  // 3. Auto-expand on search
   useEffect(() => {
     if (searchTerm.trim() !== "") {
         setIsSessionsExpanded(true);
         setIsAdminSectionExpanded(true);
-    } else if (activeSessionUid) {
-        setIsSessionsExpanded(true);
+        // Also remove limits when searching to see results
+        setAdminLimit(1000);
+        setSessionLimit(1000);
+    } else {
+        // Reset limits when search clears (optional, keeps UI clean)
+        if (!activeSessionUid) setSessionLimit(20);
+        setAdminLimit(20);
     }
-  }, [searchTerm, activeSessionUid]);
+  }, [searchTerm]);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -101,24 +124,18 @@ export default function ProjectsSidebar({
   const canViewSessions = ['super_admin', 'admin', 'moderator'].includes(userGlobalData?.global_role);
 
   // --- SMART GROUPING LOGIC ---
-  
-  // 1. PUBLIC PROJECTS (Always Top)
   const publicProjects = projects.filter(p => p.id.startsWith("PUBLIC_"));
 
-  // 2. MY WORKSPACE (Favorites + Owned + Not Public)
   const myWorkspaceProjects = projects.filter(p => {
       if (p.id.startsWith("PUBLIC_")) return false;
-      // It's mine if I'm owner OR if I starred it
       return p.role === 'owner' || favorites.includes(p.id);
   });
 
-  // 3. OTHER / ADMIN VIEW (Everything else)
   const otherProjects = projects.filter(p => {
       if (p.id.startsWith("PUBLIC_")) return false;
       return p.role !== 'owner' && !favorites.includes(p.id);
   });
 
-  // Filter function for search
   const filterList = (list: Project[]) => {
       return list.filter(p => 
           p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -129,7 +146,7 @@ export default function ProjectsSidebar({
   const filteredUsers = (usersList || [])
     .filter(u => (u.username || "").toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Reusable Project Item Component
+  // Reusable Project Item
   const ProjectItem = ({ p }: { p: Project }) => {
       const isFav = favorites.includes(p.id);
       const isActive = activeProjectId === p.id;
@@ -148,7 +165,6 @@ export default function ProjectsSidebar({
             )}
             <span className="font-bold truncate text-[10px]">{p.name}</span>
           </div>
-
           <div className="flex items-center gap-1 ml-2 flex-shrink-0">
               <button 
                   onClick={(e) => toggleFavorite(p.id, e)}
@@ -156,7 +172,6 @@ export default function ProjectsSidebar({
               >
                   <Icons.Star className="w-3 h-3 fill-current" />
               </button>
-
               {p.role !== 'moderator' && (
                 <button 
                   onClick={(e) => onDeleteProject(p.id, e)} 
@@ -169,6 +184,13 @@ export default function ProjectsSidebar({
         </div>
       );
   };
+
+  // Process lists with Limit
+  const visibleAdminProjects = filterList(otherProjects).slice(0, adminLimit);
+  const totalAdminProjects = filterList(otherProjects).length;
+  
+  const visibleUsers = filteredUsers.slice(0, sessionLimit);
+  const totalUsers = filteredUsers.length;
 
   return (
     <div className="w-60 flex flex-col gap-2 h-full">
@@ -196,7 +218,7 @@ export default function ProjectsSidebar({
 
       <div className="border-t border-slate-100 my-1"></div>
 
-      {/* --- SECTION 1: COMMUNITY (Public) --- */}
+      {/* 1. COMMUNITY */}
       <div className="flex justify-between items-center px-1 mb-1">
         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Community</span>
       </div>
@@ -204,7 +226,7 @@ export default function ProjectsSidebar({
           {filterList(publicProjects).map(p => <ProjectItem key={p.id} p={p} />)}
       </div>
 
-      {/* --- SECTION 2: MY WORKSPACE (Owner + Favorites) --- */}
+      {/* 2. MY WORKSPACE */}
       <div className="flex justify-between items-center px-1 mt-3 mb-1 group">
         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">My Workspace</span>
         <button 
@@ -237,8 +259,8 @@ export default function ProjectsSidebar({
           {filterList(myWorkspaceProjects).map(p => <ProjectItem key={p.id} p={p} />)}
       </div>
 
-      {/* --- SECTION 3: SHARED / ADMIN (Collapsible) --- */}
-      {filterList(otherProjects).length > 0 && (
+      {/* 3. SHARED / ADMIN (Collapsible + Limit) */}
+      {totalAdminProjects > 0 && (
           <>
             <div className="border-t border-slate-100 my-2"></div>
             <div 
@@ -246,20 +268,30 @@ export default function ProjectsSidebar({
                 className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 rounded p-0.5"
             >
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                    Shared / Admin ({filterList(otherProjects).length})
+                    Shared / Admin ({totalAdminProjects})
                 </span>
                 <Icons.ArrowRight className={`w-3 h-3 text-slate-300 transition-transform ${isAdminSectionExpanded ? 'rotate-90' : ''}`} />
             </div>
             
             {isAdminSectionExpanded && (
                 <div className="flex flex-col animate-in fade-in slide-in-from-top-1 duration-200">
-                    {filterList(otherProjects).map(p => <ProjectItem key={p.id} p={p} />)}
+                    {visibleAdminProjects.map(p => <ProjectItem key={p.id} p={p} />)}
+                    
+                    {/* SHOW MORE BUTTON */}
+                    {totalAdminProjects > adminLimit && (
+                        <button 
+                            onClick={() => setAdminLimit(prev => prev + 20)}
+                            className="text-[9px] text-blue-600 hover:text-blue-800 text-left px-2 py-1 font-bold italic"
+                        >
+                            + Show {totalAdminProjects - adminLimit} more...
+                        </button>
+                    )}
                 </div>
             )}
           </>
       )}
 
-      {/* --- SECTION 4: USER SESSIONS (Collapsible Admin) --- */}
+      {/* 4. USER SESSIONS (Collapsible + Limit) */}
       {canViewSessions && filteredUsers && (
         <>
           <div className="border-t border-slate-200 my-2"></div>
@@ -270,14 +302,14 @@ export default function ProjectsSidebar({
           >
             <div className="flex items-center gap-2">
                 <Icons.Shield className="w-3 h-3 text-red-500" />
-                <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">User Sessions ({filteredUsers.length})</span>
+                <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Sessions ({totalUsers})</span>
             </div>
             <Icons.ArrowRight className={`w-3 h-3 text-slate-300 transition-transform duration-200 ${isSessionsExpanded ? 'rotate-90' : ''}`} />
           </div>
           
           {isSessionsExpanded && (
               <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 custom-scrollbar pr-1 max-h-[150px] animate-in fade-in slide-in-from-top-1 duration-200">
-                {filteredUsers.map(u => (
+                {visibleUsers.map(u => (
                 <div 
                     key={u.uid}
                     onClick={() => handleSelectUserSession(u.uid)}
@@ -290,6 +322,16 @@ export default function ProjectsSidebar({
                     </div>
                 </div>
                 ))}
+
+                {/* SHOW MORE BUTTON */}
+                {totalUsers > sessionLimit && (
+                    <button 
+                        onClick={() => setSessionLimit(prev => prev + 20)}
+                        className="text-[9px] text-red-500 hover:text-red-700 text-left px-2 py-1 font-bold italic"
+                    >
+                        + Show {totalUsers - sessionLimit} more...
+                    </button>
+                )}
             </div>
           )}
         </>
