@@ -55,7 +55,6 @@ export default function ProjectsSidebar({
   const [searchTerm, setSearchTerm] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  // Load favorites from LocalStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('solufuse_favorites');
     if (saved) setFavorites(JSON.parse(saved));
@@ -85,19 +84,15 @@ export default function ProjectsSidebar({
       if (setActiveSessionUid) setActiveSessionUid(uid);
   };
 
-  // Logic: Roles Allowed to view sessions
   const canViewSessions = ['super_admin', 'admin', 'moderator'].includes(userGlobalData?.global_role);
 
-  // --- FILTERING & SORTING ---
   const filteredProjects = projects
     .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.toLowerCase().includes(searchTerm.toLowerCase()))
     .sort((a, b) => {
-        // Favorites first
         const aFav = favorites.includes(a.id);
         const bFav = favorites.includes(b.id);
         if (aFav && !bFav) return -1;
         if (!aFav && bFav) return 1;
-        // Then alphabetical
         return a.name.localeCompare(b.name);
     });
 
@@ -107,7 +102,7 @@ export default function ProjectsSidebar({
   return (
     <div className="w-60 flex flex-col gap-2 h-full">
       
-      {/* 1. SEARCH BAR (Unified) */}
+      {/* 1. SEARCH BAR */}
       <div className="relative mb-2">
         <Icons.Search className="absolute left-2 top-1.5 w-3 h-3 text-slate-400" />
         <input 
@@ -119,7 +114,7 @@ export default function ProjectsSidebar({
         />
       </div>
 
-      {/* 2. MY SESSION (Compact) */}
+      {/* 2. MY SESSION */}
       <div 
         onClick={handleSelectMySession} 
         className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer border transition-all ${activeProjectId === null && (!activeSessionUid) ? 'bg-slate-800 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50'}`}
@@ -156,7 +151,7 @@ export default function ProjectsSidebar({
         </div>
       )}
 
-      {/* 4. PROJECTS LIST */}
+      {/* 4. PROJECTS LIST (FIXED LAYOUT) */}
       <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 custom-scrollbar pr-1 min-h-[100px]">
         {filteredProjects.map(p => {
           const isFav = favorites.includes(p.id);
@@ -166,10 +161,11 @@ export default function ProjectsSidebar({
             <div 
               key={p.id} 
               onClick={() => handleSelectProject(p.id)} 
-              className={`group relative flex items-center justify-between px-2 py-1.5 rounded cursor-pointer border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50'}`}
+              // [+] Removed 'relative', changed to justify-between for clear separation
+              className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-600 border-transparent hover:bg-slate-50'}`}
             >
-              <div className="flex items-center gap-2 overflow-hidden w-full">
-                {/* Icon logic */}
+              {/* LEFT SIDE: Icon & Name */}
+              <div className="flex items-center gap-2 overflow-hidden truncate">
                 {p.id.startsWith("PUBLIC_") ? (
                     <Icons.Hash className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-400'}`} />
                 ) : p.role === 'owner' ? (
@@ -177,27 +173,29 @@ export default function ProjectsSidebar({
                 ) : (
                     <Icons.Folder className={`w-3 h-3 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-300'}`} />
                 )}
-                
                 <span className="font-bold truncate text-[10px]">{p.name}</span>
-                
-                {/* Star Icon (Always visible if fav, otherwise on hover) */}
-                <button 
-                    onClick={(e) => toggleFavorite(p.id, e)}
-                    className={`ml-auto ${isFav ? 'opacity-100 text-yellow-400' : 'opacity-0 group-hover:opacity-100 text-slate-300 hover:text-yellow-400'} transition-opacity`}
-                >
-                    <Icons.Star className="w-3 h-3 fill-current" />
-                </button>
               </div>
 
-              {/* Delete Button (Only on hover, separate from main click) */}
-              {p.role !== 'moderator' && !isActive && (
-                <button 
-                  onClick={(e) => onDeleteProject(p.id, e)} 
-                  className="absolute right-1 opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 text-red-400 rounded"
-                >
-                  <Icons.Trash className="w-2.5 h-2.5" />
-                </button>
-              )}
+              {/* RIGHT SIDE: Actions Container (Star + Delete) */}
+              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                  {/* Star Icon */}
+                  <button 
+                      onClick={(e) => toggleFavorite(p.id, e)}
+                      className={`${isFav ? 'opacity-100 text-yellow-400' : 'opacity-0 group-hover:opacity-100 text-slate-300 hover:text-yellow-400'} transition-opacity`}
+                  >
+                      <Icons.Star className="w-3 h-3 fill-current" />
+                  </button>
+
+                  {/* Delete Button (Removed absolute positioning) */}
+                  {p.role !== 'moderator' && !isActive && (
+                    <button 
+                      onClick={(e) => onDeleteProject(p.id, e)} 
+                      className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-100 text-red-400 rounded transition-opacity"
+                    >
+                      <Icons.Trash className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+              </div>
             </div>
           );
         })}
