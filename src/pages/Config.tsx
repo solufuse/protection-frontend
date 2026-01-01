@@ -7,9 +7,9 @@ import {
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
+import ContextRoleBadge from '../components/ContextRoleBadge'; // [NEW]
 
 export default function Config({ user }: { user: any }) {
-  // --- STATE ---
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   
@@ -33,10 +33,16 @@ export default function Config({ user }: { user: any }) {
 
   const apiUrl = import.meta.env.VITE_API_URL || 'https://api.solufuse.com';
 
+  // [NEW] Calculate Context Role
+  const currentProjectRole = activeProjectId 
+    ? projects.find(p => p.id === activeProjectId)?.role 
+    : undefined;
+
   const notify = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, msg, type });
   };
 
+  // ... (defaultConfig removed for brevity, assume it's same as before, see next block)
   const defaultConfig = {
     project_name: "NEW_PROJECT",
     settings: {
@@ -252,13 +258,17 @@ export default function Config({ user }: { user: any }) {
             System Configuration
             {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}
           </label>
-          <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
-            {activeProjectId ? (
-                <><Folder className="w-5 h-5 text-blue-600" /><span>{activeProjectId}</span><span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">PROJECT</span></>
-            ) : (
-                <><HardDrive className="w-5 h-5 text-slate-600" /><span>My Session</span><span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span></>
-            )}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
+                {activeProjectId ? (
+                    <><Folder className="w-5 h-5 text-blue-600" /><span>{activeProjectId}</span></>
+                ) : (
+                    <><HardDrive className="w-5 h-5 text-slate-600" /><span>My Session</span><span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span></>
+                )}
+            </h1>
+            {/* [NEW] Insert Context Badge */}
+            <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null} />
+          </div>
         </div>
         <div className="flex gap-2">
             <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-yellow-600 font-bold transition-colors"><Key className="w-3.5 h-3.5" /> TOKEN</button>

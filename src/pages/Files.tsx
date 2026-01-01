@@ -1,22 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, Fragment } from 'react';
 import { Icons } from '../icons';
 import Toast from '../components/Toast';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
+import ContextRoleBadge from '../components/ContextRoleBadge'; // [NEW] Import
 import MembersModal from '../components/MembersModal';
-import ProjectsSidebar from '../components/ProjectsSidebar';
+import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import FileToolbar from '../components/FileToolbar';
 import FileTable, { SessionFile, SortKey, SortOrder } from '../components/FileTable';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../firebase';
 
-interface Project {
-  id: string;
-  name: string;
-  role: 'owner' | 'admin' | 'moderator' | 'editor' | 'viewer' | 'staff_override';
-}
-
 export default function Files({ user }: { user: any }) {
-  // --- STATE ---
   const [files, setFiles] = useState<SessionFile[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -39,7 +33,11 @@ export default function Files({ user }: { user: any }) {
   
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
 
-  // --- HELPERS ---
+  // [NEW] Calculate Context Role
+  const currentProjectRole = activeProjectId 
+    ? projects.find(p => p.id === activeProjectId)?.role 
+    : undefined;
+
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   
   const formatBytes = (bytes: number) => {
@@ -51,12 +49,9 @@ export default function Files({ user }: { user: any }) {
   };
 
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
-  
   const handleGoogleLogin = async () => { await signInWithPopup(auth, new GoogleAuthProvider()); };
-  
   const handleCopyToken = async () => { const t = await getToken(); if (!t) return notify("No Token", "error"); navigator.clipboard.writeText(t); notify("Token Copied"); };
 
-  // --- API ---
   const fetchGlobalProfile = async () => {
      try {
          const t = await getToken();
@@ -94,7 +89,6 @@ export default function Files({ user }: { user: any }) {
     }
   }, [user, activeProjectId]);
 
-  // --- HANDLERS ---
   const createProject = async () => {
     if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error");
     if (!newProjectName.trim()) return;
@@ -218,7 +212,6 @@ export default function Files({ user }: { user: any }) {
 
   const handleSort = (key: SortKey) => { setSortConfig(current => ({ key, order: current.key === key && current.order === 'asc' ? 'desc' : 'asc' })); };
   
-  // Logic to filter and sort
   const filteredFiles = files.filter(f => f.filename.toLowerCase().includes(searchTerm.toLowerCase())).sort((a, b) => {
       let aVal: any = a[sortConfig.key]; let bVal: any = b[sortConfig.key];
       if (sortConfig.key === 'size') { aVal = a.size; bVal = b.size; }
@@ -238,21 +231,24 @@ export default function Files({ user }: { user: any }) {
             Workspace
             {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}
           </label>
-          <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
-            {activeProjectId ? (
-                <>
-                    <Icons.Folder className="w-5 h-5 text-blue-600" />
-                    <span>{activeProjectId}</span>
-                    <span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">PROJECT</span>
-                </>
-            ) : (
-                <>
-                    <Icons.HardDrive className="w-5 h-5 text-slate-600" />
-                    <span>My Session</span>
-                    <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span>
-                </>
-            )}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
+                {activeProjectId ? (
+                    <>
+                        <Icons.Folder className="w-5 h-5 text-blue-600" />
+                        <span>{activeProjectId}</span>
+                    </>
+                ) : (
+                    <>
+                        <Icons.HardDrive className="w-5 h-5 text-slate-600" />
+                        <span>My Session</span>
+                        <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span>
+                    </>
+                )}
+            </h1>
+            {/* [NEW] Insert Context Badge */}
+            <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null} />
+          </div>
         </div>
         <div className="flex gap-2">
           {userGlobalData && userGlobalData.global_role === 'super_admin' && (
@@ -293,7 +289,6 @@ export default function Files({ user }: { user: any }) {
           onDeleteProject={deleteProject}
         />
 
-        {/* MAIN PANEL */}
         <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden font-bold relative transition-all"
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} 
             onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} 
