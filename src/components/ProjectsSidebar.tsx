@@ -100,6 +100,7 @@ export default function ProjectsSidebar({
         <Icons.HardDrive className="w-3.5 h-3.5" /> <span className="font-bold text-[10px]">My Session</span>
       </div>
 
+      {/* [FIX] Separator Line Color */}
       <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
 
       <div className="flex justify-between items-center px-1 mb-1"><span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Community</span></div>
@@ -124,6 +125,7 @@ export default function ProjectsSidebar({
 
       {filterList(otherProjects).length > 0 && (
           <>
+            {/* [FIX] Separator */}
             <div className="border-t border-slate-100 dark:border-slate-800 my-2"></div>
             <div onClick={() => setIsAdminSectionExpanded(!isAdminSectionExpanded)} className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 rounded p-0.5">
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Shared / Admin ({filterList(otherProjects).length})</span>
@@ -140,7 +142,8 @@ export default function ProjectsSidebar({
 
       {canViewSessions && filteredUsers.length > 0 && (
         <>
-          <div className="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+          {/* [FIX] Separator */}
+          <div className="border-t border-slate-200 dark:border-slate-800 my-2"></div>
           <div onClick={() => setIsSessionsExpanded(!isSessionsExpanded)} className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 rounded p-0.5 select-none">
             <div className="flex items-center gap-2"><Icons.Shield className="w-3 h-3 text-red-500" /><span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Sessions ({filteredUsers.length})</span></div>
             <Icons.ArrowRight className={`w-3 h-3 text-slate-300 transition-transform duration-200 ${isSessionsExpanded ? 'rotate-90' : ''}`} />

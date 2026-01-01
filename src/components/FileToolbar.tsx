@@ -17,6 +17,7 @@ export default function FileToolbar({
   onShowMembers, onClear, uploading, onUpload
 }: FileToolbarProps) {
   return (
+    // [FIX] Bottom border to dark:border-slate-800
     <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-wrap justify-between items-center gap-4">
       <div className="flex items-center gap-2 flex-1">
         <div className="relative flex-1 max-w-md">

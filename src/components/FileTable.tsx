@@ -35,6 +35,7 @@ export default function FileTable({
   return (
     <div className="flex-1 overflow-y-auto">
       <table className="w-full text-left font-bold border-collapse">
+        {/* [FIX] Header borders set to dark:border-slate-800 */}
         <thead className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50/50 dark:bg-slate-900/50 sticky top-0 z-10 backdrop-blur-sm">
           <tr>
             <th className="py-2 px-3 border-b border-slate-100 dark:border-slate-800 font-bold w-8"></th>
@@ -50,7 +51,9 @@ export default function FileTable({
             <th className="py-2 px-3 border-b border-slate-100 dark:border-slate-800 text-right w-64 font-bold">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+        
+        {/* [FIX] CRITICAL: Changed divide-slate-50 to dark:divide-slate-800/50 to remove white lines between rows */}
+        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
           {files.length === 0 ? (
             <tr><td colSpan={5} className="py-20 text-center text-slate-300 dark:text-slate-600 italic"><Icons.Archive className="w-10 h-10 mx-auto mb-3 opacity-50" /><span className="block opacity-70">{searchTerm ? "No matches found" : "No files in this context"}</span></td></tr>
           ) : (
