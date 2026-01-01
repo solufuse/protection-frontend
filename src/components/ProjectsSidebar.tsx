@@ -2,42 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { Icons } from '../icons';
 
-export interface Project {
-  id: string;
-  name: string;
-  role: 'owner' | 'admin' | 'moderator' | 'editor' | 'viewer' | 'staff_override';
-}
-
-export interface UserSummary {
-  uid: string;
-  email: string;
-  username?: string;
-  global_role: string;
-}
+export interface Project { id: string; name: string; role: 'owner' | 'admin' | 'moderator' | 'editor' | 'viewer' | 'staff_override'; }
+export interface UserSummary { uid: string; email: string; username?: string; global_role: string; }
 
 interface ProjectsSidebarProps {
-  user: any;
-  userGlobalData?: any;
-  projects: Project[];
-  usersList?: UserSummary[];
-  activeProjectId: string | null;
-  setActiveProjectId: (id: string | null) => void;
-  activeSessionUid?: string | null;
-  setActiveSessionUid?: (uid: string | null) => void;
-  isCreatingProject: boolean;
-  setIsCreatingProject: (val: boolean) => void;
-  newProjectName: string;
-  setNewProjectName: (val: string) => void;
-  onCreateProject: () => void;
-  onDeleteProject: (id: string, e: React.MouseEvent) => void;
+  user: any; userGlobalData?: any; projects: Project[]; usersList?: UserSummary[];
+  activeProjectId: string | null; setActiveProjectId: (id: string | null) => void;
+  activeSessionUid?: string | null; setActiveSessionUid?: (uid: string | null) => void;
+  isCreatingProject: boolean; setIsCreatingProject: (val: boolean) => void;
+  newProjectName: string; setNewProjectName: (val: string) => void;
+  onCreateProject: () => void; onDeleteProject: (id: string, e: React.MouseEvent) => void;
 }
 
 export default function ProjectsSidebar({
   user, userGlobalData, projects, usersList,
-  activeProjectId, setActiveProjectId,
-  activeSessionUid, setActiveSessionUid,
-  isCreatingProject, setIsCreatingProject,
-  newProjectName, setNewProjectName, onCreateProject, onDeleteProject
+  activeProjectId, setActiveProjectId, activeSessionUid, setActiveSessionUid,
+  isCreatingProject, setIsCreatingProject, newProjectName, setNewProjectName, onCreateProject, onDeleteProject
 }: ProjectsSidebarProps) {
     
   const [searchTerm, setSearchTerm] = useState("");
@@ -58,17 +38,12 @@ export default function ProjectsSidebar({
     }
   }, []);
 
-  useEffect(() => {
-    const state = { sessions: isSessionsExpanded, admin: isAdminSectionExpanded };
-    localStorage.setItem('solufuse_sidebar_state', JSON.stringify(state));
-  }, [isSessionsExpanded, isAdminSectionExpanded]);
+  useEffect(() => { localStorage.setItem('solufuse_sidebar_state', JSON.stringify({ sessions: isSessionsExpanded, admin: isAdminSectionExpanded })); }, [isSessionsExpanded, isAdminSectionExpanded]);
 
   useEffect(() => {
     if (searchTerm.trim() !== "") {
-        setIsSessionsExpanded(true);
-        setIsAdminSectionExpanded(true);
-        setAdminLimit(1000);
-        setSessionLimit(1000);
+        setIsSessionsExpanded(true); setIsAdminSectionExpanded(true);
+        setAdminLimit(1000); setSessionLimit(1000);
     } else {
         if (!activeSessionUid) setSessionLimit(20);
         setAdminLimit(20);
@@ -87,7 +62,6 @@ export default function ProjectsSidebar({
   const handleSelectUserSession = (uid: string) => { setActiveProjectId(null); if (setActiveSessionUid) setActiveSessionUid(uid); };
 
   const canViewSessions = ['super_admin', 'admin', 'moderator'].includes(userGlobalData?.global_role);
-
   const publicProjects = projects.filter(p => p.id.startsWith("PUBLIC_"));
   const myWorkspaceProjects = projects.filter(p => !p.id.startsWith("PUBLIC_") && (p.role === 'owner' || favorites.includes(p.id)));
   const otherProjects = projects.filter(p => !p.id.startsWith("PUBLIC_") && p.role !== 'owner' && !favorites.includes(p.id));
@@ -113,9 +87,7 @@ export default function ProjectsSidebar({
   };
 
   const visibleAdminProjects = filterList(otherProjects).slice(0, adminLimit);
-  const totalAdminProjects = filterList(otherProjects).length;
   const visibleUsers = filteredUsers.slice(0, sessionLimit);
-  const totalUsers = filteredUsers.length;
 
   return (
     <div className="w-60 flex flex-col gap-2 h-full flex-shrink-0">
@@ -125,8 +97,7 @@ export default function ProjectsSidebar({
       </div>
 
       <div onClick={handleSelectMySession} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer border transition-all ${activeProjectId === null && (!activeSessionUid) ? 'bg-slate-800 dark:bg-blue-600 text-white border-slate-900 dark:border-blue-700 shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
-        <Icons.HardDrive className="w-3.5 h-3.5" />
-        <span className="font-bold text-[10px]">My Session</span>
+        <Icons.HardDrive className="w-3.5 h-3.5" /> <span className="font-bold text-[10px]">My Session</span>
       </div>
 
       <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
@@ -151,27 +122,27 @@ export default function ProjectsSidebar({
           {filterList(myWorkspaceProjects).map(p => <ProjectItem key={p.id} p={p} />)}
       </div>
 
-      {totalAdminProjects > 0 && (
+      {filterList(otherProjects).length > 0 && (
           <>
             <div className="border-t border-slate-100 dark:border-slate-800 my-2"></div>
             <div onClick={() => setIsAdminSectionExpanded(!isAdminSectionExpanded)} className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 rounded p-0.5">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Shared / Admin ({totalAdminProjects})</span>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Shared / Admin ({filterList(otherProjects).length})</span>
                 <Icons.ArrowRight className={`w-3 h-3 text-slate-300 transition-transform ${isAdminSectionExpanded ? 'rotate-90' : ''}`} />
             </div>
             {isAdminSectionExpanded && (
                 <div className="flex flex-col animate-in fade-in slide-in-from-top-1 duration-200">
                     {visibleAdminProjects.map(p => <ProjectItem key={p.id} p={p} />)}
-                    {totalAdminProjects > adminLimit && <button onClick={() => setAdminLimit(prev => prev + 20)} className="text-[9px] text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-left px-2 py-1 font-bold italic">+ Show {totalAdminProjects - adminLimit} more...</button>}
+                    {filterList(otherProjects).length > adminLimit && <button onClick={() => setAdminLimit(prev => prev + 20)} className="text-[9px] text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-left px-2 py-1 font-bold italic">+ Show more...</button>}
                 </div>
             )}
           </>
       )}
 
-      {canViewSessions && filteredUsers && (
+      {canViewSessions && filteredUsers.length > 0 && (
         <>
           <div className="border-t border-slate-200 dark:border-slate-700 my-2"></div>
           <div onClick={() => setIsSessionsExpanded(!isSessionsExpanded)} className="flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 rounded p-0.5 select-none">
-            <div className="flex items-center gap-2"><Icons.Shield className="w-3 h-3 text-red-500" /><span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Sessions ({totalUsers})</span></div>
+            <div className="flex items-center gap-2"><Icons.Shield className="w-3 h-3 text-red-500" /><span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Sessions ({filteredUsers.length})</span></div>
             <Icons.ArrowRight className={`w-3 h-3 text-slate-300 transition-transform duration-200 ${isSessionsExpanded ? 'rotate-90' : ''}`} />
           </div>
           {isSessionsExpanded && (
@@ -182,7 +153,7 @@ export default function ProjectsSidebar({
                     <div className="flex flex-col overflow-hidden w-full"><span className="font-bold truncate text-[10px]">{u.username || "User"}</span><span className="truncate text-[8px] opacity-70">{u.email}</span></div>
                 </div>
                 ))}
-                {totalUsers > sessionLimit && <button onClick={() => setSessionLimit(prev => prev + 20)} className="text-[9px] text-red-500 hover:text-red-700 text-left px-2 py-1 font-bold italic">+ Show {totalUsers - sessionLimit} more...</button>}
+                {filteredUsers.length > sessionLimit && <button onClick={() => setSessionLimit(prev => prev + 20)} className="text-[9px] text-red-500 hover:text-red-700 text-left px-2 py-1 font-bold italic">+ Show more...</button>}
             </div>
           )}
         </>

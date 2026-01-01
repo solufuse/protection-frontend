@@ -21,9 +21,8 @@ export default function App() {
   // [+] Dark Mode State
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // [+] Init Theme
   useEffect(() => {
-    // Check LocalStorage or System Preference
+    // 1. Initialize Theme from LocalStorage or System
     const savedTheme = localStorage.getItem('solufuse_theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
@@ -35,6 +34,7 @@ export default function App() {
         document.documentElement.classList.remove('dark');
     }
 
+    // 2. Auth Listener
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
@@ -50,7 +50,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // [+] Toggle Function
   const toggleTheme = () => {
       const newMode = !isDarkMode;
       setIsDarkMode(newMode);
@@ -67,10 +66,11 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* Top Navbar Layout with Dark Mode support */}
+      {/* Top Navbar Layout with Dark Mode classes */}
       <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
         {user && <Navbar user={user} onLogout={() => auth.signOut()} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />}
         
+        {/* Global Scroll Enabled */}
         <main className="flex-1 overflow-y-scroll relative flex flex-col w-full">
           <Routes>
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
