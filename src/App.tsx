@@ -18,23 +18,26 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // [+] Dark Mode State
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Initialize state based on localStorage or System Pref
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+      const saved = localStorage.getItem('solufuse_theme');
+      if (saved) return saved === 'dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  // [FIX] Sync Logic: Updates DOM whenever 'isDarkMode' changes
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDarkMode) {
+      root.classList.add('dark');
+      localStorage.setItem('solufuse_theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      localStorage.setItem('solufuse_theme', 'light');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
-    // 1. Initialize Theme from LocalStorage or System
-    const savedTheme = localStorage.getItem('solufuse_theme');
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
-        setIsDarkMode(true);
-        document.documentElement.classList.add('dark');
-    } else {
-        setIsDarkMode(false);
-        document.documentElement.classList.remove('dark');
-    }
-
-    // 2. Auth Listener
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
@@ -51,26 +54,17 @@ export default function App() {
   }, []);
 
   const toggleTheme = () => {
-      const newMode = !isDarkMode;
-      setIsDarkMode(newMode);
-      if (newMode) {
-          document.documentElement.classList.add('dark');
-          localStorage.setItem('solufuse_theme', 'dark');
-      } else {
-          document.documentElement.classList.remove('dark');
-          localStorage.setItem('solufuse_theme', 'light');
-      }
+      setIsDarkMode(prev => !prev);
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 font-bold text-xs">LOADING SYSTEM...</div>;
 
   return (
     <BrowserRouter>
-      {/* Top Navbar Layout with Dark Mode classes */}
+      {/* Top Navbar Layout */}
       <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
         {user && <Navbar user={user} onLogout={() => auth.signOut()} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />}
         
-        {/* Global Scroll Enabled */}
         <main className="flex-1 overflow-y-scroll relative flex flex-col w-full">
           <Routes>
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
