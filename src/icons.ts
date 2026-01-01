@@ -90,6 +90,6 @@ export const Icons = {
   ArrowUpDown,
   Archive,
   Lock,
-  Activity,              // Requis par Navbar.tsx
-  Crown                  // Requis par Profile.tsx
+  Activity,
+  Crown
 };
