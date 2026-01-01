@@ -15,7 +15,6 @@ export default function Files({ user }: { user: any }) {
   const [files, setFiles] = useState<SessionFile[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   
-  // Navigation States
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
   const [usersList, setUsersList] = useState<UserSummary[]>([]);
@@ -46,6 +45,13 @@ export default function Files({ user }: { user: any }) {
       currentProjectRole = 'admin';
   }
 
+  // [+] Helper to get CLEAN project name for Header
+  const getActiveProjectName = () => {
+      if (!activeProjectId) return null;
+      const proj = projects.find(p => p.id === activeProjectId);
+      return proj ? proj.name : activeProjectId; // Show Name if found, else ID
+  };
+
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   
   const formatBytes = (bytes: number) => {
@@ -67,8 +73,6 @@ export default function Files({ user }: { user: any }) {
          if (res.ok) {
              const data = await res.json();
              setUserGlobalData(data);
-             
-             // [+] [LOGIC] Fetch Users if Staff (Super Admin, Admin, Moderator)
              if (['super_admin', 'admin', 'moderator'].includes(data.global_role)) {
                  fetchAllUsers(t);
              }
@@ -79,12 +83,7 @@ export default function Files({ user }: { user: any }) {
   const fetchAllUsers = async (token: string) => {
       try {
           const res = await fetch(`${API_URL}/admin/users?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } });
-          if (res.ok) {
-             setUsersList(await res.json());
-          } else {
-             // Silently fail if 403 (e.g., if backend doesn't allow Moderators yet)
-             console.warn("Could not fetch user list. Check backend permissions.");
-          }
+          if (res.ok) setUsersList(await res.json());
       } catch (e) { console.error("Admin List Error", e); }
   };
 
@@ -101,12 +100,8 @@ export default function Files({ user }: { user: any }) {
     try {
       const t = await getToken();
       let url = `${API_URL}/files/details`;
-      
-      if (activeProjectId) {
-          url += `?project_id=${activeProjectId}`;
-      } else if (activeSessionUid) {
-          url += `?project_id=${activeSessionUid}`;
-      }
+      if (activeProjectId) url += `?project_id=${activeProjectId}`;
+      else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
       
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
       if (!res.ok) throw new Error("Failed to fetch");
@@ -179,7 +174,6 @@ export default function Files({ user }: { user: any }) {
     try {
       const t = await getToken();
       let url = `${API_URL}/files/upload`;
-      
       if (activeProjectId) url += `?project_id=${activeProjectId}`;
       else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
 
@@ -285,8 +279,13 @@ export default function Files({ user }: { user: any }) {
             <h1 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
                 {activeProjectId ? (
                     <>
-                        <Icons.Folder className="w-5 h-5 text-blue-600" />
-                        <span>{activeProjectId}</span>
+                        {activeProjectId.startsWith("PUBLIC_") ? (
+                            <Icons.Hash className="w-5 h-5 text-blue-600" />
+                        ) : (
+                            <Icons.Folder className="w-5 h-5 text-blue-600" />
+                        )}
+                        {/* [+] DISPLAY CLEAN NAME */}
+                        <span>{getActiveProjectName()}</span>
                     </>
                 ) : activeSessionUid ? (
                     <>
@@ -297,7 +296,8 @@ export default function Files({ user }: { user: any }) {
                     <>
                         <Icons.HardDrive className="w-5 h-5 text-slate-600" />
                         <span>My Session</span>
-                        <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">RAM</span>
+                        {/* [+] RENAMED RAM TO PRIVATE */}
+                        <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">PRIVATE</span>
                     </>
                 )}
             </h1>
