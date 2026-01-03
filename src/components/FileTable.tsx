@@ -1,4 +1,7 @@
 
+// [structure:root] : Table Component for Files
+// [context:flow] : Displays files list with checkboxes, single-line dates, and actions.
+
 import { Fragment } from 'react';
 import { Icons } from '../icons';
 
@@ -21,7 +24,6 @@ interface FileTableProps {
   onOpenLink: (type: string, filename: string) => void;
   onDelete: (path: string) => void;
   formatBytes: (bytes: number) => string;
-  // [!] [CRITICAL] : New Props for Selection
   selectedFiles: Set<string>;
   onToggleSelect: (path: string) => void;
   onSelectAll: (checked: boolean) => void;
@@ -33,7 +35,8 @@ export default function FileTable({
   selectedFiles, onToggleSelect, onSelectAll
 }: FileTableProps) {
   
-  const allSelected = files.length > 0 && selectedFiles.size === files.length;
+  // [decision:logic] : Determine if all visible files are selected
+  const allSelected = files.length > 0 && files.every(f => selectedFiles.has(f.path));
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -41,12 +44,12 @@ export default function FileTable({
         {/* Header */}
         <thead className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50/50 dark:bg-[#161b22]/90 sticky top-0 z-10 backdrop-blur-sm border-b border-slate-100 dark:border-slate-800">
           <tr>
-            {/* [decision:logic] : Checkbox Column */}
-            <th className="py-2 px-3 w-8 text-center">
+            {/* [decision:logic] : Master Checkbox (Select All) */}
+            <th className="py-2 px-3 w-8 text-center" onClick={(e) => e.stopPropagation()}>
                 <input 
                     type="checkbox" 
                     checked={allSelected} 
-                    onChange={(e) => onSelectAll(e.target.checked)}
+                    onChange={(e) => { e.stopPropagation(); onSelectAll(e.target.checked); }}
                     className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
             </th>
@@ -69,17 +72,19 @@ export default function FileTable({
           ) : (
             files.map((file, i) => {
                const isConvertible = /\.(si2s|lf1s|mdb|json)$/i.test(file.filename);
-               const isSelected = selectedFiles.has(file.path);
+               // [!] [CRITICAL] : Fallback to filename if path is missing to ensure unique ID
+               const uniqueId = file.path || file.filename;
+               const isSelected = selectedFiles.has(uniqueId);
                
                return (
-                <Fragment key={i}>
+                <Fragment key={uniqueId}>
                     <tr className={`group transition-colors ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'}`}>
                       {/* Checkbox Row */}
-                      <td className="px-3 py-1.5 text-center">
+                      <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                           <input 
                             type="checkbox" 
                             checked={isSelected} 
-                            onChange={() => onToggleSelect(file.path)}
+                            onChange={(e) => { e.stopPropagation(); onToggleSelect(uniqueId); }}
                             className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                       </td>
