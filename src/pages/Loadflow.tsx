@@ -51,7 +51,6 @@ export default function Loadflow({ user }: { user: any }) {
   const [selectedCase, setSelectedCase] = useState<LoadflowResult | null>(null);
   
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
-  const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]); 
   
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   
@@ -98,7 +97,7 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
 
-  // [FIX] Update clean logic to target the correct folder if needed (Backend handles delete by path now)
+  // Update clean logic to target the correct folder if needed (Backend handles delete by path now)
   const cleanOldScenarios = async (rootName: string) => { 
       if (!activeProjectId && !activeSessionUid) return; 
       try { 
@@ -111,6 +110,7 @@ export default function Loadflow({ user }: { user: any }) {
           if (!listRes.ok) return; 
           
           const listData = await listRes.json(); 
+          // Match files starting with baseName inside loadflow_results or root
           const historyFiles = (listData.files || []).filter((f: any) => f.filename.includes(rootName + "_") && f.filename.endsWith(".json")); 
           historyFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
@@ -170,6 +170,7 @@ export default function Loadflow({ user }: { user: any }) {
           
           jsonFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
+          // Try loading the most recent valid result
           for (const candidate of jsonFiles) { 
               try { 
                   let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}`;
