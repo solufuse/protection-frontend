@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import Navbar from './components/Navbar';
 import Files from './pages/Files';
@@ -11,8 +11,8 @@ import Ingestion from './pages/Ingestion';
 import Config from './pages/Config';
 import Extraction from './pages/Extraction';
 import Login from './pages/Login';
-import Forum from './pages/Forum'; // [RESTORED]
-import Profile from './pages/Profile'; // [RESTORED]
+import Forum from './pages/Forum'; 
+import Profile from './pages/Profile'; 
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -40,11 +40,8 @@ export default function App() {
         setUser(currentUser);
         setLoading(false);
       } else {
-        console.log("No user detected. Signing in as Guest...");
-        signInAnonymously(auth).catch((error) => {
-            console.error("Auto-Guest failed:", error);
-            setLoading(false);
-        });
+        setUser(null);
+        setLoading(false);
       }
     });
     return () => unsubscribe();
@@ -53,31 +50,31 @@ export default function App() {
   const toggleTheme = () => {
       const newMode = !isDarkMode;
       setIsDarkMode(newMode);
-      if (newMode) {
-          document.documentElement.classList.add('dark');
-          localStorage.setItem('solufuse_theme', 'dark');
-      } else {
-          document.documentElement.classList.remove('dark');
-          localStorage.setItem('solufuse_theme', 'light');
-      }
+      localStorage.setItem('solufuse_theme', newMode ? 'dark' : 'light');
+      if (newMode) document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 font-bold text-xs">LOADING SYSTEM...</div>;
+  if (loading) return <div className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400">Loading...</div>;
 
   return (
     <BrowserRouter>
-      {/* Top Navbar Layout */}
-      <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+      <div className="flex flex-col h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-300 overflow-hidden">
+        
         {user && <Navbar user={user} onLogout={() => auth.signOut()} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />}
         
-        <main className="flex-1 overflow-y-scroll relative flex flex-col w-full">
+        {/* [FIX] Global Scroll Container 
+            - flex-1: Takes all remaining height
+            - overflow-y-scroll: Forces scrollbar track to always be visible (Stable UI)
+            - w-full: Full width
+        */}
+        <main className="flex-1 overflow-y-scroll w-full relative flex flex-col">
           <Routes>
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
             
             <Route path="/" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             <Route path="/files" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             
-            {/* [RESTORED ROUTES] */}
             <Route path="/forum" element={user ? <Forum user={user} /> : <Navigate to="/login" />} />
             <Route path="/profile" element={user ? <Profile user={user} /> : <Navigate to="/login" />} />
             
