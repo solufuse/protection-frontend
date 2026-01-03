@@ -70,7 +70,7 @@ export default function FileTable({
           {files.length === 0 ? (
             <tr><td colSpan={5} className="py-20 text-center text-slate-300 dark:text-slate-600 italic"><Icons.Archive className="w-10 h-10 mx-auto mb-3 opacity-50" /><span className="block opacity-70">{searchTerm ? "No matches found" : "No files in this context"}</span></td></tr>
           ) : (
-            files.map((file, i) => {
+            files.map((file) => { // [!] FIX: Removed unused 'i' argument
                const isConvertible = /\.(si2s|lf1s|mdb|json)$/i.test(file.filename);
                // [!] [CRITICAL] : Fallback to filename if path is missing to ensure unique ID
                const uniqueId = file.path || file.filename;
