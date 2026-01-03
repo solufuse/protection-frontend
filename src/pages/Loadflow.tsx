@@ -3,29 +3,69 @@
 // LOADFLOW PAGE
 // [context:flow] Main entry point. Composes Logic (Hook) and UI (Components).
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react'; 
 import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 import { useLoadflow } from '../hooks/useLoadflow';
+import { useAuth } from '../context/AuthContext';
 
 // Imported Modular Components
 import LoadflowToolbar from '../components/Loadflow/LoadflowToolbar';
 import ResultCard from '../components/Loadflow/ResultCard';
 import HistorySidebar from '../components/Loadflow/HistorySidebar';
 
-const Loadflow = () => {
+const Loadflow = ({ user }: { user: any }) => {
     // UI State
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
     const [onlyWinners, setOnlyWinners] = useState(false); 
     const [showHistory, setShowHistory] = useState(true);
+
+    // --- SIDEBAR STATE REQUIREMENTS ---
+    // [fix] ProjectsSidebar is complex, we need to provide all its props
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [isCreatingProject, setIsCreatingProject] = useState(false);
+    const [newProjectName, setNewProjectName] = useState("");
+    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
     // Logic Hook (Brain)
     const { 
         results, loading, error, historyFiles, 
         runAnalysis, loadResultFile 
     } = useLoadflow(currentProject?.id, currentProject?.name);
+
+    // Fetch Projects for Sidebar
+    useEffect(() => {
+        const fetchProjects = async () => {
+            if (!user) return;
+            try {
+                const token = await user.getIdToken();
+                const res = await fetch("https://api.solufuse.com/projects/", {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setProjects(data);
+                }
+            } catch (e) { console.error("Failed to load projects", e); }
+        };
+        fetchProjects();
+    }, [user]);
+
+    // Handle Project Selection from Sidebar
+    useEffect(() => {
+        if (activeProjectId) {
+            const p = projects.find(proj => proj.id === activeProjectId);
+            if (p) setCurrentProject(p);
+        } else {
+            setCurrentProject(null);
+        }
+    }, [activeProjectId, projects]);
+
+    // Helper for Sidebar props (read-only mode mostly)
+    const handleCreateProject = () => { alert("Create project via Files page"); setIsCreatingProject(false); };
+    const handleDeleteProject = () => { alert("Delete project via Files page"); };
 
     // Filter Logic
     const filteredResults = results.filter(r => {
@@ -35,7 +75,20 @@ const Loadflow = () => {
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
-            <ProjectsSidebar onSelectProject={setCurrentProject} selectedProjectId={currentProject?.id} />
+            <ProjectsSidebar 
+                user={user}
+                projects={projects}
+                activeProjectId={activeProjectId}
+                setActiveProjectId={setActiveProjectId}
+                isCreatingProject={isCreatingProject}
+                setIsCreatingProject={setIsCreatingProject}
+                newProjectName={newProjectName}
+                setNewProjectName={setNewProjectName}
+                onCreateProject={handleCreateProject}
+                onDeleteProject={handleDeleteProject}
+                // Optional props
+                userGlobalData={user} // Assuming user object has global_role
+            />
 
             <div className="flex-1 flex flex-col min-w-0">
                 {/* HEADER */}
@@ -55,7 +108,7 @@ const Loadflow = () => {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <GlobalRoleBadge />
+                        <GlobalRoleBadge role={user?.global_role} />
                         <button 
                             onClick={() => setShowHistory(!showHistory)}
                             className={`p-2 rounded-lg transition-colors ${showHistory ? 'bg-slate-100 dark:bg-slate-700 text-blue-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}

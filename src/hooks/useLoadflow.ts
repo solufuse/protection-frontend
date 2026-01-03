@@ -1,7 +1,7 @@
 
 // [structure:hook]
 // USELOADFLOW HOOK
-// [context:flow] Handles API interaction for Loadflow: Running analysis, saving results, loading history.
+// [context:flow] Handles API interaction for Loadflow.
 
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -38,7 +38,8 @@ export interface HistoryFile {
 }
 
 export const useLoadflow = (currentProjectId: string | undefined, currentProjectName: string | undefined) => {
-    const { token } = useAuth();
+    // [FIX] Use user object to get token dynamically
+    const { user } = useAuth();
     
     // State
     const [results, setResults] = useState<LoadflowResult[]>([]);
@@ -46,9 +47,10 @@ export const useLoadflow = (currentProjectId: string | undefined, currentProject
     const [error, setError] = useState<string | null>(null);
     const [historyFiles, setHistoryFiles] = useState<HistoryFile[]>([]);
 
-    // [?] [THOUGHT] Standardized API fetcher with token injection
+    // [?] [THOUGHT] Standardized API fetcher with async token retrieval
     const apiCall = useCallback(async (endpoint: string, options: RequestInit = {}) => {
-        if (!token) return;
+        if (!user) return;
+        const token = await user.getIdToken();
         const headers = { 
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -60,7 +62,7 @@ export const useLoadflow = (currentProjectId: string | undefined, currentProject
             throw new Error(err.detail || 'API Error');
         }
         return response.json();
-    }, [token]);
+    }, [user]);
 
     // [+] [INFO] Refresh available archives from backend
     const refreshHistory = useCallback(async () => {
@@ -123,11 +125,10 @@ export const useLoadflow = (currentProjectId: string | undefined, currentProject
         setError(null);
         try {
             // Workaround: Use download endpoint to get content
-            // Ensure we handle paths correctly if they are nested
             const cleanPath = filename.includes('/') ? filename : `loadflow_results/${filename}`;
             
             const response = await fetch(`https://api.solufuse.com/files/download?project_id=${currentProjectId}&filename=${cleanPath}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${(await user?.getIdToken())}` }
             });
             
             if (!response.ok) throw new Error("Could not load archive");
