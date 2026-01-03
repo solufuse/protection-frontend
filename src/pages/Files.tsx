@@ -172,7 +172,9 @@ export default function Files({ user }: { user: any }) {
             </h1>
             <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null && activeSessionUid === null} />
             {/* [MOVED] Badge is now here */}
-            {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}
+            {userGlobalData && userGlobalData.global_role && (
+                <div className="ml-2 scale-110">
+                    <GlobalRoleBadge role={userGlobalData.global_role} />
           </div>
         </div>
         <div className="flex gap-2">
