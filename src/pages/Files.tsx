@@ -73,17 +73,30 @@ export default function Files({ user }: { user: any }) {
 
   // --- ACTIONS ---
 
-  // [decision:logic] : Silent Download Helper
-  // Creates an invisible anchor tag to trigger download without opening a popup window.
-  // This is required to bypass browser popup blockers during bulk actions.
-  const triggerDownload = (url: string, filename: string) => {
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', filename); 
-      link.setAttribute('target', '_blank'); // Fallback
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  // [decision:logic] : Blob Download Method
+  // Fetching the file as a blob and creating a local object URL bypasses most popup blockers
+  // because the browser sees it as a "save" action initiated by the user, not a "navigation".
+  const downloadAsBlob = async (url: string, filename: string) => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename; // This forces the browser to save
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      } catch (error) {
+        console.error("Download failed", error);
+        notify(`Failed to download ${filename}`, "error");
+      }
   };
 
   const handleOpenLink = async (type: string, filename: string) => { 
@@ -101,12 +114,12 @@ export default function Files({ user }: { user: any }) {
           else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encName}&token=${t}${pParam}`; 
           
           if (url) {
-              // [decision:logic] : If it's a preview (json_tab), we MUST open a tab.
-              // If it's a download (raw, xlsx, json), we use the silent trigger.
               if (type === 'json_tab') {
+                  // Previews must open in a new tab
                   window.open(url, '_blank');
               } else {
-                  triggerDownload(url, filename);
+                  // Downloads use the blob method
+                  await downloadAsBlob(url, filename);
               }
           }
       } catch (e) { notify("Link Error", "error"); } 
@@ -117,15 +130,14 @@ export default function Files({ user }: { user: any }) {
       notify(`Preparing ${filesToDownload.length} downloads...`);
       
       for (const file of filesToDownload) {
-          // Skip incompatible files for conversions
           if (type !== 'raw' && !/\.(si2s|lf1s|mdb|json)$/i.test(file.filename)) continue;
           
-          // [!] [CRITICAL] : For Bulk JSON, we force 'json' (download) instead of 'json_tab' (preview)
-          // to avoid opening 50 tabs and crashing the browser.
-          handleOpenLink(type, file.filename);
+          // [decision:logic] : Sequential processing ensures browser doesn't choke on memory
+          // We assume handleOpenLink -> downloadAsBlob handles the fetch/save
+          await handleOpenLink(type === 'json' ? 'json' : type, file.filename);
           
-          // [decision:logic] : Small delay to prevent browser throttling
-          await new Promise(r => setTimeout(r, 750));
+          // Small delay is still good practice for UI responsiveness
+          await new Promise(r => setTimeout(r, 500));
       }
       setSelectedFiles(new Set());
   };
