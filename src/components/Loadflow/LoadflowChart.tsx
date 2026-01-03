@@ -16,8 +16,6 @@ interface Props {
 export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
     const [showCapaComparison, setShowCapaComparison] = useState(true);
     const [isGridView, setIsGridView] = useState(false);
-    
-    // [NEW] State for the Zoomed Chart
     const [zoomedGroup, setZoomedGroup] = useState<string | null>(null);
 
     const keys = Object.keys(groups);
@@ -59,11 +57,7 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
 
     // --- HELPER: RENDER SINGLE SVG ---
     const renderChartSvg = (targetBaseKeys: string[], width: string | number, height: string | number, hideAxisLabels = false) => {
-        // SVG Coordinate mapping
-        const getX = (val: number) => ((val - minX) / rangeX) * (typeof width === 'number' ? width - 40 : 800) + 20; 
-        const getY = (val: number) => (typeof height === 'number' ? height : 300) - ((val - plotMinY) / (plotMaxY - plotMinY)) * ((typeof height === 'number' ? height : 300) - 40) - 20;
-        
-        // Note: For dynamic width (100%), we use viewBox effectively
+        // Dynamic SVG Scaling
         const vW = 800; 
         const vH = 300;
         
@@ -172,7 +166,7 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                 {sortedBaseKeys.map((baseKey) => (
                     <div 
                         key={baseKey} 
-                        onClick={() => setZoomedGroup(baseKey)} // [NEW] Click to Zoom
+                        onClick={() => setZoomedGroup(baseKey)} 
                         className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm p-3 flex flex-col h-[200px] cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group relative"
                     >
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-100 dark:bg-slate-700 p-1 rounded">
@@ -201,13 +195,11 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                 <div className="relative h-[320px] w-full">
                     {renderChartSvg(sortedBaseKeys, 800, 300)}
                 </div>
-                {/* [NEW] Expanded Legend - Shows ALL keys */}
+                {/* Expanded Legend */}
                 <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 justify-center px-4">
                     {sortedKeys.map((key) => {
                         const isCapa = key.toUpperCase().endsWith('_CAPA');
                         const baseKey = key.replace(/_CAPA$/i, '').trim();
-                        // If grouping is ON, handle display logic (optional: hide CAPA specific legend if obvious, but user asked for ALL names)
-                        // User asked: "appear their names all" -> We show everything clearly.
                         const color = baseColorMap[baseKey];
                         
                         return (
@@ -224,7 +216,7 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
             </div>
         )}
 
-        {/* [NEW] ZOOM MODAL */}
+        {/* ZOOM MODAL */}
         {zoomedGroup && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in duration-200" onClick={() => setZoomedGroup(null)}>
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl h-[60vh] flex flex-col p-6 relative border border-slate-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
