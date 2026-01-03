@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { LoadflowResult } from '../../types/loadflow';
 import { Icons } from '../../icons';
+import ResultsTable from './ResultsTable'; // [NEW] Import Table for Modal
 
 const LINE_COLORS = [
   "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", 
@@ -17,6 +18,11 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
     const [showCapaComparison, setShowCapaComparison] = useState(true);
     const [isGridView, setIsGridView] = useState(false);
     const [zoomedGroup, setZoomedGroup] = useState<string | null>(null);
+
+    // --- LOCAL STATE FOR MODAL TABLE ---
+    const [modalSearch, setModalSearch] = useState("");
+    const [modalWinner, setModalWinner] = useState(false);
+    const [modalValid, setModalValid] = useState(false);
 
     const keys = Object.keys(groups);
     if (keys.length === 0) return null;
@@ -56,27 +62,36 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
     const sortedBaseKeys = Array.from(uniqueBaseKeys).sort();
 
     // --- HELPER: RENDER SINGLE SVG ---
-    // [FIX] Removed unused width/height args. Fixed ViewBox 800x300 works for responsive scale.
     const renderChartSvg = (targetBaseKeys: string[], hideAxisLabels = false) => {
         const vW = 800; 
         const vH = 300;
         
-        const mapX = (val: number) => ((val - minX) / rangeX) * (vW - 40) + 20;
-        const mapY = (val: number) => vH - ((val - plotMinY) / (plotMaxY - plotMinY)) * (vH - 40) - 20;
+        // [FIX] Increased Left Margin (50px) for Y-Axis Labels
+        const marginL = 50; 
+        const marginR = 20;
+        const marginB = 20;
+        const marginT = 20;
+
+        const mapX = (val: number) => ((val - minX) / rangeX) * (vW - (marginL + marginR)) + marginL;
+        const mapY = (val: number) => (vH - marginB) - ((val - plotMinY) / (plotMaxY - plotMinY)) * (vH - (marginT + marginB));
 
         return (
             <svg viewBox={`0 0 ${vW} ${vH}`} className="w-full h-full overflow-visible" preserveAspectRatio="none">
                 {/* Grid Lines */}
-                <line x1="20" y1={vH-20} x2={vW-20} y2={vH-20} stroke="#cbd5e1" strokeWidth="1" />
-                <line x1="20" y1="20" x2="20" y2={vH-20} stroke="#cbd5e1" strokeWidth="1" />
+                <line x1={marginL} y1={vH-marginB} x2={vW-marginR} y2={vH-marginB} stroke="#cbd5e1" strokeWidth="1" />
+                <line x1={marginL} y1={marginT} x2={marginL} y2={vH-marginB} stroke="#cbd5e1" strokeWidth="1" />
+                
+                {/* Horizontal Grid & Labels */}
                 {[0, 0.25, 0.5, 0.75, 1].map(pct => { 
-                    const yPos = 20 + (vH - 40) * pct; 
+                    const yPos = marginT + (vH - (marginT + marginB)) * pct; 
                     const val = plotMaxY - (plotMaxY - plotMinY) * pct; 
                     return (
                         <g key={pct}>
-                            <line x1="20" y1={yPos} x2={vW-20} y2={yPos} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
+                            <line x1={marginL} y1={yPos} x2={vW-marginR} y2={yPos} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
                             {!hideAxisLabels && (
-                                <text x="15" y={yPos + 3} textAnchor="end" fontSize="10" fill="#94a3b8" className="font-mono">{val.toFixed(0)}</text>
+                                <text x={marginL - 8} y={yPos + 3} textAnchor="end" fontSize="11" fontWeight="bold" fill="#94a3b8" className="font-mono">
+                                    {val.toFixed(0)}
+                                </text>
                             )}
                         </g>
                     ); 
@@ -127,6 +142,24 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
         );
     };
 
+    // [HELPER] Get Data for Modal Table
+    const getModalData = () => {
+        if (!zoomedGroup) return [];
+        const baseData = groups[zoomedGroup] || [];
+        const capaKey = keys.find(k => k.replace(/_CAPA$/i, '').trim() === zoomedGroup && k.toUpperCase().endsWith('_CAPA'));
+        const capaData = capaKey ? groups[capaKey] : [];
+        
+        // Return combined and sorted list
+        const combined = [...baseData, ...capaData];
+        combined.sort((a, b) => {
+             // Sort by Load Number then by ID
+             const diff = extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision);
+             if (diff !== 0) return diff;
+             return a.filename.localeCompare(b.filename);
+        });
+        return combined;
+    };
+
     return (
       <div className="flex flex-col gap-4">
         
@@ -167,7 +200,8 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                     <div 
                         key={baseKey} 
                         onClick={() => setZoomedGroup(baseKey)} 
-                        className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm p-3 flex flex-col h-[200px] cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group relative"
+                        // [FIX] Increased height to h-[250px] for better visibility
+                        className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm p-3 flex flex-col h-[250px] cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group relative"
                     >
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-100 dark:bg-slate-700 p-1 rounded">
                             <Icons.Maximize className="w-3 h-3 text-slate-500" />
@@ -185,7 +219,7 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                             )}
                         </div>
                         <div className="flex-1 w-full relative">
-                            {renderChartSvg([baseKey], true)}
+                            {renderChartSvg([baseKey], false)} {/* Show axis labels in grid too for clarity */}
                         </div>
                     </div>
                 ))}
@@ -216,33 +250,50 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
             </div>
         )}
 
-        {/* ZOOM MODAL */}
+        {/* [NEW] ADVANCED ZOOM MODAL WITH TABLE */}
         {zoomedGroup && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in duration-200" onClick={() => setZoomedGroup(null)}>
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl h-[60vh] flex flex-col p-6 relative border border-slate-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-between items-center mb-4">
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col relative border border-slate-200 dark:border-slate-700 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                    
+                    {/* Modal Header */}
+                    <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                             <span style={{ color: baseColorMap[zoomedGroup] }}>{zoomedGroup}</span>
-                            <span className="text-sm font-normal text-slate-400">Detailed Analysis</span>
+                            <span className="text-sm font-normal text-slate-400">Analysis & Data</span>
                         </h2>
-                        <button onClick={() => setZoomedGroup(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
-                            <Icons.X className="w-6 h-6 text-slate-500" />
+                        <button onClick={() => setZoomedGroup(null)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
+                            <Icons.X className="w-5 h-5 text-slate-500" />
                         </button>
                     </div>
                     
-                    <div className="flex-1 w-full relative bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700 p-4">
-                         {renderChartSvg([zoomedGroup])}
-                    </div>
+                    {/* Modal Body: Split into Chart (Top) and Table (Bottom) */}
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        
+                        {/* 1. Zoomed Chart */}
+                        <div className="h-[40%] p-4 border-b border-slate-100 dark:border-slate-700 shrink-0">
+                             <div className="w-full h-full relative">
+                                {renderChartSvg([zoomedGroup])}
+                             </div>
+                        </div>
 
-                    <div className="mt-4 flex gap-4 justify-center">
-                         <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                            <div className="w-6 h-0 border-t-4 border-solid" style={{ borderColor: baseColorMap[zoomedGroup] }}></div>
-                            Base Scenario
-                         </div>
-                         <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                            <div className="w-6 h-0 border-t-4 border-dashed opacity-60" style={{ borderColor: baseColorMap[zoomedGroup] }}></div>
-                            With CAPA
-                         </div>
+                        {/* 2. Contextual Table */}
+                        <div className="flex-1 min-h-0 bg-slate-50 dark:bg-slate-900/30 flex flex-col p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Icons.Table className="w-4 h-4 text-slate-400" />
+                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                                    Detailed Results for {zoomedGroup}
+                                </span>
+                            </div>
+                            
+                            {/* Reusing ResultsTable with local state filters */}
+                            <ResultsTable 
+                                results={getModalData()}
+                                filterSearch={modalSearch} setFilterSearch={setModalSearch}
+                                filterWinner={modalWinner} setFilterWinner={setModalWinner}
+                                filterValid={modalValid} setFilterValid={setModalValid}
+                                onSelectCase={() => {}} // No action on click inside modal for now
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
