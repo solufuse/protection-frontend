@@ -43,7 +43,7 @@ export default function Files({ user }: { user: any }) {
   // --- HOOKS ---
   const { 
     files, loading, uploading, sortConfig, 
-    handleSort, handleUpload, handleDelete, handleBulkDelete, refreshFiles,
+    handleSort, handleUpload, handleDelete, handleBulkDelete, handleBulkDownload, refreshFiles,
     starredFiles, toggleStar 
   } = useFileManager(user, activeProjectId, activeSessionUid, API_URL, notify);
 
@@ -67,38 +67,12 @@ export default function Files({ user }: { user: any }) {
   const fetchAllUsers = async (token: string) => { try { const res = await fetch(`${API_URL}/admin/users?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) setUsersList(await res.json()); } catch (e) { console.error("Admin List Error", e); } };
   const fetchProjects = async () => { try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } }); if (res.ok) setProjects(await res.json()); } catch (e) { console.error("Failed to load projects", e); } };
 
-  // Project Management
   const createProject = async () => { if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); if (!newProjectName.trim()) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/create`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newProjectName, name: newProjectName }) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail); } notify("Project Created"); setNewProjectName(""); setIsCreatingProject(false); fetchProjects(); } catch (e: any) { notify(e.message || "Failed", "error"); } };
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
 
   // --- ACTIONS ---
 
-  // [decision:logic] : Blob Download Method
-  // Fetching the file as a blob and creating a local object URL bypasses most popup blockers
-  // because the browser sees it as a "save" action initiated by the user, not a "navigation".
-  const downloadAsBlob = async (url: string, filename: string) => {
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Network response was not ok');
-        
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = filename; // This forces the browser to save
-        document.body.appendChild(link);
-        link.click();
-        
-        // Cleanup
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-      } catch (error) {
-        console.error("Download failed", error);
-        notify(`Failed to download ${filename}`, "error");
-      }
-  };
-
+  // Legacy single download link
   const handleOpenLink = async (type: string, filename: string) => { 
       try { 
           const t = await getToken(); 
@@ -113,33 +87,25 @@ export default function Files({ user }: { user: any }) {
           else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}&token=${t}${pParam}`; 
           else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encName}&token=${t}${pParam}`; 
           
-          if (url) {
-              if (type === 'json_tab') {
-                  // Previews must open in a new tab
-                  window.open(url, '_blank');
-              } else {
-                  // Downloads use the blob method
-                  await downloadAsBlob(url, filename);
-              }
-          }
+          if (url) window.open(url, '_blank');
       } catch (e) { notify("Link Error", "error"); } 
   };
 
-  const handleBulkDownload = async (type: 'raw' | 'xlsx' | 'json') => {
-      const filesToDownload = filteredFiles.filter(f => selectedFiles.has(f.path));
-      notify(`Preparing ${filesToDownload.length} downloads...`);
-      
-      for (const file of filesToDownload) {
-          if (type !== 'raw' && !/\.(si2s|lf1s|mdb|json)$/i.test(file.filename)) continue;
-          
-          // [decision:logic] : Sequential processing ensures browser doesn't choke on memory
-          // We assume handleOpenLink -> downloadAsBlob handles the fetch/save
-          await handleOpenLink(type === 'json' ? 'json' : type, file.filename);
-          
-          // Small delay is still good practice for UI responsiveness
-          await new Promise(r => setTimeout(r, 500));
+  const onBulkDownloadTrigger = async (type: 'raw' | 'xlsx' | 'json') => {
+      if (type === 'raw') {
+         await handleBulkDownload(selectedFiles);
+         setSelectedFiles(new Set());
+      } else {
+         // Fallback loop for conversions (XLSX/JSON)
+         const filesToDownload = filteredFiles.filter(f => selectedFiles.has(f.path));
+         notify(`Processing ${filesToDownload.length} conversions...`);
+         for (const file of filesToDownload) {
+             if (!/\.(si2s|lf1s|mdb|json)$/i.test(file.filename)) continue;
+             handleOpenLink(type === 'json' ? 'json' : type, file.filename);
+             await new Promise(r => setTimeout(r, 750));
+         }
+         setSelectedFiles(new Set());
       }
-      setSelectedFiles(new Set());
   };
 
   const toggleSelect = (path: string) => {
@@ -198,7 +164,7 @@ export default function Files({ user }: { user: any }) {
                 searchTerm={searchTerm} setSearchTerm={setSearchTerm} fileCount={filteredFiles.length} 
                 activeProjectId={activeProjectId || activeSessionUid} onShowMembers={() => setShowMembers(true)} 
                 uploading={uploading} onUpload={handleUpload}
-                selectedCount={selectedFiles.size} onBulkDownload={handleBulkDownload} onBulkDelete={() => handleBulkDelete(Array.from(selectedFiles)).then(() => setSelectedFiles(new Set()))}
+                selectedCount={selectedFiles.size} onBulkDownload={onBulkDownloadTrigger} onBulkDelete={() => handleBulkDelete(Array.from(selectedFiles)).then(() => setSelectedFiles(new Set()))}
             />
             
             <FileTable 

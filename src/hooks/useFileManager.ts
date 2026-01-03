@@ -5,7 +5,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SessionFile, SortKey, SortOrder } from '../components/FileTable';
 
-// [decision:logic] : Return type definition
 interface UseFileManagerReturn {
     files: SessionFile[];
     loading: boolean;
@@ -15,8 +14,8 @@ interface UseFileManagerReturn {
     handleUpload: (fileList: FileList | null) => Promise<void>;
     handleDelete: (path: string) => Promise<void>;
     handleBulkDelete: (paths: string[]) => Promise<void>;
+    handleBulkDownload: (selectedFiles: Set<string>) => Promise<void>; 
     refreshFiles: () => void;
-    // [!] [CRITICAL] : New Star features
     starredFiles: Set<string>;
     toggleStar: (path: string) => void;
 }
@@ -36,13 +35,11 @@ export const useFileManager = (
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'uploaded_at', order: 'desc' });
     
     // [decision:logic] : Initialize Starred Files from LocalStorage
-    // We use a Set for O(1) lookup performance during rendering.
     const [starredFiles, setStarredFiles] = useState<Set<string>>(() => {
         const saved = localStorage.getItem('solufuse_starred_files');
         return saved ? new Set(JSON.parse(saved)) : new Set();
     });
 
-    // [+] [INFO] : Persist stars when changed
     useEffect(() => {
         localStorage.setItem('solufuse_starred_files', JSON.stringify(Array.from(starredFiles)));
     }, [starredFiles]);
@@ -56,10 +53,8 @@ export const useFileManager = (
         });
     };
 
-    // [+] [INFO] : Helper to get the auth token
     const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
 
-    // [+] [INFO] : Fetch Files from Backend
     const fetchFiles = useCallback(async () => {
         if (!user) return;
         setLoading(true);
@@ -81,10 +76,8 @@ export const useFileManager = (
         }
     }, [user, activeProjectId, activeSessionUid, apiUrl]);
 
-    // [+] [INFO] : Initial Load
     useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
-    // [+] [INFO] : Upload Logic
     const handleUpload = async (fileList: FileList | null) => {
         if (!fileList || !user) return;
         setUploading(true);
@@ -110,7 +103,6 @@ export const useFileManager = (
         }
     };
 
-    // [+] [INFO] : Delete Logic
     const handleDelete = async (path: string) => {
         try {
             const t = await getToken();
@@ -136,22 +128,60 @@ export const useFileManager = (
         }
     };
 
+    // [decision:logic] : Bulk Download via Backend ZIP
+    const handleBulkDownload = async (selectedFiles: Set<string>) => {
+        const targets = Array.from(selectedFiles);
+        if (targets.length === 0) return;
+
+        notify(`Compressing ${targets.length} files...`);
+        
+        try {
+            const t = await getToken();
+            let url = `${apiUrl}/files/bulk-download`;
+            if (activeProjectId) url += `?project_id=${activeProjectId}`;
+            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${t}`,
+                    'Content-Type': 'application/json'
+                },
+                // Send simple list of filenames (path=filename in this backend version)
+                body: JSON.stringify(targets) 
+            });
+
+            if (!res.ok) throw new Error("Compression failed");
+
+            // Convert to Blob and download
+            const blob = await res.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `solufuse_archive_${new Date().getTime()}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            notify("Archive Downloaded!");
+
+        } catch (e) {
+            console.error(e);
+            notify("Bulk download failed", "error");
+        }
+    };
+
     const handleSort = (key: SortKey) => {
         setSortConfig(current => ({ key, order: current.key === key && current.order === 'asc' ? 'desc' : 'asc' }));
     };
 
-    // [decision:logic] : Sorting Strategy
-    // 1. Starred files ALWAYS come first.
-    // 2. Then normal sorting applies.
     const sortedFiles = [...files].sort((a, b) => {
-        // [!] [CRITICAL] : Star Priority Logic
         const aStarred = starredFiles.has(a.path || a.filename);
         const bStarred = starredFiles.has(b.path || b.filename);
 
-        if (aStarred && !bStarred) return -1; // a comes first
-        if (!aStarred && bStarred) return 1;  // b comes first
+        if (aStarred && !bStarred) return -1; 
+        if (!aStarred && bStarred) return 1;
 
-        // Standard sorting for items with same star status
         let aVal: any = a[sortConfig.key];
         let bVal: any = b[sortConfig.key];
         
@@ -179,6 +209,7 @@ export const useFileManager = (
         handleUpload,
         handleDelete,
         handleBulkDelete,
+        handleBulkDownload, 
         refreshFiles: fetchFiles,
         starredFiles,
         toggleStar
