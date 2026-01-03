@@ -1,7 +1,7 @@
 
 // [structure:component]
 // LOADFLOW TOOLBAR
-// [context:flow] Controls for running analysis. Styled exactly like FileToolbar.tsx.
+// [context:flow] Controls for running analysis with naming support.
 
 import * as Icons from 'lucide-react';
 import ContextRoleBadge from '../ContextRoleBadge';
@@ -16,16 +16,20 @@ interface LoadflowToolbarProps {
     project: Project | null;
     onToggleHistory: () => void;
     showHistory: boolean;
+    // [+] New Props for Naming
+    runName: string;
+    setRunName: (v: string) => void;
 }
 
 const LoadflowToolbar = ({ 
     onRun, loading, onlyWinners, setOnlyWinners, count,
-    project, onToggleHistory, showHistory
+    project, onToggleHistory, showHistory,
+    runName, setRunName
 }: LoadflowToolbarProps) => {
     return (
         <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-wrap justify-between items-center gap-4 min-h-[50px]">
             
-            {/* LEFT: Context & Status (Mimics the Search/Count area of FileToolbar) */}
+            {/* LEFT: Context & Status */}
             <div className="flex items-center gap-3">
                  <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
                     <Icons.Activity className="w-4 h-4" />
@@ -54,10 +58,22 @@ const LoadflowToolbar = ({
                  )}
             </div>
 
-            {/* RIGHT: Actions (Mimics the Buttons area of FileToolbar) */}
+            {/* RIGHT: Actions */}
             <div className="flex items-center gap-2">
                 
-                {/* Filter Toggle (Style matches 'MEMBERS' button) */}
+                {/* [+] Run Name Input */}
+                <div className="relative group">
+                    <input 
+                        type="text" 
+                        placeholder="Run Name..." 
+                        value={runName}
+                        onChange={(e) => setRunName(e.target.value)}
+                        className="w-32 pl-2 pr-2 py-1.5 text-[10px] font-medium border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-400"
+                        maxLength={20}
+                    />
+                </div>
+
+                {/* Filter Toggle */}
                 <button
                     onClick={() => setOnlyWinners(!onlyWinners)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-bold transition-all text-[10px] border ${
@@ -67,10 +83,10 @@ const LoadflowToolbar = ({
                     }`}
                 >
                     <Icons.Trophy className="w-3.5 h-3.5" />
-                    {onlyWinners ? 'WINNERS ONLY' : 'ALL RESULTS'}
+                    {onlyWinners ? 'WINNERS' : 'ALL'}
                 </button>
 
-                {/* Run Button (Style matches 'UPLOAD' button) */}
+                {/* Run Button */}
                 <button
                     onClick={onRun}
                     disabled={loading || !project}
@@ -79,10 +95,10 @@ const LoadflowToolbar = ({
                     }`}
                 >
                     {loading ? <Icons.Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Icons.Play className="w-3.5 h-3.5" />}
-                    RUN ANALYSIS
+                    RUN
                 </button>
 
-                {/* History Toggle (Icon Button) */}
+                {/* History Toggle */}
                 <button 
                     onClick={onToggleHistory}
                     className={`p-1.5 rounded border transition-colors ${

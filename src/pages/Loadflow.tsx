@@ -1,7 +1,7 @@
 
 // [structure:root]
 // LOADFLOW PAGE
-// [context:flow] Updated to fully mirror Files.tsx sidebar behavior (Sessions, Admins, etc.)
+// [context:flow] Main entry point.
 
 import { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react'; 
@@ -14,7 +14,7 @@ import ResultCard from '../components/Loadflow/ResultCard';
 import HistorySidebar from '../components/Loadflow/HistorySidebar';
 
 const Loadflow = ({ user }: { user: any }) => {
-    // --- SIDEBAR STATE (FULL PARITY) ---
+    // --- SIDEBAR STATE ---
     const [projects, setProjects] = useState<Project[]>([]);
     const [usersList, setUsersList] = useState<UserSummary[]>([]);
     
@@ -28,6 +28,9 @@ const Loadflow = ({ user }: { user: any }) => {
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
     const [onlyWinners, setOnlyWinners] = useState(false); 
     const [showHistory, setShowHistory] = useState(true);
+    
+    // [+] Run Name State
+    const [runName, setRunName] = useState("");
 
     // Logic Hook
     const { 
@@ -61,12 +64,10 @@ const Loadflow = ({ user }: { user: any }) => {
     // --- SELECTION LOGIC ---
     useEffect(() => {
         if (activeProjectId) {
-            // Project Mode
             const p = projects.find(proj => proj.id === activeProjectId);
             if (p) setCurrentProject(p);
             if (activeSessionUid) setActiveSessionUid(null);
         } else if (activeSessionUid) {
-            // Session Mode
             const u = usersList.find(usr => usr.uid === activeSessionUid);
             setCurrentProject({ 
                 id: 'SESSION', 
@@ -75,7 +76,6 @@ const Loadflow = ({ user }: { user: any }) => {
             });
             if (activeProjectId) setActiveProjectId(null);
         } else {
-            // My Session (Default)
             setCurrentProject(null);
         }
     }, [activeProjectId, activeSessionUid, projects, usersList]);
@@ -86,6 +86,11 @@ const Loadflow = ({ user }: { user: any }) => {
         alert(`Please delete project ${id} from the Files Dashboard.`);
     };
 
+    // [+] WRAPPER TO PASS NAME
+    const handleRunClick = () => {
+        runAnalysis(runName);
+    };
+
     const filteredResults = results.filter(r => {
         if (onlyWinners) return r.is_winner;
         return true;
@@ -93,7 +98,6 @@ const Loadflow = ({ user }: { user: any }) => {
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
-            {/* FULLY FUNCTIONAL SIDEBAR */}
             <ProjectsSidebar 
                 user={user}
                 userGlobalData={user}
@@ -117,7 +121,7 @@ const Loadflow = ({ user }: { user: any }) => {
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
                 
                 <LoadflowToolbar 
-                    onRun={runAnalysis} 
+                    onRun={handleRunClick} 
                     loading={loading}
                     onlyWinners={onlyWinners}
                     setOnlyWinners={setOnlyWinners}
@@ -125,6 +129,9 @@ const Loadflow = ({ user }: { user: any }) => {
                     project={currentProject} 
                     showHistory={showHistory}
                     onToggleHistory={() => setShowHistory(!showHistory)}
+                    // [+] Pass Naming Props
+                    runName={runName}
+                    setRunName={setRunName}
                 />
 
                 <div className="flex-1 flex overflow-hidden">
@@ -142,7 +149,7 @@ const Loadflow = ({ user }: { user: any }) => {
                                 <p className="text-xs font-bold uppercase tracking-widest">
                                     {currentProject ? `Ready to analyze ${currentProject.name}` : "Ready to analyze Session"}
                                 </p>
-                                <p className="text-[10px] mt-1">Press Run to start</p>
+                                <p className="text-[10px] mt-1">Enter a name and press Run</p>
                             </div>
                         )}
 

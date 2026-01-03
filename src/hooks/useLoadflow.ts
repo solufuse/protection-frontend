@@ -1,7 +1,7 @@
 
 // [structure:hook]
 // USELOADFLOW HOOK
-// [context:flow] Handles API interaction. Now supports Project AND Session contexts.
+// [context:flow] Handles API interaction. Now supports Custom Filenames.
 
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -37,7 +37,6 @@ export interface HistoryFile {
     path?: string;
 }
 
-// [FIX] Added activeSessionUid to params
 export const useLoadflow = (
     currentProjectId: string | null, 
     activeSessionUid: string | null,
@@ -69,14 +68,12 @@ export const useLoadflow = (
 
     // [+] [INFO] Refresh available archives
     const refreshHistory = useCallback(async () => {
-        // [logic] Work in Project OR Session mode
         if (!currentProjectId && !activeSessionUid) return;
 
         try {
-            // Build URL based on context (Project vs Session)
             let url = '/files/details';
             if (currentProjectId) url += `?project_id=${currentProjectId}`;
-            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`; // Backend treats session UID as project_id param often
+            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`; 
 
             const data = await apiCall(url);
             
@@ -101,22 +98,23 @@ export const useLoadflow = (
         if (currentProjectId || activeSessionUid) refreshHistory();
     }, [currentProjectId, activeSessionUid, refreshHistory]);
 
-    // [+] [INFO] Run Analysis
-    const runAnalysis = async () => {
+    // [+] [INFO] Run Analysis with Custom Name
+    const runAnalysis = async (customName: string) => {
         if (!currentProjectId && !activeSessionUid) return;
         setLoading(true);
         setError(null);
         setResults([]);
         
         try {
-            const safeName = (currentProjectName || 'session_run').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 15);
+            // Use custom name or fallback to project/default
+            let base = customName.trim();
+            if (!base) base = (currentProjectName || 'run');
+            
+            // Clean the name strictly
+            const safeName = base.replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 20);
             
             let url = `/loadflow/run-and-save?basename=${safeName}`;
             if (currentProjectId) url += `&project_id=${currentProjectId}`;
-            // If session, we don't send project_id, backend defaults to user session
-            
-            // [!] Edge case: If viewing ANOTHER user's session (Admin), we might need specific backend support
-            // For now, assuming standard /run-and-save uses current auth user or project_id.
             
             const data: LoadflowResponse = await apiCall(url, { method: 'POST' });
 
