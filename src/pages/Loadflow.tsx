@@ -97,29 +97,28 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
 
-  // Update clean logic to target the correct folder if needed (Backend handles delete by path now)
+  // [FIX] Update clean logic: ONLY send project_id if it's a Project.
   const cleanOldScenarios = async (rootName: string) => { 
       if (!activeProjectId && !activeSessionUid) return; 
       try { 
           const t = await getToken(); 
           let url = `${API_URL}/files/details`;
+          
+          // [FIX] Session logic: if activeProjectId is null, don't send anything (defaults to user session)
           if (activeProjectId) url += `?project_id=${activeProjectId}`;
-          else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
 
           const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
           if (!listRes.ok) return; 
           
           const listData = await listRes.json(); 
-          // Match files starting with baseName inside loadflow_results or root
           const historyFiles = (listData.files || []).filter((f: any) => f.filename.includes(rootName + "_") && f.filename.endsWith(".json")); 
           historyFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
           if (historyFiles.length > MAX_HISTORY) { 
               const filesToDelete = historyFiles.slice(MAX_HISTORY); 
               for (const file of filesToDelete) { 
-                  let delUrl = `${API_URL}/files/file/${file.filename}`; // filename includes path now
+                  let delUrl = `${API_URL}/files/file/${file.filename}`;
                   if (activeProjectId) delUrl += `?project_id=${activeProjectId}`;
-                  else if (activeSessionUid) delUrl += `?project_id=${activeSessionUid}`;
                   
                   await fetch(delUrl, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); 
               } 
@@ -156,8 +155,10 @@ export default function Loadflow({ user }: { user: any }) {
       try { 
           const t = await getToken(); 
           let url = `${API_URL}/files/details`;
+          
+          // [FIX] Correctly handle Session vs Project
           if (activeProjectId) url += `?project_id=${activeProjectId}`;
-          else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+          // If Project ID is null, we send nothing -> Backend defaults to My Session
 
           const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
           if (!listRes.ok) throw new Error("Failed to list files"); 
@@ -170,12 +171,10 @@ export default function Loadflow({ user }: { user: any }) {
           
           jsonFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
-          // Try loading the most recent valid result
           for (const candidate of jsonFiles) { 
               try { 
                   let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}`;
                   if (activeProjectId) prevUrl += `&project_id=${activeProjectId}`;
-                  else if (activeSessionUid) prevUrl += `&project_id=${activeSessionUid}`;
 
                   const dataRes = await fetch(prevUrl); 
                   if (dataRes.ok) { 
@@ -224,8 +223,9 @@ export default function Loadflow({ user }: { user: any }) {
           if (!jsonFilename.endsWith('.json')) jsonFilename += '.json';
           
           let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}`;
+          
+          // [FIX] Session logic here too
           if (activeProjectId) url += `&project_id=${activeProjectId}`;
-          else if (activeSessionUid) url += `&project_id=${activeSessionUid}`;
 
           const dataRes = await fetch(url); 
           if (!dataRes.ok) throw new Error("No results found."); 
@@ -248,6 +248,7 @@ export default function Loadflow({ user }: { user: any }) {
           const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 20) || "lf_run"; 
           
           let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}`;
+          // [FIX] Don't send project_id for Sessions
           if (activeProjectId) url += `&project_id=${activeProjectId}`;
 
           const runRes = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } }); 
