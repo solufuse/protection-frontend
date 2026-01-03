@@ -147,7 +147,7 @@ export const useFileManager = (
                     'Authorization': `Bearer ${t}`,
                     'Content-Type': 'application/json'
                 },
-                // Send simple list of filenames (path=filename in this backend version)
+                // Send simple list of filenames
                 body: JSON.stringify(targets) 
             });
 
