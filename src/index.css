@@ -3,18 +3,19 @@
 @tailwind components;
 @tailwind utilities;
 
-/* [CRITICAL] App Shell Layout Fix */
+/* [FIX] Disable browser scroll to let App.tsx <main> handle it exclusively */
 html, body {
   height: 100%;
-  width: 100%;
-  overflow: hidden; /* Disable browser scroll, let App.tsx handle it */
+  overflow: hidden; 
   margin: 0;
   padding: 0;
 }
 
 body {
+  /* Base size increased to 14px (text-sm equivalent) for better reading */
   font-size: 14px; 
   @apply bg-slate-50 text-slate-900 transition-colors duration-300;
+  padding-right: 0 !important;
 }
 
 /* Custom Scrollbar (Colab Style) */

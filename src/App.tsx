@@ -18,11 +18,9 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // Dark Mode State
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
-    // Init Theme
     const savedTheme = localStorage.getItem('solufuse_theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
@@ -34,7 +32,6 @@ export default function App() {
         document.documentElement.classList.remove('dark');
     }
 
-    // Auth Listener
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
@@ -63,11 +60,7 @@ export default function App() {
         
         {user && <Navbar user={user} onLogout={() => auth.signOut()} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />}
         
-        {/* [FIX] Global Scroll Container 
-            - flex-1: Takes all remaining height
-            - overflow-y-scroll: Forces scrollbar track to always be visible (Stable UI)
-            - w-full: Full width
-        */}
+        {/* [FIX] Global Scroll Container: overflow-y-scroll ensures scrollbar is always visible/active */}
         <main className="flex-1 overflow-y-scroll w-full relative flex flex-col">
           <Routes>
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />

@@ -14,7 +14,6 @@ import ArchiveModal from '../components/Loadflow/ArchiveModal';
 import { LoadflowResult } from '../types/loadflow';
 
 export default function Loadflow({ user }: { user: any }) {
-  // --- UI STATE (Sidebar/View) ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [usersList, setUsersList] = useState<UserSummary[]>([]);
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
@@ -26,7 +25,6 @@ export default function Loadflow({ user }: { user: any }) {
   const [newProjectName, setNewProjectName] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   
-  // --- FILTERS ---
   const [filterSearch, setFilterSearch] = useState("");
   const [filterWinner, setFilterWinner] = useState(false);
   const [filterValid, setFilterValid] = useState(false);
@@ -35,7 +33,6 @@ export default function Loadflow({ user }: { user: any }) {
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
 
-  // --- LOGIC ENGINE (Hook) ---
   const { 
       loading, results, scenarioGroups, baseName, setBaseName, historyFiles, 
       handleManualLoad, runAnalysis, extractLoadNumber 
@@ -44,7 +41,6 @@ export default function Loadflow({ user }: { user: any }) {
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   const currentProjectRole = activeProjectId ? projects.find(p => p.id === activeProjectId)?.role : 'owner';
 
-  // --- SIDEBAR DATA FETCHING ---
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
   
   useEffect(() => {
@@ -52,11 +48,9 @@ export default function Loadflow({ user }: { user: any }) {
           if (!user) return;
           try {
               const t = await getToken();
-              // Fetch Projects
               const pRes = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } });
               if (pRes.ok) setProjects(await pRes.json());
 
-              // Fetch Global Role / Users (If Admin)
               if (['super_admin', 'admin', 'moderator'].includes(user.global_role)) {
                   const uRes = await fetch(`${API_URL}/users/`, { headers: { 'Authorization': `Bearer ${t}` } });
                   if (uRes.ok) {
@@ -73,11 +67,9 @@ export default function Loadflow({ user }: { user: any }) {
       initData();
   }, [user]);
 
-  // Sidebar Mutual Exclusive Logic
   useEffect(() => { if (activeProjectId && activeSessionUid) setActiveSessionUid(null); }, [activeProjectId]);
   useEffect(() => { if (activeSessionUid && activeProjectId) setActiveProjectId(null); }, [activeSessionUid]);
 
-  // --- UI HELPER: CLEAN DISPLAY NAME ---
   const getDisplayName = (fullId: string | null) => {
       if (!fullId) return "My Session";
       const project = projects.find(p => p.id === fullId);
@@ -87,13 +79,13 @@ export default function Loadflow({ user }: { user: any }) {
       return fullId;
   };
 
-  // --- ACTIONS WRAPPERS ---
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } };
   const createProjectWrapper = () => { notify("Please use Files Dashboard", "error"); setIsCreatingProject(false); };
   const deleteProjectWrapper = (id: string, e: any) => { e.stopPropagation(); notify(`Go to Files to delete ${id}`, "error"); };
 
   return (
-    <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col relative">
+    // [FIX] Removed 'h-full' and 'overflow-hidden' from root to allow scrolling
+    <div className="w-full px-6 py-6 text-[11px] font-sans min-h-full flex flex-col relative">
       
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
@@ -121,22 +113,18 @@ export default function Loadflow({ user }: { user: any }) {
         <div className="flex gap-2 items-center">
           <input value={baseName} onChange={(e) => setBaseName(e.target.value)} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 w-40 text-right font-bold text-slate-600 dark:text-slate-200 focus:ring-1 focus:ring-yellow-500 outline-none" placeholder="Analysis Name"/>
           <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wide mr-2">_TIMESTAMP.json</span>
-          
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
-          
           <button onClick={() => setShowHistory(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded border font-bold transition-all text-[10px] bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700">
             <Icons.Archive className="w-3.5 h-3.5" /> RESULTS ARCHIVE
           </button>
-
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
-          
           <button onClick={() => handleManualLoad(baseName)} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300 dark:border-slate-600"><Icons.Search className="w-3.5 h-3.5" /> LOAD</button>
-          
           <button onClick={runAnalysis} disabled={loading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded font-black shadow-sm disabled:opacity-50 transition-all">{loading ? <Icons.Activity className="w-3.5 h-3.5 animate-spin"/> : <Icons.Play className="w-3.5 h-3.5 fill-current" />} {loading ? "CALCULATING..." : "RUN"}</button>
         </div>
       </div>
 
       <div className="flex flex-1 gap-6 min-h-0">
+        {/* Sidebar fits into the layout but relies on main scroll now */}
         <ProjectsSidebar 
             user={user} userGlobalData={userGlobalData || user} 
             projects={projects} usersList={usersList}
@@ -147,23 +135,29 @@ export default function Loadflow({ user }: { user: any }) {
             onCreateProject={createProjectWrapper} onDeleteProject={deleteProjectWrapper} 
         />
         
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden gap-4">
-             {/* MAIN CONTENT */}
+        {/* [FIX] Content container allows stacking (no overflow-hidden) */}
+        <div className="flex-1 flex flex-col gap-4">
              {results.length === 0 && !loading ? (
-                 <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 gap-4 border-2 border-dashed border-slate-100 dark:border-slate-700 rounded bg-slate-50/50 dark:bg-slate-900/50">
+                 <div className="h-96 flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 gap-4 border-2 border-dashed border-slate-100 dark:border-slate-700 rounded bg-slate-50/50 dark:bg-slate-900/50">
                     <Icons.Activity className="w-16 h-16" />
                     <span className="font-black uppercase tracking-widest">Ready to Simulate</span>
                  </div>
              ) : (
                  <>
-                    <LoadflowChart groups={scenarioGroups} extractLoadNumber={extractLoadNumber} />
-                    <ResultsTable 
-                        results={results} 
-                        filterSearch={filterSearch} setFilterSearch={setFilterSearch}
-                        filterWinner={filterWinner} setFilterWinner={setFilterWinner}
-                        filterValid={filterValid} setFilterValid={setFilterValid}
-                        onSelectCase={setSelectedCase}
-                    />
+                    {/* Chart Container */}
+                    <div className="w-full">
+                        <LoadflowChart groups={scenarioGroups} extractLoadNumber={extractLoadNumber} />
+                    </div>
+                    {/* Table Container - Now flows naturally below chart */}
+                    <div className="w-full">
+                        <ResultsTable 
+                            results={results} 
+                            filterSearch={filterSearch} setFilterSearch={setFilterSearch}
+                            filterWinner={filterWinner} setFilterWinner={setFilterWinner}
+                            filterValid={filterValid} setFilterValid={setFilterValid}
+                            onSelectCase={setSelectedCase}
+                        />
+                    </div>
                  </>
              )}
         </div>
