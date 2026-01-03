@@ -1,11 +1,11 @@
 
 // [structure:root] : Custom Hook for File Management logic
-// [context:flow] : Handles fetching, uploading, deleting, and sorting of files to keep UI components light.
+// [context:flow] : Handles fetching, uploading, deleting, sorting AND starring of files.
 
 import { useState, useEffect, useCallback } from 'react';
 import { SessionFile, SortKey, SortOrder } from '../components/FileTable';
 
-// [decision:logic] : Return type definition for strict typing in components
+// [decision:logic] : Return type definition
 interface UseFileManagerReturn {
     files: SessionFile[];
     loading: boolean;
@@ -16,6 +16,9 @@ interface UseFileManagerReturn {
     handleDelete: (path: string) => Promise<void>;
     handleBulkDelete: (paths: string[]) => Promise<void>;
     refreshFiles: () => void;
+    // [!] [CRITICAL] : New Star features
+    starredFiles: Set<string>;
+    toggleStar: (path: string) => void;
 }
 
 export const useFileManager = (
@@ -31,6 +34,27 @@ export const useFileManager = (
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'uploaded_at', order: 'desc' });
+    
+    // [decision:logic] : Initialize Starred Files from LocalStorage
+    // We use a Set for O(1) lookup performance during rendering.
+    const [starredFiles, setStarredFiles] = useState<Set<string>>(() => {
+        const saved = localStorage.getItem('solufuse_starred_files');
+        return saved ? new Set(JSON.parse(saved)) : new Set();
+    });
+
+    // [+] [INFO] : Persist stars when changed
+    useEffect(() => {
+        localStorage.setItem('solufuse_starred_files', JSON.stringify(Array.from(starredFiles)));
+    }, [starredFiles]);
+
+    const toggleStar = (path: string) => {
+        setStarredFiles(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(path)) newSet.delete(path);
+            else newSet.add(path);
+            return newSet;
+        });
+    };
 
     // [+] [INFO] : Helper to get the auth token
     const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
@@ -42,8 +66,6 @@ export const useFileManager = (
         try {
             const t = await getToken();
             let url = `${apiUrl}/files/details`;
-            
-            // [decision:logic] : Determine context (Project vs Session)
             if (activeProjectId) url += `?project_id=${activeProjectId}`;
             else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
 
@@ -80,7 +102,7 @@ export const useFileManager = (
             if (!res.ok) throw new Error("Upload Failed");
             
             notify(`${fileList.length} File(s) Uploaded`);
-            fetchFiles(); // Refresh list immediately
+            fetchFiles(); 
         } catch (e: any) {
             notify(e.message || "Upload Failed", "error");
         } finally {
@@ -88,7 +110,7 @@ export const useFileManager = (
         }
     };
 
-    // [+] [INFO] : Single Delete Logic
+    // [+] [INFO] : Delete Logic
     const handleDelete = async (path: string) => {
         try {
             const t = await getToken();
@@ -97,18 +119,15 @@ export const useFileManager = (
             else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
 
             await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
-            setFiles(p => p.filter(f => f.path !== path)); // Optimistic update
+            setFiles(p => p.filter(f => f.path !== path));
             notify("File deleted");
         } catch (e) {
             notify("Delete failed", "error");
         }
     };
 
-    // [+] [INFO] : Bulk Delete Logic
     const handleBulkDelete = async (paths: string[]) => {
         if (!confirm(`Delete ${paths.length} files permanently?`)) return;
-        
-        // [?] [THOUGHT] : We process deletes in parallel for speed
         try {
             await Promise.all(paths.map(path => handleDelete(path)));
             notify(`${paths.length} Files deleted`);
@@ -117,12 +136,22 @@ export const useFileManager = (
         }
     };
 
-    // [+] [INFO] : Sorting Logic (Client-side)
     const handleSort = (key: SortKey) => {
         setSortConfig(current => ({ key, order: current.key === key && current.order === 'asc' ? 'desc' : 'asc' }));
     };
 
+    // [decision:logic] : Sorting Strategy
+    // 1. Starred files ALWAYS come first.
+    // 2. Then normal sorting applies.
     const sortedFiles = [...files].sort((a, b) => {
+        // [!] [CRITICAL] : Star Priority Logic
+        const aStarred = starredFiles.has(a.path || a.filename);
+        const bStarred = starredFiles.has(b.path || b.filename);
+
+        if (aStarred && !bStarred) return -1; // a comes first
+        if (!aStarred && bStarred) return 1;  // b comes first
+
+        // Standard sorting for items with same star status
         let aVal: any = a[sortConfig.key];
         let bVal: any = b[sortConfig.key];
         
@@ -150,6 +179,8 @@ export const useFileManager = (
         handleUpload,
         handleDelete,
         handleBulkDelete,
-        refreshFiles: fetchFiles
+        refreshFiles: fetchFiles,
+        starredFiles,
+        toggleStar
     };
 };

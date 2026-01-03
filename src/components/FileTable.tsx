@@ -1,6 +1,6 @@
 
 // [structure:root] : Table Component for Files
-// [context:flow] : Displays files list with checkboxes, single-line dates, and actions.
+// [context:flow] : Displays files list with checkboxes, stars, single-line dates, and actions.
 
 import { Fragment } from 'react';
 import { Icons } from '../icons';
@@ -27,15 +27,18 @@ interface FileTableProps {
   selectedFiles: Set<string>;
   onToggleSelect: (path: string) => void;
   onSelectAll: (checked: boolean) => void;
+  // [!] [CRITICAL] : New Props for Stars
+  starredFiles: Set<string>;
+  onToggleStar: (path: string) => void;
 }
 
 export default function FileTable({
   files, sortConfig, onSort, searchTerm, 
   onOpenLink, onDelete, formatBytes,
-  selectedFiles, onToggleSelect, onSelectAll
+  selectedFiles, onToggleSelect, onSelectAll,
+  starredFiles, onToggleStar
 }: FileTableProps) {
   
-  // [decision:logic] : Determine if all visible files are selected
   const allSelected = files.length > 0 && files.every(f => selectedFiles.has(f.path));
 
   return (
@@ -44,7 +47,6 @@ export default function FileTable({
         {/* Header */}
         <thead className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50/50 dark:bg-[#161b22]/90 sticky top-0 z-10 backdrop-blur-sm border-b border-slate-100 dark:border-slate-800">
           <tr>
-            {/* [decision:logic] : Master Checkbox (Select All) */}
             <th className="py-2 px-3 w-8 text-center" onClick={(e) => e.stopPropagation()}>
                 <input 
                     type="checkbox" 
@@ -53,6 +55,9 @@ export default function FileTable({
                     className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
             </th>
+            {/* Star Column */}
+            <th className="py-2 px-1 w-6 text-center"></th>
+            
             <th className="py-2 px-3 font-bold cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 group" onClick={() => onSort('filename')}>
                 <div className="flex items-center gap-1">FILENAME {sortConfig.key === 'filename' && <Icons.ArrowUpDown className="w-3 h-3 text-blue-500" />}</div>
             </th>
@@ -68,17 +73,17 @@ export default function FileTable({
         
         <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50 text-[10px]">
           {files.length === 0 ? (
-            <tr><td colSpan={5} className="py-20 text-center text-slate-300 dark:text-slate-600 italic"><Icons.Archive className="w-10 h-10 mx-auto mb-3 opacity-50" /><span className="block opacity-70">{searchTerm ? "No matches found" : "No files in this context"}</span></td></tr>
+            <tr><td colSpan={6} className="py-20 text-center text-slate-300 dark:text-slate-600 italic"><Icons.Archive className="w-10 h-10 mx-auto mb-3 opacity-50" /><span className="block opacity-70">{searchTerm ? "No matches found" : "No files in this context"}</span></td></tr>
           ) : (
-            files.map((file) => { // [!] FIX: Removed unused 'i' argument
+            files.map((file) => {
                const isConvertible = /\.(si2s|lf1s|mdb|json)$/i.test(file.filename);
-               // [!] [CRITICAL] : Fallback to filename if path is missing to ensure unique ID
                const uniqueId = file.path || file.filename;
                const isSelected = selectedFiles.has(uniqueId);
+               const isStarred = starredFiles.has(uniqueId);
                
                return (
                 <Fragment key={uniqueId}>
-                    <tr className={`group transition-colors ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'}`}>
+                    <tr className={`group transition-colors ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/20' : isStarred ? 'bg-yellow-50/50 dark:bg-yellow-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'}`}>
                       {/* Checkbox Row */}
                       <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                           <input 
@@ -88,10 +93,19 @@ export default function FileTable({
                             className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                       </td>
+
+                      {/* Star Row */}
+                      <td className="px-1 py-1.5 text-center">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onToggleStar(uniqueId); }}
+                            className={`p-1 rounded-full transition-all ${isStarred ? 'text-yellow-400 hover:text-yellow-500' : 'text-slate-300 dark:text-slate-600 hover:text-yellow-400'}`}
+                          >
+                             <Icons.Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-current' : ''}`} />
+                          </button>
+                      </td>
                       
                       <td className="px-3 py-1.5"><div className="flex items-center gap-2"><Icons.FileText className={`w-3.5 h-3.5 ${isConvertible ? 'text-blue-500' : 'text-slate-400 dark:text-slate-600'}`} /><span className="truncate max-w-[280px] text-slate-700 dark:text-slate-300" title={file.filename}>{file.filename}</span></div></td>
                       
-                      {/* [FIX] Whitespace-nowrap enforces single line for dates */}
                       <td className="px-3 py-1.5 text-slate-400 dark:text-slate-500 font-mono text-[9px] whitespace-nowrap">
                           <div className="flex items-center gap-1"><Icons.Calendar className="w-3 h-3 text-slate-300 dark:text-slate-600"/> {file.uploaded_at || "-"}</div>
                       </td>

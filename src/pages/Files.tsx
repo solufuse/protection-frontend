@@ -11,7 +11,7 @@ import MembersModal from '../components/MembersModal';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import FileToolbar from '../components/FileToolbar';
 import FileTable from '../components/FileTable';
-import { useFileManager } from '../hooks/useFileManager'; // [!] Custom Hook
+import { useFileManager } from '../hooks/useFileManager'; 
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../firebase';
 
@@ -43,7 +43,8 @@ export default function Files({ user }: { user: any }) {
   // --- HOOKS ---
   const { 
     files, loading, uploading, sortConfig, 
-    handleSort, handleUpload, handleDelete, handleBulkDelete, refreshFiles 
+    handleSort, handleUpload, handleDelete, handleBulkDelete, refreshFiles,
+    starredFiles, toggleStar 
   } = useFileManager(user, activeProjectId, activeSessionUid, API_URL, notify);
 
   // --- EFFECTS ---
@@ -66,7 +67,7 @@ export default function Files({ user }: { user: any }) {
   const fetchAllUsers = async (token: string) => { try { const res = await fetch(`${API_URL}/admin/users?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) setUsersList(await res.json()); } catch (e) { console.error("Admin List Error", e); } };
   const fetchProjects = async () => { try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } }); if (res.ok) setProjects(await res.json()); } catch (e) { console.error("Failed to load projects", e); } };
 
-  // Project Management (Keep logic here as it relates to sidebar, not files directly)
+  // Project Management
   const createProject = async () => { if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); if (!newProjectName.trim()) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/create`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newProjectName, name: newProjectName }) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail); } notify("Project Created"); setNewProjectName(""); setIsCreatingProject(false); fetchProjects(); } catch (e: any) { notify(e.message || "Failed", "error"); } };
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
 
@@ -88,20 +89,16 @@ export default function Files({ user }: { user: any }) {
   };
 
   const handleBulkDownload = async (type: 'raw' | 'xlsx' | 'json') => {
-      // [?] [THOUGHT] : Triggering multiple downloads loop.
       const filesToDownload = filteredFiles.filter(f => selectedFiles.has(f.path));
       notify(`Preparing ${filesToDownload.length} downloads...`);
-      
       for (const file of filesToDownload) {
           if (type !== 'raw' && !/\.(si2s|lf1s|mdb|json)$/i.test(file.filename)) continue;
           handleOpenLink(type === 'json' ? 'json_tab' : type, file.filename);
-          // Small delay to prevent browser choke
           await new Promise(r => setTimeout(r, 500));
       }
       setSelectedFiles(new Set());
   };
 
-  // Selection Logic
   const toggleSelect = (path: string) => {
       const newSet = new Set(selectedFiles);
       if (newSet.has(path)) newSet.delete(path);
@@ -113,10 +110,8 @@ export default function Files({ user }: { user: any }) {
       else setSelectedFiles(new Set());
   };
 
-  // Filter
   const filteredFiles = files.filter(f => f.filename.toLowerCase().includes(searchTerm.toLowerCase()));
   
-  // Context Roles
   let currentProjectRole = undefined;
   if (activeProjectId) currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;
   else if (activeSessionUid) currentProjectRole = 'admin';
@@ -154,7 +149,6 @@ export default function Files({ user }: { user: any }) {
       <div className="flex flex-1 gap-6 min-h-0">
         <ProjectsSidebar user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid} isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} newProjectName={newProjectName} setNewProjectName={setNewProjectName} onCreateProject={createProject} onDeleteProject={deleteProject} />
 
-        {/* Main Content */}
         <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden font-bold relative transition-all" onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); }}>
             
             <FileToolbar 
@@ -169,6 +163,7 @@ export default function Files({ user }: { user: any }) {
                 searchTerm={searchTerm} 
                 onOpenLink={handleOpenLink} onDelete={handleDelete} formatBytes={formatBytes}
                 selectedFiles={selectedFiles} onToggleSelect={toggleSelect} onSelectAll={selectAll}
+                starredFiles={starredFiles} onToggleStar={toggleStar}
             />
         </div>
       </div>
