@@ -9,7 +9,6 @@ import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 import { useLoadflow } from '../hooks/useLoadflow';
-// [FIX] Removed unused useAuth import
 
 // Imported Modular Components
 import LoadflowToolbar from '../components/Loadflow/LoadflowToolbar';
@@ -17,16 +16,16 @@ import ResultCard from '../components/Loadflow/ResultCard';
 import HistorySidebar from '../components/Loadflow/HistorySidebar';
 
 const Loadflow = ({ user }: { user: any }) => {
+    // --- SIDEBAR STATE (STRICT COMPLIANCE) ---
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+    const [isCreatingProject, setIsCreatingProject] = useState(false);
+    const [newProjectName, setNewProjectName] = useState("");
+    
     // UI State
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
     const [onlyWinners, setOnlyWinners] = useState(false); 
     const [showHistory, setShowHistory] = useState(true);
-
-    // --- SIDEBAR STATE REQUIREMENTS ---
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [isCreatingProject, setIsCreatingProject] = useState(false);
-    const [newProjectName, setNewProjectName] = useState("");
-    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
     // Logic Hook (Brain)
     const { 
@@ -34,7 +33,9 @@ const Loadflow = ({ user }: { user: any }) => {
         runAnalysis, loadResultFile 
     } = useLoadflow(currentProject?.id, currentProject?.name);
 
-    // Fetch Projects for Sidebar
+    // --- EFFECTS ---
+
+    // 1. Fetch Projects on Mount (Required for Sidebar)
     useEffect(() => {
         const fetchProjects = async () => {
             if (!user) return;
@@ -52,19 +53,30 @@ const Loadflow = ({ user }: { user: any }) => {
         fetchProjects();
     }, [user]);
 
-    // Handle Project Selection from Sidebar
+    // 2. Sync Sidebar Selection with Local State
     useEffect(() => {
         if (activeProjectId) {
             const p = projects.find(proj => proj.id === activeProjectId);
-            if (p) setCurrentProject(p);
+            if (p) {
+                setCurrentProject(p);
+            }
         } else {
             setCurrentProject(null);
         }
     }, [activeProjectId, projects]);
 
-    // Helper for Sidebar props
-    const handleCreateProject = () => { alert("Create project via Files page"); setIsCreatingProject(false); };
-    const handleDeleteProject = () => { alert("Delete project via Files page"); };
+    // --- HANDLERS (SIDEBAR PLACEHOLDERS) ---
+    // Note: Create/Delete is managed fully in Files.tsx. 
+    // We provide basic alerts here or could redirect.
+    const handleCreateProject = () => { 
+        alert("Please create projects from the Files Dashboard.");
+        setIsCreatingProject(false);
+    };
+    
+    const handleDeleteProject = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        alert("Please delete projects from the Files Dashboard.");
+    };
 
     // Filter Logic
     const filteredResults = results.filter(r => {
@@ -74,18 +86,25 @@ const Loadflow = ({ user }: { user: any }) => {
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
+            {/* STRICT SIDEBAR IMPLEMENTATION */}
             <ProjectsSidebar 
                 user={user}
+                userGlobalData={user} // Pass user as global data
                 projects={projects}
+                // Selection Props
                 activeProjectId={activeProjectId}
                 setActiveProjectId={setActiveProjectId}
+                // Session Props (Optional but good to pass null explicitly)
+                activeSessionUid={null}
+                setActiveSessionUid={() => {}} 
+                // Creation Props
                 isCreatingProject={isCreatingProject}
                 setIsCreatingProject={setIsCreatingProject}
                 newProjectName={newProjectName}
                 setNewProjectName={setNewProjectName}
                 onCreateProject={handleCreateProject}
+                // Deletion Props
                 onDeleteProject={handleDeleteProject}
-                userGlobalData={user} 
             />
 
             <div className="flex-1 flex flex-col min-w-0">
