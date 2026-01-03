@@ -67,15 +67,16 @@ const Loadflow = ({ user }: { user: any }) => {
 
     // --- HANDLERS (SIDEBAR PLACEHOLDERS) ---
     // Note: Create/Delete is managed fully in Files.tsx. 
-    // We provide basic alerts here or could redirect.
+    
     const handleCreateProject = () => { 
         alert("Please create projects from the Files Dashboard.");
         setIsCreatingProject(false);
     };
     
+    // [FIX] Used 'id' in the alert string to satisfy TS6133 (unused variable)
     const handleDeleteProject = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        alert("Please delete projects from the Files Dashboard.");
+        alert(`Please delete project ${id} from the Files Dashboard.`);
     };
 
     // Filter Logic
