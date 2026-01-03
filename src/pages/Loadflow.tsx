@@ -9,7 +9,7 @@ import ResultCard from '../components/Loadflow/ResultCard';
 import HistorySidebar from '../components/Loadflow/HistorySidebar';
 
 const Loadflow = ({ user }: { user: any }) => {
-    // --- SIDEBAR STATE (Required for compatibility) ---
+    // --- SIDEBAR STATE ---
     const [projects, setProjects] = useState<Project[]>([]);
     const [usersList, setUsersList] = useState<UserSummary[]>([]);
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -21,7 +21,7 @@ const Loadflow = ({ user }: { user: any }) => {
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
     const [onlyWinners, setOnlyWinners] = useState(false); 
     const [showHistory, setShowHistory] = useState(true);
-    const [runName, setRunName] = useState(""); // [!] Added for Naming
+    const [runName, setRunName] = useState(""); 
     
     // --- LOGIC HOOK ---
     const { 
@@ -29,7 +29,7 @@ const Loadflow = ({ user }: { user: any }) => {
         runAnalysis, loadResultFile 
     } = useLoadflow(activeProjectId, activeSessionUid, currentProject?.name);
 
-    // --- 1. FETCH DATA (Sidebar) ---
+    // --- 1. FETCH DATA ---
     useEffect(() => {
         const fetchData = async () => {
             if (!user) return;
@@ -71,9 +71,13 @@ const Loadflow = ({ user }: { user: any }) => {
     // --- HANDLERS ---
     const handleRun = () => runAnalysis(runName);
     
-    // Placeholders for Sidebar
     const handleCreate = () => { alert("Go to Files to create projects"); setIsCreatingProject(false); };
-    const handleDelete = (id: string, e: any) => { e.stopPropagation(); alert("Go to Files to delete"); };
+    
+    // [FIX] Used 'id' in alert to satisfy TypeScript strict mode
+    const handleDelete = (id: string, e: any) => { 
+        e.stopPropagation(); 
+        alert(`Go to Files to delete project: ${id}`); 
+    };
 
     const filteredResults = results.filter(r => {
         if (onlyWinners) return r.is_winner;
