@@ -14,7 +14,7 @@ interface UseFileManagerReturn {
     handleUpload: (fileList: FileList | null) => Promise<void>;
     handleDelete: (path: string) => Promise<void>;
     handleBulkDelete: (paths: string[]) => Promise<void>;
-    handleBulkDownload: (selectedFiles: Set<string>) => Promise<void>; 
+    handleBulkDownload: (selectedFiles: Set<string>, format?: 'raw' | 'xlsx' | 'json') => Promise<void>; 
     refreshFiles: () => void;
     starredFiles: Set<string>;
     toggleStar: (path: string) => void;
@@ -128,16 +128,25 @@ export const useFileManager = (
         }
     };
 
-    // [decision:logic] : Bulk Download via Backend ZIP
-    const handleBulkDownload = async (selectedFiles: Set<string>) => {
+    // [decision:logic] : Unified Bulk Download (Raw OR Converted)
+    const handleBulkDownload = async (selectedFiles: Set<string>, format: 'raw' | 'xlsx' | 'json' = 'raw') => {
         const targets = Array.from(selectedFiles);
         if (targets.length === 0) return;
 
-        notify(`Compressing ${targets.length} files...`);
+        notify(format === 'raw' ? `Compressing ${targets.length} files...` : `Converting ${targets.length} files to ${format.toUpperCase()}...`);
         
         try {
             const t = await getToken();
-            let url = `${apiUrl}/files/bulk-download`;
+            let url = "";
+            
+            // [decision:logic] Route to correct endpoint based on format
+            if (format === 'raw') {
+                url = `${apiUrl}/files/bulk-download`;
+            } else {
+                url = `${apiUrl}/ingestion/bulk-download/${format}`;
+            }
+            
+            // Add Project Context
             if (activeProjectId) url += `?project_id=${activeProjectId}`;
             else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
 
@@ -151,23 +160,31 @@ export const useFileManager = (
                 body: JSON.stringify(targets) 
             });
 
-            if (!res.ok) throw new Error("Compression failed");
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "Compression/Conversion failed");
+            }
 
             // Convert to Blob and download
             const blob = await res.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = downloadUrl;
-            link.download = `solufuse_archive_${new Date().getTime()}.zip`;
+            
+            // Nice filename logic
+            const dateStr = new Date().toISOString().slice(0,19).replace(/:/g, "-");
+            const prefix = format === 'raw' ? 'files' : `converted_${format}`;
+            link.download = `solufuse_${prefix}_${dateStr}.zip`;
+            
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             
             notify("Archive Downloaded!");
 
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            notify("Bulk download failed", "error");
+            notify(e.message || "Bulk download failed", "error");
         }
     };
 

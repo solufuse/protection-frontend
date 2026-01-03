@@ -64,10 +64,9 @@ export default function Files({ user }: { user: any }) {
   const createProject = async () => { if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); if (!newProjectName.trim()) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/create`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newProjectName, name: newProjectName }) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail); } notify("Project Created"); setNewProjectName(""); setIsCreatingProject(false); fetchProjects(); } catch (e: any) { notify(e.message || "Failed", "error"); } };
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
 
-  // --- ACTIONS (SECURE OPEN & DOWNLOAD) ---
+  // --- ACTIONS ---
 
-  // [decision:logic] : Helper to fetch securely (Headers) and open/download Blob.
-  // This avoids passing tokens in the URL (secure logs) and bypasses popup blockers (trusted user action).
+  // Single file operations (Open/Download)
   const fetchAndOpen = async (url: string, filename: string, mode: 'download' | 'open') => {
       try {
           const t = await getToken();
@@ -80,10 +79,8 @@ export default function Files({ user }: { user: any }) {
           const blobUrl = window.URL.createObjectURL(blob);
           
           if (mode === 'open') {
-              // Open Blob in New Tab (Browser handles mimetype)
               window.open(blobUrl, '_blank');
           } else {
-              // Trigger Download
               const link = document.createElement('a');
               link.href = blobUrl;
               link.download = filename;
@@ -91,10 +88,7 @@ export default function Files({ user }: { user: any }) {
               link.click();
               document.body.removeChild(link);
           }
-          
-          // Cleanup blob URL after a delay to ensure it loaded
           setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
-
       } catch (e) {
           console.error(e);
           notify("Action failed", "error");
@@ -111,14 +105,10 @@ export default function Files({ user }: { user: any }) {
           let url = ""; 
           let mode: 'download' | 'open' = 'download';
 
-          if (type === 'raw') {
-              url = `${API_URL}/files/download?filename=${encName}${pParam}`;
-          } else if (type === 'xlsx') {
-              url = `${API_URL}/ingestion/download/xlsx?filename=${encName}${pParam}`;
-          } else if (type === 'json') {
-              url = `${API_URL}/ingestion/download/json?filename=${encName}${pParam}`;
-          } else if (type === 'json_tab') {
-              // [!] For Open in Tab, we fetch the preview content as a blob
+          if (type === 'raw') url = `${API_URL}/files/download?filename=${encName}${pParam}`; 
+          else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encName}${pParam}`; 
+          else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}${pParam}`; 
+          else if (type === 'json_tab') {
               url = `${API_URL}/ingestion/preview?filename=${encName}${pParam}`;
               mode = 'open';
           }
@@ -128,21 +118,10 @@ export default function Files({ user }: { user: any }) {
       } catch (e) { notify("Link Error", "error"); } 
   };
 
+  // [!] UPDATED: Single function call for bulk actions (No loop)
   const onBulkDownloadTrigger = async (type: 'raw' | 'xlsx' | 'json') => {
-      if (type === 'raw') {
-         await handleBulkDownload(selectedFiles);
-         setSelectedFiles(new Set());
-      } else {
-         const filesToDownload = filteredFiles.filter(f => selectedFiles.has(f.path));
-         notify(`Processing ${filesToDownload.length} conversions...`);
-         
-         for (const file of filesToDownload) {
-             if (!/\.(si2s|lf1s|mdb|json)$/i.test(file.filename)) continue;
-             await handleOpenLink(type === 'json' ? 'json' : type, file.filename);
-             await new Promise(r => setTimeout(r, 750));
-         }
-         setSelectedFiles(new Set());
-      }
+      await handleBulkDownload(selectedFiles, type);
+      setSelectedFiles(new Set());
   };
 
   const toggleSelect = (path: string) => {
