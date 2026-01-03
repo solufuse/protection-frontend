@@ -27,7 +27,6 @@ interface FileTableProps {
   selectedFiles: Set<string>;
   onToggleSelect: (path: string) => void;
   onSelectAll: (checked: boolean) => void;
-  // [!] [CRITICAL] : New Props for Stars
   starredFiles: Set<string>;
   onToggleStar: (path: string) => void;
 }
@@ -67,7 +66,8 @@ export default function FileTable({
             <th className="py-2 px-3 w-24 font-bold text-center cursor-pointer hover:text-blue-600 dark:hover:text-blue-400" onClick={() => onSort('size')}>
                  <div className="flex items-center justify-center gap-1">SIZE {sortConfig.key === 'size' && <Icons.ArrowUpDown className="w-3 h-3 text-blue-500" />}</div>
             </th>
-            <th className="py-2 px-3 text-right w-48 font-bold">Actions</th>
+            {/* [FIX] Increased width to fit all buttons (RAW, XLSX, JSON, OPEN, DELETE) */}
+            <th className="py-2 px-3 text-right w-64 font-bold">Actions</th>
           </tr>
         </thead>
         
@@ -115,12 +115,18 @@ export default function FileTable({
                       <td className="px-3 py-1.5 text-right">
                           <div className="flex justify-end gap-1.5 items-center opacity-80 group-hover:opacity-100 transition-opacity">
                               <button onClick={() => onOpenLink('raw', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-700 transition-colors" title="Download Raw"><Icons.FileDown className="w-3 h-3"/> <span className="text-[9px]">RAW</span></button>
+                              
                               {isConvertible && (
                               <>
                                 <button onClick={() => onOpenLink('xlsx', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 hover:bg-green-100 dark:bg-green-900/10 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded border border-green-200 dark:border-green-900/50 transition-colors" title="Download XLSX"><Icons.FileSpreadsheet className="w-3 h-3"/> <span className="text-[9px]">XLSX</span></button>
+                                
+                                {/* [FIX] Added JSON Download Button */}
+                                <button onClick={() => onOpenLink('json', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/10 dark:hover:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded border border-yellow-200 dark:border-yellow-900/50 transition-colors" title="Download JSON"><Icons.FileJson className="w-3 h-3"/> <span className="text-[9px]">JSON</span></button>
+                                
                                 <button onClick={() => onOpenLink('json_tab', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/10 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded border border-blue-200 dark:border-blue-900/50 transition-colors" title="Open in new Tab"><Icons.ExternalLink className="w-3 h-3"/> <span className="text-[9px]">OPEN</span></button>
                               </>
                               )}
+                              
                               <button onClick={() => onDelete(file.path)} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 rounded transition-colors ml-1"><Icons.Trash className="w-3.5 h-3.5"/></button>
                           </div>
                       </td>
