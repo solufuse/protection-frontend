@@ -9,7 +9,7 @@ import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 import { useLoadflow } from '../hooks/useLoadflow';
-import { useAuth } from '../context/AuthContext';
+// [FIX] Removed unused useAuth import
 
 // Imported Modular Components
 import LoadflowToolbar from '../components/Loadflow/LoadflowToolbar';
@@ -23,7 +23,6 @@ const Loadflow = ({ user }: { user: any }) => {
     const [showHistory, setShowHistory] = useState(true);
 
     // --- SIDEBAR STATE REQUIREMENTS ---
-    // [fix] ProjectsSidebar is complex, we need to provide all its props
     const [projects, setProjects] = useState<Project[]>([]);
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState("");
@@ -63,7 +62,7 @@ const Loadflow = ({ user }: { user: any }) => {
         }
     }, [activeProjectId, projects]);
 
-    // Helper for Sidebar props (read-only mode mostly)
+    // Helper for Sidebar props
     const handleCreateProject = () => { alert("Create project via Files page"); setIsCreatingProject(false); };
     const handleDeleteProject = () => { alert("Delete project via Files page"); };
 
@@ -86,8 +85,7 @@ const Loadflow = ({ user }: { user: any }) => {
                 setNewProjectName={setNewProjectName}
                 onCreateProject={handleCreateProject}
                 onDeleteProject={handleDeleteProject}
-                // Optional props
-                userGlobalData={user} // Assuming user object has global_role
+                userGlobalData={user} 
             />
 
             <div className="flex-1 flex flex-col min-w-0">
