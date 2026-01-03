@@ -22,17 +22,12 @@ export default function Files({ user }: { user: any }) {
   const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
   const [usersList, setUsersList] = useState<UserSummary[]>([]);
   
-  // Sidebar State
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  
-  // UI State
   const [searchTerm, setSearchTerm] = useState("");
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
-  
-  // Bulk Selection State
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   // --- CONFIG ---
@@ -55,7 +50,6 @@ export default function Files({ user }: { user: any }) {
     }
   }, [user]);
 
-  // Clear selection when context changes
   useEffect(() => { setSelectedFiles(new Set()); }, [activeProjectId, activeSessionUid]);
 
   // --- HELPERS ---
@@ -70,24 +64,67 @@ export default function Files({ user }: { user: any }) {
   const createProject = async () => { if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); if (!newProjectName.trim()) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/create`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newProjectName, name: newProjectName }) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail); } notify("Project Created"); setNewProjectName(""); setIsCreatingProject(false); fetchProjects(); } catch (e: any) { notify(e.message || "Failed", "error"); } };
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
 
-  // --- ACTIONS ---
+  // --- ACTIONS (SECURE OPEN & DOWNLOAD) ---
 
-  // Legacy single download link
+  // [decision:logic] : Helper to fetch securely (Headers) and open/download Blob.
+  // This avoids passing tokens in the URL (secure logs) and bypasses popup blockers (trusted user action).
+  const fetchAndOpen = async (url: string, filename: string, mode: 'download' | 'open') => {
+      try {
+          const t = await getToken();
+          notify(mode === 'open' ? "Opening..." : "Downloading...");
+          
+          const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
+          if (!res.ok) throw new Error("Request failed");
+          
+          const blob = await res.blob();
+          const blobUrl = window.URL.createObjectURL(blob);
+          
+          if (mode === 'open') {
+              // Open Blob in New Tab (Browser handles mimetype)
+              window.open(blobUrl, '_blank');
+          } else {
+              // Trigger Download
+              const link = document.createElement('a');
+              link.href = blobUrl;
+              link.download = filename;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+          }
+          
+          // Cleanup blob URL after a delay to ensure it loaded
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
+
+      } catch (e) {
+          console.error(e);
+          notify("Action failed", "error");
+      }
+  };
+
   const handleOpenLink = async (type: string, filename: string) => { 
       try { 
-          const t = await getToken(); 
           let pParam = ""; 
           if (activeProjectId) pParam = `&project_id=${activeProjectId}`; 
           else if (activeSessionUid) pParam = `&project_id=${activeSessionUid}`; 
+          
           const encName = encodeURIComponent(filename); 
           let url = ""; 
+          let mode: 'download' | 'open' = 'download';
+
+          if (type === 'raw') {
+              url = `${API_URL}/files/download?filename=${encName}${pParam}`;
+          } else if (type === 'xlsx') {
+              url = `${API_URL}/ingestion/download/xlsx?filename=${encName}${pParam}`;
+          } else if (type === 'json') {
+              url = `${API_URL}/ingestion/download/json?filename=${encName}${pParam}`;
+          } else if (type === 'json_tab') {
+              // [!] For Open in Tab, we fetch the preview content as a blob
+              url = `${API_URL}/ingestion/preview?filename=${encName}${pParam}`;
+              mode = 'open';
+          }
           
-          if (type === 'raw') url = `${API_URL}/files/download?filename=${encName}&token=${t}${pParam}`; 
-          else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encName}&token=${t}${pParam}`; 
-          else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}&token=${t}${pParam}`; 
-          else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encName}&token=${t}${pParam}`; 
-          
-          if (url) window.open(url, '_blank');
+          if (url) await fetchAndOpen(url, filename, mode);
+
       } catch (e) { notify("Link Error", "error"); } 
   };
 
@@ -96,12 +133,12 @@ export default function Files({ user }: { user: any }) {
          await handleBulkDownload(selectedFiles);
          setSelectedFiles(new Set());
       } else {
-         // Fallback loop for conversions (XLSX/JSON)
          const filesToDownload = filteredFiles.filter(f => selectedFiles.has(f.path));
          notify(`Processing ${filesToDownload.length} conversions...`);
+         
          for (const file of filesToDownload) {
              if (!/\.(si2s|lf1s|mdb|json)$/i.test(file.filename)) continue;
-             handleOpenLink(type === 'json' ? 'json' : type, file.filename);
+             await handleOpenLink(type === 'json' ? 'json' : type, file.filename);
              await new Promise(r => setTimeout(r, 750));
          }
          setSelectedFiles(new Set());
