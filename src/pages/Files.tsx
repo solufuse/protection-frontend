@@ -72,6 +72,20 @@ export default function Files({ user }: { user: any }) {
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
 
   // --- ACTIONS ---
+
+  // [decision:logic] : Silent Download Helper
+  // Creates an invisible anchor tag to trigger download without opening a popup window.
+  // This is required to bypass browser popup blockers during bulk actions.
+  const triggerDownload = (url: string, filename: string) => {
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename); 
+      link.setAttribute('target', '_blank'); // Fallback
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
   const handleOpenLink = async (type: string, filename: string) => { 
       try { 
           const t = await getToken(); 
@@ -80,21 +94,38 @@ export default function Files({ user }: { user: any }) {
           else if (activeSessionUid) pParam = `&project_id=${activeSessionUid}`; 
           const encName = encodeURIComponent(filename); 
           let url = ""; 
+          
           if (type === 'raw') url = `${API_URL}/files/download?filename=${encName}&token=${t}${pParam}`; 
           else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encName}&token=${t}${pParam}`; 
           else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}&token=${t}${pParam}`; 
           else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encName}&token=${t}${pParam}`; 
-          if (url) window.open(url, '_blank'); 
+          
+          if (url) {
+              // [decision:logic] : If it's a preview (json_tab), we MUST open a tab.
+              // If it's a download (raw, xlsx, json), we use the silent trigger.
+              if (type === 'json_tab') {
+                  window.open(url, '_blank');
+              } else {
+                  triggerDownload(url, filename);
+              }
+          }
       } catch (e) { notify("Link Error", "error"); } 
   };
 
   const handleBulkDownload = async (type: 'raw' | 'xlsx' | 'json') => {
       const filesToDownload = filteredFiles.filter(f => selectedFiles.has(f.path));
       notify(`Preparing ${filesToDownload.length} downloads...`);
+      
       for (const file of filesToDownload) {
+          // Skip incompatible files for conversions
           if (type !== 'raw' && !/\.(si2s|lf1s|mdb|json)$/i.test(file.filename)) continue;
-          handleOpenLink(type === 'json' ? 'json_tab' : type, file.filename);
-          await new Promise(r => setTimeout(r, 500));
+          
+          // [!] [CRITICAL] : For Bulk JSON, we force 'json' (download) instead of 'json_tab' (preview)
+          // to avoid opening 50 tabs and crashing the browser.
+          handleOpenLink(type, file.filename);
+          
+          // [decision:logic] : Small delay to prevent browser throttling
+          await new Promise(r => setTimeout(r, 750));
       }
       setSelectedFiles(new Set());
   };
