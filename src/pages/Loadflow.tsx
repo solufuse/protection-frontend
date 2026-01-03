@@ -1,13 +1,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import * as Icons from 'lucide-react'; 
-import Toast from '../components/Toast';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 import { useAuth } from '../context/AuthContext';
 
-// --- TYPES (From Original File) ---
+// --- TYPES ---
 interface StudyCase { id: string; config: string; revision: string; }
 interface TransformerResult { Tap: number; LFMW: number; LFMvar: number; kV: number; }
 interface LoadflowResult {
@@ -31,7 +30,7 @@ interface LoadflowResponse {
 }
 
 const Loadflow = ({ user }: { user: any }) => {
-    // --- 1. SIDEBAR & CONTEXT STATE (Adapted from Files.tsx) ---
+    // --- 1. SIDEBAR & CONTEXT STATE ---
     const [projects, setProjects] = useState<Project[]>([]);
     const [usersList, setUsersList] = useState<UserSummary[]>([]);
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -40,9 +39,9 @@ const Loadflow = ({ user }: { user: any }) => {
     const [newProjectName, setNewProjectName] = useState("");
     const [userGlobalData, setUserGlobalData] = useState<any>(null);
 
-    // --- 2. PAGE STATE (Original) ---
+    // --- 2. PAGE STATE ---
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
-    const [files, setFiles] = useState<any[]>([]);
+    // [FIX] Removed unused 'files' state
     const [results, setResults] = useState<LoadflowResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -53,10 +52,9 @@ const Loadflow = ({ user }: { user: any }) => {
     const [showHistory, setShowHistory] = useState(true);
     const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]);
 
-    // --- 3. API & LOGIC (Original Monolithic) ---
-    const { token } = useAuth(); // Note: user prop passed, but token needed for calls if not using user.getIdToken() directly everywhere.
-                                 // Ideally use user.getIdToken() inside apiCall.
-
+    // --- 3. API & LOGIC ---
+    // [FIX] Removed unused 'useAuth' destructuring since user is passed as prop
+    
     const apiCall = useCallback(async (endpoint: string, options: RequestInit = {}) => {
         if (!user) return;
         const t = await user.getIdToken();
@@ -73,7 +71,7 @@ const Loadflow = ({ user }: { user: any }) => {
         return response.json();
     }, [user]);
 
-    // --- 4. INITIAL DATA LOADING (Sidebar Fix) ---
+    // --- 4. INITIAL DATA LOADING ---
     useEffect(() => {
         const initData = async () => {
             if (!user) return;
@@ -121,10 +119,9 @@ const Loadflow = ({ user }: { user: any }) => {
         }
     }, [activeProjectId, activeSessionUid, projects, usersList]);
 
-    // --- 6. ORIGINAL LOGIC (Refresh, Run, History) ---
+    // --- 6. LOGIC ---
     
     const refreshFiles = useCallback(async () => {
-        // Works for Project OR Session
         if (!activeProjectId && !activeSessionUid) return;
         try {
             let url = `/files/details`;
@@ -132,7 +129,7 @@ const Loadflow = ({ user }: { user: any }) => {
             else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
 
             const data = await apiCall(url);
-            setFiles(data.files || []);
+            // [FIX] Removed setFiles since it's unused
 
             const archives = (data.files || [])
                 .filter((f: any) => f.filename.includes('loadflow_results') || f.filename.match(/_\d{8}_\d{6}\.json$/))
@@ -161,7 +158,6 @@ const Loadflow = ({ user }: { user: any }) => {
             
             let url = `/loadflow/run-and-save?basename=${basename}`;
             if (activeProjectId) url += `&project_id=${activeProjectId}`;
-            // If session, backend infers from token or we might need specific handling, but usually implicit.
 
             const data: LoadflowResponse = await apiCall(url, { method: 'POST' });
 
@@ -184,15 +180,14 @@ const Loadflow = ({ user }: { user: any }) => {
         setLoading(true);
         try {
             let url = `https://api.solufuse.com/files/download?filename=${filename}`;
-            // If the filename comes from the list, it might be relative.
             if (!filename.includes('/')) url = `https://api.solufuse.com/files/download?filename=loadflow_results/${filename}`;
             
             if (activeProjectId) url += `&project_id=${activeProjectId}`;
             else if (activeSessionUid) url += `&project_id=${activeSessionUid}`;
 
-            const token = await user.getIdToken();
+            const t = await user.getIdToken();
             const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${t}` }
             });
             
             if (!response.ok) throw new Error("Impossible de charger l'archive");
@@ -228,13 +223,12 @@ const Loadflow = ({ user }: { user: any }) => {
         return <Icons.XCircle className="w-5 h-5 text-red-500" />;
     };
 
-    // Sidebar Placeholders
     const handleCreateProject = () => { alert("Please use Files page to create projects"); setIsCreatingProject(false); };
-    const handleDeleteProject = (id: string, e: any) => { e.stopPropagation(); alert("Please use Files page to delete"); };
+    // [FIX] Used 'id' in alert to satisfy strict mode
+    const handleDeleteProject = (id: string, e: any) => { e.stopPropagation(); alert(`Go to Files to delete project ${id}`); };
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
-            {/* SIDEBAR (Corrected with all props) */}
             <ProjectsSidebar 
                 user={user} 
                 userGlobalData={userGlobalData}
@@ -253,7 +247,6 @@ const Loadflow = ({ user }: { user: any }) => {
             />
 
             <div className="flex-1 flex flex-col min-w-0">
-                {/* HEADER (Original) */}
                 <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 shrink-0">
                     <div className="flex items-center gap-4">
                         <Icons.Activity className="w-6 h-6 text-blue-600" />
@@ -282,9 +275,7 @@ const Loadflow = ({ user }: { user: any }) => {
                 </header>
 
                 <div className="flex-1 flex overflow-hidden">
-                    {/* MAIN CONTENT */}
                     <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                        {/* TOOLBAR (Original) */}
                         <div className="p-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-4 items-center justify-between z-10">
                             <div className="flex items-center gap-2">
                                 <button
@@ -316,7 +307,6 @@ const Loadflow = ({ user }: { user: any }) => {
                             </div>
                         </div>
 
-                        {/* RESULTS AREA */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-slate-900">
                             {error && (
                                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
@@ -341,7 +331,6 @@ const Loadflow = ({ user }: { user: any }) => {
                                         : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700'
                                     }`}
                                 >
-                                    {/* CARD HEADER */}
                                     <div 
                                         onClick={() => toggleExpand(res.filename)}
                                         className="p-4 flex items-center justify-between cursor-pointer group select-none"
@@ -390,7 +379,6 @@ const Loadflow = ({ user }: { user: any }) => {
                                         </div>
                                     </div>
 
-                                    {/* DETAILS */}
                                     {expandedCards[res.filename] && (
                                         <div className="border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 p-4 animate-in slide-in-from-top-2 duration-200">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -431,17 +419,21 @@ const Loadflow = ({ user }: { user: any }) => {
                         </div>
                     </main>
 
-                    {/* RIGHT SIDEBAR (History) */}
                     {showHistory && (
                         <aside className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col shadow-xl z-20">
-                            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                                <h2 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                    <Icons.Archive className="w-4 h-4" />
-                                    Results Archive
-                                </h2>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Click to load previous runs
-                                </p>
+                            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+                                <div>
+                                    <h2 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                        <Icons.Archive className="w-4 h-4" />
+                                        Results Archive
+                                    </h2>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        Click to load previous runs
+                                    </p>
+                                </div>
+                                <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded">
+                                    <Icons.X className="w-4 h-4 text-slate-500" />
+                                </button>
                             </div>
                             
                             <div className="flex-1 overflow-y-auto p-2 space-y-1">
