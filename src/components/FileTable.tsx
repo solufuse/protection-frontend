@@ -43,7 +43,6 @@ export default function FileTable({
   return (
     <div className="flex-1 overflow-y-auto">
       <table className="w-full text-left font-bold border-collapse">
-        {/* Header */}
         <thead className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50/50 dark:bg-[#161b22]/90 sticky top-0 z-10 backdrop-blur-sm border-b border-slate-100 dark:border-slate-800">
           <tr>
             <th className="py-2 px-3 w-8 text-center" onClick={(e) => e.stopPropagation()}>
@@ -54,7 +53,6 @@ export default function FileTable({
                     className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
             </th>
-            {/* Star Column */}
             <th className="py-2 px-1 w-6 text-center"></th>
             
             <th className="py-2 px-3 font-bold cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 group" onClick={() => onSort('filename')}>
@@ -66,7 +64,6 @@ export default function FileTable({
             <th className="py-2 px-3 w-24 font-bold text-center cursor-pointer hover:text-blue-600 dark:hover:text-blue-400" onClick={() => onSort('size')}>
                  <div className="flex items-center justify-center gap-1">SIZE {sortConfig.key === 'size' && <Icons.ArrowUpDown className="w-3 h-3 text-blue-500" />}</div>
             </th>
-            {/* [FIX] Increased width to fit all buttons (RAW, XLSX, JSON, OPEN, DELETE) */}
             <th className="py-2 px-3 text-right w-64 font-bold">Actions</th>
           </tr>
         </thead>
@@ -76,7 +73,8 @@ export default function FileTable({
             <tr><td colSpan={6} className="py-20 text-center text-slate-300 dark:text-slate-600 italic"><Icons.Archive className="w-10 h-10 mx-auto mb-3 opacity-50" /><span className="block opacity-70">{searchTerm ? "No matches found" : "No files in this context"}</span></td></tr>
           ) : (
             files.map((file) => {
-               const isConvertible = /\.(si2s|lf1s|mdb|json)$/i.test(file.filename);
+               // [!] FIX: Removed 'json' from convertible regex. Added 'mdb' as it is a DB format.
+               const isConvertible = /\.(si2s|lf1s|mdb)$/i.test(file.filename);
                const uniqueId = file.path || file.filename;
                const isSelected = selectedFiles.has(uniqueId);
                const isStarred = starredFiles.has(uniqueId);
@@ -84,7 +82,6 @@ export default function FileTable({
                return (
                 <Fragment key={uniqueId}>
                     <tr className={`group transition-colors ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/20' : isStarred ? 'bg-yellow-50/50 dark:bg-yellow-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'}`}>
-                      {/* Checkbox Row */}
                       <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                           <input 
                             type="checkbox" 
@@ -94,7 +91,6 @@ export default function FileTable({
                           />
                       </td>
 
-                      {/* Star Row */}
                       <td className="px-1 py-1.5 text-center">
                           <button 
                             onClick={(e) => { e.stopPropagation(); onToggleStar(uniqueId); }}
@@ -120,7 +116,6 @@ export default function FileTable({
                               <>
                                 <button onClick={() => onOpenLink('xlsx', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 hover:bg-green-100 dark:bg-green-900/10 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded border border-green-200 dark:border-green-900/50 transition-colors" title="Download XLSX"><Icons.FileSpreadsheet className="w-3 h-3"/> <span className="text-[9px]">XLSX</span></button>
                                 
-                                {/* [FIX] Added JSON Download Button */}
                                 <button onClick={() => onOpenLink('json', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/10 dark:hover:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded border border-yellow-200 dark:border-yellow-900/50 transition-colors" title="Download JSON"><Icons.FileJson className="w-3 h-3"/> <span className="text-[9px]">JSON</span></button>
                                 
                                 <button onClick={() => onOpenLink('json_tab', file.filename)} className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/10 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded border border-blue-200 dark:border-blue-900/50 transition-colors" title="Open in new Tab"><Icons.ExternalLink className="w-3 h-3"/> <span className="text-[9px]">OPEN</span></button>

@@ -103,21 +103,15 @@ export default function Files({ user }: { user: any }) {
           const encName = encodeURIComponent(filename); 
           let url = ""; 
           let mode: 'download' | 'open' = 'download';
-          
-          // [FIX] Smart Extension Replacement
-          // If downloading a conversion (xlsx/json), we MUST change the extension
-          // so the browser saves it correctly.
           let downloadName = filename;
 
           if (type === 'raw') {
               url = `${API_URL}/files/download?filename=${encName}${pParam}`;
           } else if (type === 'xlsx') {
               url = `${API_URL}/ingestion/download/xlsx?filename=${encName}${pParam}`;
-              // Replace extension with .xlsx
               downloadName = filename.replace(/\.[^/.]+$/, "") + ".xlsx";
           } else if (type === 'json') {
               url = `${API_URL}/ingestion/download/json?filename=${encName}${pParam}`;
-              // Replace extension with .json
               downloadName = filename.replace(/\.[^/.]+$/, "") + ".json";
           } else if (type === 'json_tab') {
               url = `${API_URL}/ingestion/preview?filename=${encName}${pParam}`;
@@ -130,9 +124,23 @@ export default function Files({ user }: { user: any }) {
   };
 
   const onBulkDownloadTrigger = async (type: 'raw' | 'xlsx' | 'json') => {
-      // Use the bulk hook
-      await handleBulkDownload(selectedFiles, type);
-      setSelectedFiles(new Set());
+      if (type === 'raw') {
+         await handleBulkDownload(selectedFiles, type);
+         setSelectedFiles(new Set());
+      } else {
+         // [!] Fix: Sync bulk logic regex with Table regex (exclude generic json)
+         const filesToDownload = filteredFiles.filter(f => selectedFiles.has(f.path));
+         notify(`Processing ${filesToDownload.length} conversions...`);
+         
+         for (const file of filesToDownload) {
+             // [!] ONLY allow .si2s, .lf1s, .mdb for conversion
+             if (!/\.(si2s|lf1s|mdb)$/i.test(file.filename)) continue;
+             
+             await handleOpenLink(type === 'json' ? 'json' : type, file.filename);
+             await new Promise(r => setTimeout(r, 750));
+         }
+         setSelectedFiles(new Set());
+      }
   };
 
   const toggleSelect = (path: string) => {
