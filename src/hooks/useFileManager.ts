@@ -28,13 +28,11 @@ export const useFileManager = (
     notify: (msg: string, type?: 'success' | 'error') => void
 ): UseFileManagerReturn => {
     
-    // [context:flow] : State Definitions
     const [files, setFiles] = useState<SessionFile[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'uploaded_at', order: 'desc' });
     
-    // [decision:logic] : Initialize Starred Files from LocalStorage
     const [starredFiles, setStarredFiles] = useState<Set<string>>(() => {
         const saved = localStorage.getItem('solufuse_starred_files');
         return saved ? new Set(JSON.parse(saved)) : new Set();
@@ -118,17 +116,48 @@ export const useFileManager = (
         }
     };
 
+    // [!] UPDATED: Bulk Delete using Server-Side Endpoint
     const handleBulkDelete = async (paths: string[]) => {
+        if (paths.length === 0) return;
         if (!confirm(`Delete ${paths.length} files permanently?`)) return;
+        
+        notify(`Deleting ${paths.length} files...`);
+        
         try {
-            await Promise.all(paths.map(path => handleDelete(path)));
-            notify(`${paths.length} Files deleted`);
+            const t = await getToken();
+            let url = `${apiUrl}/files/bulk-delete`;
+            if (activeProjectId) url += `?project_id=${activeProjectId}`;
+            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${t}`,
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify(paths)
+            });
+
+            if (!res.ok) throw new Error("Bulk delete failed");
+            
+            const data = await res.json();
+            
+            // Remove deleted files from state optimistically
+            const deletedSet = new Set(data.deleted);
+            setFiles(prev => prev.filter(f => !deletedSet.has(f.path)));
+            
+            if (data.errors && data.errors.length > 0) {
+                notify(`Deleted ${data.deleted.length} files. Some failed.`, "error");
+            } else {
+                notify(`${data.deleted.length} Files deleted`);
+            }
+            
         } catch (e) {
-            notify("Some files could not be deleted", "error");
+            console.error(e);
+            notify("Bulk delete failed", "error");
         }
     };
 
-    // [decision:logic] : Unified Bulk Download (Raw OR Converted) using ZIP streaming
     const handleBulkDownload = async (selectedFiles: Set<string>, format: 'raw' | 'xlsx' | 'json' = 'raw') => {
         const targets = Array.from(selectedFiles);
         if (targets.length === 0) return;
@@ -138,15 +167,11 @@ export const useFileManager = (
         try {
             const t = await getToken();
             let url = "";
-            
-            // [decision:logic] Route to correct endpoint based on format
             if (format === 'raw') {
                 url = `${apiUrl}/files/bulk-download`;
             } else {
                 url = `${apiUrl}/ingestion/bulk-download/${format}`;
             }
-            
-            // Add Project Context
             if (activeProjectId) url += `?project_id=${activeProjectId}`;
             else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
 
@@ -156,7 +181,6 @@ export const useFileManager = (
                     'Authorization': `Bearer ${t}`,
                     'Content-Type': 'application/json'
                 },
-                // Send simple list of filenames
                 body: JSON.stringify(targets) 
             });
 
@@ -165,13 +189,11 @@ export const useFileManager = (
                 throw new Error(err.detail || "Compression/Conversion failed");
             }
 
-            // Convert to Blob and download
             const blob = await res.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = downloadUrl;
             
-            // Nice filename logic
             const dateStr = new Date().toISOString().slice(0,19).replace(/:/g, "-");
             const prefix = format === 'raw' ? 'files' : `converted_${format}`;
             link.download = `solufuse_${prefix}_${dateStr}.zip`;
