@@ -56,8 +56,8 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
     const sortedBaseKeys = Array.from(uniqueBaseKeys).sort();
 
     // --- HELPER: RENDER SINGLE SVG ---
-    const renderChartSvg = (targetBaseKeys: string[], width: string | number, height: string | number, hideAxisLabels = false) => {
-        // Dynamic SVG Scaling
+    // [FIX] Removed unused width/height args. Fixed ViewBox 800x300 works for responsive scale.
+    const renderChartSvg = (targetBaseKeys: string[], hideAxisLabels = false) => {
         const vW = 800; 
         const vH = 300;
         
@@ -185,7 +185,7 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                             )}
                         </div>
                         <div className="flex-1 w-full relative">
-                            {renderChartSvg([baseKey], 400, 160, true)}
+                            {renderChartSvg([baseKey], true)}
                         </div>
                     </div>
                 ))}
@@ -193,7 +193,7 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
         ) : (
             <div className="w-full bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col">
                 <div className="relative h-[320px] w-full">
-                    {renderChartSvg(sortedBaseKeys, 800, 300)}
+                    {renderChartSvg(sortedBaseKeys)}
                 </div>
                 {/* Expanded Legend */}
                 <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 justify-center px-4">
@@ -231,7 +231,7 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                     </div>
                     
                     <div className="flex-1 w-full relative bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700 p-4">
-                         {renderChartSvg([zoomedGroup], "100%", "100%")}
+                         {renderChartSvg([zoomedGroup])}
                     </div>
 
                     <div className="mt-4 flex gap-4 justify-center">
