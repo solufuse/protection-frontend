@@ -9,27 +9,29 @@ import ResultCard from '../components/Loadflow/ResultCard';
 import HistorySidebar from '../components/Loadflow/HistorySidebar';
 
 const Loadflow = ({ user }: { user: any }) => {
-    // --- SIDEBAR STATE ---
+    // --- 1. STATES REQUIRED BY SIDEBAR (Compatibility Fix) ---
     const [projects, setProjects] = useState<Project[]>([]);
     const [usersList, setUsersList] = useState<UserSummary[]>([]);
+    
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
+    
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState("");
     
-    // --- UI STATE ---
+    // --- 2. PAGE UI STATE ---
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
     const [onlyWinners, setOnlyWinners] = useState(false); 
     const [showHistory, setShowHistory] = useState(true);
-    const [runName, setRunName] = useState(""); 
-    
-    // --- LOGIC HOOK ---
+    const [runName, setRunName] = useState(""); // Needed for backend
+
+    // --- 3. LOGIC HOOK ---
     const { 
         results, loading, error, historyFiles, 
         runAnalysis, loadResultFile 
     } = useLoadflow(activeProjectId, activeSessionUid, currentProject?.name);
 
-    // --- 1. FETCH DATA ---
+    // --- 4. DATA FETCHING (Projects & Users) ---
     useEffect(() => {
         const fetchData = async () => {
             if (!user) return;
@@ -37,9 +39,11 @@ const Loadflow = ({ user }: { user: any }) => {
                 const token = await user.getIdToken();
                 const headers = { Authorization: `Bearer ${token}` };
                 
+                // Fetch Projects
                 const projRes = await fetch("https://api.solufuse.com/projects/", { headers });
                 if (projRes.ok) setProjects(await projRes.json());
 
+                // Fetch Users (for Admin Sidebar)
                 if (['super_admin', 'admin', 'moderator'].includes(user.global_role)) {
                     const usersRes = await fetch("https://api.solufuse.com/users/", { headers });
                     if (usersRes.ok) setUsersList(await usersRes.json());
@@ -49,7 +53,7 @@ const Loadflow = ({ user }: { user: any }) => {
         fetchData();
     }, [user]);
 
-    // --- 2. SYNC SELECTION ---
+    // --- 5. SYNC SELECTION ---
     useEffect(() => {
         if (activeProjectId) {
             const p = projects.find(proj => proj.id === activeProjectId);
@@ -71,13 +75,9 @@ const Loadflow = ({ user }: { user: any }) => {
     // --- HANDLERS ---
     const handleRun = () => runAnalysis(runName);
     
-    const handleCreate = () => { alert("Go to Files to create projects"); setIsCreatingProject(false); };
-    
-    // [FIX] Used 'id' in alert to satisfy TypeScript strict mode
-    const handleDelete = (id: string, e: any) => { 
-        e.stopPropagation(); 
-        alert(`Go to Files to delete project: ${id}`); 
-    };
+    // Sidebar Placeholders
+    const handleCreate = () => { alert("Please use Files page to create projects"); setIsCreatingProject(false); };
+    const handleDelete = (id: string, e: any) => { e.stopPropagation(); alert(`Go to Files to delete project: ${id}`); };
 
     const filteredResults = results.filter(r => {
         if (onlyWinners) return r.is_winner;
@@ -86,6 +86,7 @@ const Loadflow = ({ user }: { user: any }) => {
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
+            {/* --- SIDEBAR --- */}
             <ProjectsSidebar 
                 user={user} userGlobalData={user}
                 projects={projects} usersList={usersList}
@@ -97,18 +98,16 @@ const Loadflow = ({ user }: { user: any }) => {
             />
 
             <div className="flex-1 flex flex-col min-w-0">
-                {/* --- [RESTORED] ORIGINAL HEADER DESIGN --- */}
+                {/* --- [ORIGINAL HEADER] --- */}
                 <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400">
-                            <Icons.Activity className="w-6 h-6" />
-                        </div>
+                        <Icons.Activity className="w-6 h-6 text-blue-600" />
                         <div>
                             <h1 className="text-lg font-bold text-slate-800 dark:text-white">Loadflow Analysis</h1>
                             <div className="flex items-center gap-2 text-xs text-slate-500">
                                 {currentProject ? (
                                     <>
-                                        <span className="font-medium">{currentProject.name}</span>
+                                        <span>{currentProject.name}</span>
                                         <ContextRoleBadge role={currentProject.role} />
                                     </>
                                 ) : <span>Select a project</span>}
@@ -129,27 +128,26 @@ const Loadflow = ({ user }: { user: any }) => {
 
                 <div className="flex-1 flex overflow-hidden">
                     <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                        {/* --- TOOLBAR --- */}
+                        {/* --- [ORIGINAL TOOLBAR LAYOUT] --- */}
                         <div className="p-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-4 items-center justify-between z-10">
                             <div className="flex items-center gap-2">
-                                {/* [!] RUN NAME INPUT */}
-                                <div className="relative">
-                                    <input 
-                                        type="text"
-                                        placeholder="Run Name..."
-                                        value={runName}
-                                        onChange={(e) => setRunName(e.target.value)}
-                                        className="pl-3 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 sm:w-48"
-                                        maxLength={20}
-                                    />
-                                </div>
+                                {/* Run Name Input (Added functionality within original layout) */}
+                                <input 
+                                    type="text" 
+                                    placeholder="Run Name..." 
+                                    value={runName}
+                                    onChange={(e) => setRunName(e.target.value)}
+                                    className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-slate-900 w-32 sm:w-48"
+                                    maxLength={20}
+                                />
+                                
                                 <button
                                     onClick={handleRun}
                                     disabled={loading || !currentProject}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-r-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm -ml-2 z-10"
+                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                                 >
                                     {loading ? <Icons.Loader2 className="w-4 h-4 animate-spin" /> : <Icons.Play className="w-4 h-4" />}
-                                    Run
+                                    Run Analysis & Save
                                 </button>
                                 
                                 <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
@@ -163,12 +161,12 @@ const Loadflow = ({ user }: { user: any }) => {
                                     }`}
                                 >
                                     <Icons.Trophy className="w-4 h-4" />
-                                    {onlyWinners ? 'Winners Only' : 'Show All'}
+                                    {onlyWinners ? 'Winners Only' : 'Show All Candidates'}
                                 </button>
                             </div>
                             
-                            <div className="text-sm text-slate-500 font-mono">
-                                {filteredResults.length > 0 && <span>{filteredResults.length} scenarios</span>}
+                            <div className="text-sm text-slate-500">
+                                {filteredResults.length > 0 && <span>{filteredResults.length} scenarios analyzed</span>}
                             </div>
                         </div>
 
@@ -184,7 +182,7 @@ const Loadflow = ({ user }: { user: any }) => {
                             {!loading && results.length === 0 && !error && (
                                 <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                     <Icons.Activity className="w-16 h-16 mb-4 opacity-20" />
-                                    <p>Ready to analyze. Select project, name run, and press Play.</p>
+                                    <p>Ready to analyze. Press Run to start.</p>
                                 </div>
                             )}
 
@@ -194,7 +192,7 @@ const Loadflow = ({ user }: { user: any }) => {
                         </div>
                     </main>
 
-                    {/* --- HISTORY --- */}
+                    {/* --- HISTORY SIDEBAR --- */}
                     {showHistory && (
                         <HistorySidebar 
                             files={historyFiles} 
