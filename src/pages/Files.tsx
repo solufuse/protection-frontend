@@ -5,7 +5,6 @@
 import { useEffect, useState } from 'react';
 import { Icons } from '../icons';
 import Toast from '../components/Toast';
-import { useDropzone } from 'react-dropzone';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 import MembersModal from '../components/MembersModal';
@@ -161,40 +160,21 @@ export default function Files({ user }: { user: any }) {
   if (activeProjectId) currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;
   else if (activeSessionUid) currentProjectRole = 'admin';
   const getActiveProjectName = () => { if (!activeProjectId) return null; const proj = projects.find(p => p.id === activeProjectId); return proj ? proj.name : activeProjectId; };
-  
-  const onDrop = async (acceptedFiles: File[]) => { 
-      if (acceptedFiles.length > 0) handleUpload(acceptedFiles); 
-  };
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, noClick: true });
 
   return (
     <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
-      
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
         <div className="flex flex-col">
-          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
-            Workspace
-          </label>
+          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">Workspace</label>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">
                 {activeProjectId ? <><Icons.Folder className="w-5 h-5 text-blue-600" /><span>{getActiveProjectName()}</span></> : activeSessionUid ? <><Icons.Shield className="w-5 h-5 text-red-500" /><span className="text-red-600">Session: {usersList.find(u => u.uid === activeSessionUid)?.username || activeSessionUid.slice(0,6)}</span></> : <><Icons.HardDrive className="w-5 h-5 text-slate-600 dark:text-slate-400" /><span>My Session</span><span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">PRIVATE</span></>}
             </h1>
-            
-            {/* BADGES ROW (Clean Position) */}
-            <div className="flex items-center gap-2 ml-2">
-                <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null && activeSessionUid === null} />
-                
-                {/* GLOBAL ROLE BADGE */}
-                {userGlobalData && (
-                    <div className="scale-110">
-                        <GlobalRoleBadge role={userGlobalData.global_role} />
-                    </div>
-                )}
-            </div>
+            <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null && activeSessionUid === null} />
+            {/* [MOVED] Badge is now here */}
+            {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}
           </div>
         </div>
-        
         <div className="flex gap-2">
           {userGlobalData && userGlobalData.global_role === 'super_admin' && <button onClick={() => window.open(`${API_URL}/docs`, '_blank')} className="flex items-center gap-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300 px-3 py-1.5 rounded border border-red-200 dark:border-red-900 text-red-600 font-bold transition-colors"><Icons.Shield className="w-3.5 h-3.5" /> API</button>}
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
@@ -215,8 +195,8 @@ export default function Files({ user }: { user: any }) {
       <div className="flex flex-1 gap-6 min-h-0">
         <ProjectsSidebar user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid} isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} newProjectName={newProjectName} setNewProjectName={setNewProjectName} onCreateProject={createProject} onDeleteProject={deleteProject} />
 
-        <div {...getRootProps()} className={`flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden font-bold relative transition-all ${isDragActive ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-900' : ''}`}>
-            <input {...getInputProps()} />
+        {/* Added 'as any' to avoid TS error on FileList vs File[] mismatch */}
+        <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden font-bold relative transition-all" onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files as any); }}>
             
             <FileToolbar 
                 searchTerm={searchTerm} setSearchTerm={setSearchTerm} fileCount={filteredFiles.length} 
@@ -232,15 +212,6 @@ export default function Files({ user }: { user: any }) {
                 selectedFiles={selectedFiles} onToggleSelect={toggleSelect} onSelectAll={selectAll}
                 starredFiles={starredFiles} onToggleStar={toggleStar}
             />
-            
-            {isDragActive && (
-                <div className="absolute inset-0 bg-blue-50/80 dark:bg-blue-900/50 flex items-center justify-center z-50 backdrop-blur-sm">
-                    <div className="text-blue-600 dark:text-blue-300 font-black text-lg flex flex-col items-center animate-bounce">
-                        <Icons.UploadCloud className="w-12 h-12 mb-2" />
-                        DROP FILES TO UPLOAD
-                    </div>
-                </div>
-            )}
         </div>
       </div>
       
