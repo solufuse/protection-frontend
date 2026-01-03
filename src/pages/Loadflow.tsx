@@ -84,11 +84,12 @@ export default function Loadflow({ user }: { user: any }) {
   const deleteProjectWrapper = (id: string, e: any) => { e.stopPropagation(); notify(`Go to Files to delete ${id}`, "error"); };
 
   return (
-    // [FIX] Removed 'h-full' and 'overflow-hidden' from root to allow scrolling
-    <div className="w-full px-6 py-6 text-[11px] font-sans min-h-full flex flex-col relative">
+    // [FIX] Removed 'h-[calc...]' and 'overflow-hidden'. 
+    // Added 'min-h-full' to ensure bg covers screen, but allows expansion.
+    <div className="w-full px-6 py-6 text-[11px] font-sans flex flex-col relative min-h-full">
       
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">System Analysis {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}</label>
           <div className="flex items-center gap-2">
@@ -123,20 +124,22 @@ export default function Loadflow({ user }: { user: any }) {
         </div>
       </div>
 
-      <div className="flex flex-1 gap-6 min-h-0">
-        {/* Sidebar fits into the layout but relies on main scroll now */}
-        <ProjectsSidebar 
-            user={user} userGlobalData={userGlobalData || user} 
-            projects={projects} usersList={usersList}
-            activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId}
-            activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid}
-            isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} 
-            newProjectName={newProjectName} setNewProjectName={setNewProjectName} 
-            onCreateProject={createProjectWrapper} onDeleteProject={deleteProjectWrapper} 
-        />
+      <div className="flex flex-1 gap-6">
+        {/* Sidebar height handled by its own content or sticky behavior if added later */}
+        <div className="shrink-0">
+            <ProjectsSidebar 
+                user={user} userGlobalData={userGlobalData || user} 
+                projects={projects} usersList={usersList}
+                activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId}
+                activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid}
+                isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} 
+                newProjectName={newProjectName} setNewProjectName={setNewProjectName} 
+                onCreateProject={createProjectWrapper} onDeleteProject={deleteProjectWrapper} 
+            />
+        </div>
         
-        {/* [FIX] Content container allows stacking (no overflow-hidden) */}
-        <div className="flex-1 flex flex-col gap-4">
+        {/* RIGHT CONTENT - Allowed to grow infinitely */}
+        <div className="flex-1 flex flex-col gap-6 min-w-0">
              {results.length === 0 && !loading ? (
                  <div className="h-96 flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 gap-4 border-2 border-dashed border-slate-100 dark:border-slate-700 rounded bg-slate-50/50 dark:bg-slate-900/50">
                     <Icons.Activity className="w-16 h-16" />
@@ -144,12 +147,13 @@ export default function Loadflow({ user }: { user: any }) {
                  </div>
              ) : (
                  <>
-                    {/* Chart Container */}
+                    {/* Chart */}
                     <div className="w-full">
                         <LoadflowChart groups={scenarioGroups} extractLoadNumber={extractLoadNumber} />
                     </div>
-                    {/* Table Container - Now flows naturally below chart */}
-                    <div className="w-full">
+                    
+                    {/* Table - No height restrictions */}
+                    <div className="w-full pb-10">
                         <ResultsTable 
                             results={results} 
                             filterSearch={filterSearch} setFilterSearch={setFilterSearch}
