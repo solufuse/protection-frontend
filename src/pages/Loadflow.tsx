@@ -1,6 +1,5 @@
-
-import { useState, useEffect } from 'react';
-import { Icons } from '../icons';
+import { useState, useEffect, useCallback } from 'react';
+import { Icons } from '../icons'; 
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
@@ -77,10 +76,27 @@ export default function Loadflow({ user }: { user: any }) {
   useEffect(() => { if (activeProjectId && activeSessionUid) setActiveSessionUid(null); }, [activeProjectId]);
   useEffect(() => { if (activeSessionUid && activeProjectId) setActiveProjectId(null); }, [activeSessionUid]);
 
+  // --- HELPER: CLEAN DISPLAY NAME ---
+  // Transforms "a7VIx0..._TCR24026" into "TCR24026"
+  const getDisplayName = (fullId: string | null) => {
+      if (!fullId) return "My Session";
+      
+      // 1. Try to find the official name from the project list
+      const project = projects.find(p => p.id === fullId);
+      if (project) return project.name;
+
+      // 2. Fallback: Split by underscore and remove the UID part (first part)
+      const parts = fullId.split('_');
+      if (parts.length > 1) {
+          return parts.slice(1).join('_'); // Returns everything after the first '_'
+      }
+      
+      return fullId;
+  };
+
   // --- ACTIONS WRAPPERS ---
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } };
   const createProjectWrapper = () => { notify("Please use Files Dashboard", "error"); setIsCreatingProject(false); };
-  // [FIX] Used 'id' in notification to satisfy linter
   const deleteProjectWrapper = (id: string, e: any) => { e.stopPropagation(); notify(`Go to Files to delete ${id}`, "error"); };
 
   return (
@@ -91,7 +107,19 @@ export default function Loadflow({ user }: { user: any }) {
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">System Analysis {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}</label>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">{activeProjectId ? <><Icons.Folder className="w-5 h-5 text-blue-600" /><span>{activeProjectId}</span></> : <><Icons.HardDrive className="w-5 h-5 text-slate-600 dark:text-slate-400" /><span>My Session</span></>}</h1>
+            <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">
+                {activeProjectId ? (
+                    <>
+                        <Icons.Folder className="w-5 h-5 text-blue-600" />
+                        <span>{getDisplayName(activeProjectId)}</span> {/* [FIX] Uses helper function */}
+                    </>
+                ) : (
+                    <>
+                        <Icons.HardDrive className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                        <span>My Session</span>
+                    </>
+                )}
+            </h1>
             <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null} />
           </div>
         </div>
