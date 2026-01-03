@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as Icons from 'lucide-react'; 
 import Toast from '../components/Toast';
-import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
+import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 
@@ -13,54 +13,273 @@ interface LoadflowResult {
   filename: string; is_valid: boolean; mw_flow: number; mvar_flow: number; delta_target: number; is_winner: boolean;
   study_case?: StudyCase; transformers: Record<string, TransformerResult>;
 }
-interface LoadflowResponse { status: string; results: LoadflowResult[]; }
+interface LoadflowResponse { 
+    status: string; 
+    results: LoadflowResult[]; 
+    filename?: string; // [!] Added to type definition for backend response
+}
 
 const extractLoadNumber = (rev: string | undefined) => {
     if (!rev) return 0;
     const match = rev.match(/(\d+)/);
     return match ? parseInt(match[0]) : 0;
 };
-const getTimestampSuffix = () => {
-    const now = new Date();
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-};
+
+// [FIX] Removed getTimestampSuffix - Backend handles this now
+
 const LINE_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#6366f1", "#84cc16"];
 
 export default function Loadflow({ user }: { user: any }) {
+  // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null); // [!] Restore Session Support
+  const [usersList, setUsersList] = useState<UserSummary[]>([]); // [!] Restore Admin List
+  
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
+  
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<LoadflowResponse | null>(null);
   const [baseName, setBaseName] = useState("lf_results");
   const [scenarioGroups, setScenarioGroups] = useState<Record<string, LoadflowResult[]>>({});
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  
   const [filterSearch, setFilterSearch] = useState("");
   const [filterWinner, setFilterWinner] = useState(false);
   const [filterValid, setFilterValid] = useState(false);
   const [selectedCase, setSelectedCase] = useState<LoadflowResult | null>(null);
+  
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
+  
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
-  const currentProjectRole = activeProjectId ? projects.find(p => p.id === activeProjectId)?.role : undefined;
+  
+  // Logic to determine current role context (Project vs Session)
+  const currentProjectRole = activeProjectId 
+      ? projects.find(p => p.id === activeProjectId)?.role 
+      : 'owner'; // Session is always owner
+
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
 
-  const fetchGlobalProfile = async () => { try { const t = await getToken(); const res = await fetch(`${API_URL}/admin/me`, { headers: { 'Authorization': `Bearer ${t}` } }); if (res.ok) setUserGlobalData(await res.json()); } catch (e) {} };
-  const fetchProjects = async () => { try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } }); if (res.ok) setProjects(await res.json()); } catch (e) {} };
-  const createProject = async () => { if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); if (!newProjectName.trim()) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/create`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newProjectName, name: newProjectName }) }); if (!res.ok) throw new Error((await res.json()).detail); notify("Project Created"); setNewProjectName(""); setIsCreatingProject(false); fetchProjects(); } catch (e: any) { notify(e.message || "Failed", "error"); } };
-  const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
+  // --- DATA LOADING ---
+  const fetchGlobalProfile = async () => { 
+      try { 
+          const t = await getToken(); 
+          // Use /users/ endpoint or /admin/me if available, logic adapted from Files.tsx
+          // Assuming user prop has basics, but we try to fetch more if needed
+          if (['super_admin', 'admin', 'moderator'].includes(user.global_role)) {
+             const res = await fetch(`${API_URL}/users/`, { headers: { 'Authorization': `Bearer ${t}` } });
+             if (res.ok) {
+                 const users = await res.json();
+                 setUsersList(users);
+                 const me = users.find((u: any) => u.uid === user.uid);
+                 setUserGlobalData(me || user);
+             }
+          } else {
+             setUserGlobalData(user);
+          }
+      } catch (e) {} 
+  };
+
+  const fetchProjects = async () => { 
+      try { 
+          const t = await getToken(); 
+          const res = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } }); 
+          if (res.ok) setProjects(await res.json()); 
+      } catch (e) {} 
+  };
+
+  // --- ACTIONS ---
+  const createProject = async () => { notify("Please use the Files Dashboard to create projects.", "error"); setIsCreatingProject(false); };
+  const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); notify("Please use the Files Dashboard to delete projects.", "error"); };
+  
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
-  const cleanOldScenarios = async (rootName: string) => { if (!activeProjectId) return; try { const t = await getToken(); const listRes = await fetch(`${API_URL}/files/details?project_id=${activeProjectId}`, { headers: { 'Authorization': `Bearer ${t}` } }); if (!listRes.ok) return; const listData = await listRes.json(); const historyFiles = (listData.files || []).filter((f: any) => f.filename.startsWith(rootName + "_") && f.filename.endsWith(".json")); historyFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); if (historyFiles.length > MAX_HISTORY) { const filesToDelete = historyFiles.slice(MAX_HISTORY); for (const file of filesToDelete) { await fetch(`${API_URL}/files/file/${file.filename}?project_id=${activeProjectId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); } } } catch (e) {} };
-  const processResults = (data: LoadflowResponse) => { if (!data.results) return; const groups: Record<string, LoadflowResult[]> = {}; data.results.forEach(r => { const key = r.study_case ? `${r.study_case.id} / ${r.study_case.config}` : "Unknown Scenario"; if (!groups[key]) groups[key] = []; groups[key].push(r); }); Object.keys(groups).forEach(k => { groups[k].sort((a, b) => extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision)); }); setScenarioGroups(groups); data.results.sort((a, b) => { const keyA = a.study_case ? `${a.study_case.id}_${a.study_case.config}` : a.filename; const keyB = b.study_case ? `${b.study_case.id}_${b.study_case.config}` : b.filename; if (keyA < keyB) return -1; if (keyA > keyB) return 1; return extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision); }); setResults(data); };
+
+  // Clean old scenarios logic (Updated to match backend naming if needed, but mostly relies on list)
+  const cleanOldScenarios = async (rootName: string) => { 
+      if (!activeProjectId && !activeSessionUid) return; 
+      try { 
+          const t = await getToken(); 
+          let url = `${API_URL}/files/details`;
+          if (activeProjectId) url += `?project_id=${activeProjectId}`;
+          else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+
+          const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
+          if (!listRes.ok) return; 
+          
+          const listData = await listRes.json(); 
+          const historyFiles = (listData.files || []).filter((f: any) => f.filename.startsWith(rootName + "_") && f.filename.endsWith(".json")); 
+          historyFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
+          
+          if (historyFiles.length > MAX_HISTORY) { 
+              const filesToDelete = historyFiles.slice(MAX_HISTORY); 
+              for (const file of filesToDelete) { 
+                  let delUrl = `${API_URL}/files/file/${file.filename}`;
+                  if (activeProjectId) delUrl += `?project_id=${activeProjectId}`;
+                  else if (activeSessionUid) delUrl += `?project_id=${activeSessionUid}`;
+                  
+                  await fetch(delUrl, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); 
+              } 
+          } 
+      } catch (e) {} 
+  };
+
+  const processResults = (data: LoadflowResponse) => { 
+      if (!data.results) return; 
+      const groups: Record<string, LoadflowResult[]> = {}; 
+      data.results.forEach(r => { 
+          const key = r.study_case ? `${r.study_case.id} / ${r.study_case.config}` : "Unknown Scenario"; 
+          if (!groups[key]) groups[key] = []; 
+          groups[key].push(r); 
+      }); 
+      Object.keys(groups).forEach(k => { groups[k].sort((a, b) => extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision)); }); 
+      setScenarioGroups(groups); 
+      
+      data.results.sort((a, b) => { 
+          const keyA = a.study_case ? `${a.study_case.id}_${a.study_case.config}` : a.filename; 
+          const keyB = b.study_case ? `${b.study_case.id}_${b.study_case.config}` : b.filename; 
+          if (keyA < keyB) return -1; 
+          if (keyA > keyB) return 1; 
+          return extractLoadNumber(a.study_case?.revision) - extractLoadNumber(b.study_case?.revision); 
+      }); 
+      setResults(data); 
+  };
   
-  const detectAndLoadResults = useCallback(async () => { if (!user) return; if (!activeProjectId) return; setLoading(true); setResults(null); try { const t = await getToken(); const listRes = await fetch(`${API_URL}/files/details?project_id=${activeProjectId}`, { headers: { 'Authorization': `Bearer ${t}` } }); if (!listRes.ok) throw new Error("Failed to list files"); const listData = await listRes.json(); const files = listData.files || []; const jsonFiles = files.filter((f: any) => f.filename.toLowerCase().endsWith('.json') && f.filename.toLowerCase() !== 'config.json'); if (jsonFiles.length === 0) { setLoading(false); return; } jsonFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); for (const candidate of jsonFiles) { try { const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}&project_id=${activeProjectId}`); if (dataRes.ok) { const jsonData = await dataRes.json(); if (jsonData && Array.isArray(jsonData.results) && jsonData.results.length > 0) { const firstItem = jsonData.results[0]; if (firstItem.mw_flow !== undefined || firstItem.transformers !== undefined) { const rawName = candidate.filename.replace('.json', ''); const cleanName = rawName.replace(/_\d{8}_\d{6}$/, ""); setBaseName(cleanName); processResults(jsonData as LoadflowResponse); notify(`Auto-loaded: ${candidate.filename}`); break; } } } } catch (err) { } } } catch (e: any) { console.warn("Auto-load failed", e); } finally { setLoading(false); } }, [user, activeProjectId, API_URL]);
-  useEffect(() => { let mounted = true; if (user && mounted) { if (activeProjectId) detectAndLoadResults(); } return () => { mounted = false; }; }, [activeProjectId, user]); 
+  // Auto-load Logic
+  const detectAndLoadResults = useCallback(async () => { 
+      if (!user) return; 
+      if (!activeProjectId && !activeSessionUid) return; 
+      setLoading(true); 
+      setResults(null); 
+      try { 
+          const t = await getToken(); 
+          let url = `${API_URL}/files/details`;
+          if (activeProjectId) url += `?project_id=${activeProjectId}`;
+          else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+
+          const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
+          if (!listRes.ok) throw new Error("Failed to list files"); 
+          
+          const listData = await listRes.json(); 
+          const files = listData.files || []; 
+          // Look for JSONs (excluding config) and prioritize 'loadflow_results' if possible
+          const jsonFiles = files.filter((f: any) => f.filename.toLowerCase().endsWith('.json') && f.filename.toLowerCase() !== 'config.json'); 
+          
+          if (jsonFiles.length === 0) { setLoading(false); return; } 
+          
+          jsonFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
+          
+          // Try loading the most recent valid result
+          for (const candidate of jsonFiles) { 
+              try { 
+                  let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}`;
+                  if (activeProjectId) prevUrl += `&project_id=${activeProjectId}`;
+                  else if (activeSessionUid) prevUrl += `&project_id=${activeSessionUid}`;
+
+                  const dataRes = await fetch(prevUrl); 
+                  if (dataRes.ok) { 
+                      const jsonData = await dataRes.json(); 
+                      if (jsonData && Array.isArray(jsonData.results) && jsonData.results.length > 0) { 
+                          const firstItem = jsonData.results[0]; 
+                          if (firstItem.mw_flow !== undefined || firstItem.transformers !== undefined) { 
+                              const rawName = candidate.filename.split('/').pop().replace('.json', ''); 
+                              const cleanName = rawName.replace(/_\d{8}_\d{6}$/, ""); 
+                              setBaseName(cleanName); 
+                              processResults(jsonData as LoadflowResponse); 
+                              notify(`Auto-loaded: ${rawName}`); 
+                              break; 
+                          } 
+                      } 
+                  } 
+              } catch (err) { } 
+          } 
+      } catch (e: any) { console.warn("Auto-load failed", e); } finally { setLoading(false); } 
+  }, [user, activeProjectId, activeSessionUid, API_URL]);
+
+  // Sidebar Selection Logic (Mutual Exclusivity)
+  useEffect(() => {
+      if (activeProjectId && activeSessionUid) setActiveSessionUid(null);
+  }, [activeProjectId]);
   
-  const handleManualLoad = async (overrideName?: string) => { if (!user) return; setLoading(true); try { const t = await getToken(); const pParam = activeProjectId ? `&project_id=${activeProjectId}` : ""; const targetName = overrideName || baseName; const jsonFilename = `${targetName}.json`; const dataRes = await fetch(`${API_URL}/ingestion/preview?filename=${jsonFilename}&token=${t}${pParam}`); if (!dataRes.ok) throw new Error("No results found."); const jsonData: LoadflowResponse = await dataRes.json(); processResults(jsonData); notify(`Loaded: ${jsonData.results.length} files`); } catch (e: any) { notify(e.message, "error"); } finally { setLoading(false); } };
-  const handleRunAnalysis = async () => { if (!user) return; setLoading(true); setResults(null); setSelectedCase(null); try { const t = await getToken(); const pParam = activeProjectId ? `&project_id=${activeProjectId}` : ""; const timestamp = getTimestampSuffix(); const cleanBaseName = baseName.replace(/_\d{8}_\d{6}$/, ""); const uniqueName = `${cleanBaseName}_${timestamp}`; const runRes = await fetch(`${API_URL}/loadflow/run-and-save?basename=${uniqueName}${pParam}`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } }); if (runRes.status !== 200 && !runRes.ok) { throw new Error("Calculation Failed"); } await handleManualLoad(uniqueName); if (activeProjectId) { cleanOldScenarios(cleanBaseName); } notify("Analysis Computed & Saved"); } catch (e) { notify("Error during analysis", "error"); } finally { setLoading(false); } };
+  useEffect(() => {
+      if (activeSessionUid && activeProjectId) setActiveProjectId(null);
+  }, [activeSessionUid]);
+
+  useEffect(() => { 
+      let mounted = true; 
+      if (user && mounted) { 
+          if (activeProjectId || activeSessionUid) detectAndLoadResults(); 
+      } 
+      return () => { mounted = false; }; 
+  }, [activeProjectId, activeSessionUid, user]); 
+  
+  const handleManualLoad = async (overrideName?: string) => { 
+      if (!user) return; 
+      setLoading(true); 
+      try { 
+          const t = await getToken(); 
+          
+          let targetName = overrideName || baseName;
+          // [FIX] Ensure we handle the folder path if returned by backend, or stripped
+          // Backend returns filename like "name_timestamp.json", preview needs full path usually or just name if flat
+          // Since we moved to /loadflow_results folder in backend, ingestion/preview might need adjustment or filename must include folder
+          // However, ingestion/preview usually searches. Let's try passing the exact filename if we have it.
+          
+          let jsonFilename = targetName;
+          if (!jsonFilename.endsWith('.json')) jsonFilename += '.json';
+          // If the backend returned a path "loadflow_results/file.json", use it. Otherwise rely on search.
+          
+          let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}`;
+          if (activeProjectId) url += `&project_id=${activeProjectId}`;
+          else if (activeSessionUid) url += `&project_id=${activeSessionUid}`;
+
+          const dataRes = await fetch(url); 
+          if (!dataRes.ok) throw new Error("No results found."); 
+          const jsonData: LoadflowResponse = await dataRes.json(); 
+          processResults(jsonData); 
+          notify(`Loaded: ${jsonData.results.length} files`); 
+      } catch (e: any) { notify(e.message, "error"); } finally { setLoading(false); } 
+  };
+
+  const handleRunAnalysis = async () => { 
+      if (!user) return; 
+      if (!activeProjectId && !activeSessionUid) return notify("Select a context first", "error");
+      
+      setLoading(true); 
+      setResults(null); 
+      setSelectedCase(null); 
+      
+      try { 
+          const t = await getToken(); 
+          
+          // [FIX] No timestamp generation here! Just clean the base name.
+          const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 20) || "lf_run"; 
+          
+          let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}`;
+          if (activeProjectId) url += `&project_id=${activeProjectId}`;
+          // Session is implied by token usually, or if Admin viewing session, backend needs logic. 
+          // For now assume standard flow.
+
+          const runRes = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } }); 
+          
+          if (!runRes.ok) throw new Error("Calculation Failed"); 
+          
+          const runData: LoadflowResponse = await runRes.json();
+          
+          // [FIX] Use the filename returned by the backend to load the result
+          if (runData.filename) {
+              await handleManualLoad(runData.filename);
+              if (activeProjectId || activeSessionUid) cleanOldScenarios(cleanBaseName);
+              notify("Analysis Computed & Saved");
+          } else {
+              throw new Error("No filename returned from backend");
+          }
+
+      } catch (e: any) { notify(e.message || "Error during analysis", "error"); } finally { setLoading(false); } 
+  };
+
   useEffect(() => { if (user) { fetchGlobalProfile(); fetchProjects(); } }, [user]);
 
   const filteredData = (results?.results || []).filter(r => { const searchLower = filterSearch.toLowerCase(); const matchesSearch = filterSearch === "" || r.filename.toLowerCase().includes(searchLower) || r.study_case?.id.toLowerCase().includes(searchLower) || r.study_case?.config.toLowerCase().includes(searchLower) || r.study_case?.revision.toLowerCase().includes(searchLower); if (!matchesSearch) return false; if (filterWinner && !r.is_winner) return false; if (filterValid && !r.is_valid) return false; return true; });
@@ -100,7 +319,10 @@ export default function Loadflow({ user }: { user: any }) {
         </div>
         <div className="flex gap-2 items-center">
           <input value={baseName} onChange={(e) => setBaseName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleManualLoad()} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 w-40 text-right font-bold text-slate-600 dark:text-slate-200 focus:ring-1 focus:ring-yellow-500 outline-none" placeholder="Analysis Name"/>
+          
+          {/* [FIX] Keeping the text for user info, but logic is handled by backend */}
           <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wide mr-2">_TIMESTAMP.json</span>
+          
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
           <button onClick={() => handleManualLoad()} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300 dark:border-slate-600"><Icons.Search className="w-3.5 h-3.5" /> LOAD</button>
@@ -109,7 +331,16 @@ export default function Loadflow({ user }: { user: any }) {
       </div>
 
       <div className="flex flex-1 gap-6 min-h-0">
-        <ProjectsSidebar user={user} projects={projects} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} newProjectName={newProjectName} setNewProjectName={setNewProjectName} onCreateProject={createProject} onDeleteProject={deleteProject} />
+        <ProjectsSidebar 
+            user={user} userGlobalData={userGlobalData}
+            projects={projects} usersList={usersList}
+            activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId}
+            activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid}
+            isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} 
+            newProjectName={newProjectName} setNewProjectName={setNewProjectName} 
+            onCreateProject={createProject} onDeleteProject={deleteProject} 
+        />
+        
         <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden relative">
             <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-between items-center gap-4">
                 <div className="flex items-center gap-2 flex-1">
