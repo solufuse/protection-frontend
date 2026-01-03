@@ -43,39 +43,44 @@ export default function Loadflow({ user }: { user: any }) {
 
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
   
-  // --- DATA INIT ---
+  // --- DATA INIT (CRITICAL FIX) ---
   useEffect(() => {
       const initData = async () => {
           if (!user) return;
           try {
               const t = await getToken();
-              
-              // 1. Projects
-              try {
-                  const pRes = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } });
-                  if (pRes.ok) setProjects(await pRes.json());
-              } catch (e) {}
+              const headers = { 'Authorization': `Bearer ${t}` };
 
-              // 2. User Data (Global Role)
-              // [FIX] Always attempt to fetch users list. 
-              // If backend allows it (200 OK), we are admin -> Set Badge.
-              // If backend denies it (403), we are user -> No Badge.
+              // 1. Fetch "ME" (Fastest way to get Global Role) - Like Files page
               try {
-                  const uRes = await fetch(`${API_URL}/users/`, { headers: { 'Authorization': `Bearer ${t}` } });
-                  if (uRes.ok) {
-                      const list = await uRes.json();
-                      setUsersList(list);
-                      const me = list.find((u: any) => u.uid === user.uid);
-                      setUserGlobalData(me || user);
+                  const meRes = await fetch(`${API_URL}/users/me`, { headers });
+                  if (meRes.ok) {
+                      const meData = await meRes.json();
+                      setUserGlobalData(meData); // <--- Sets the Badge!
+                      
+                      // 2. If Admin, Fetch Full User List (For Sidebar)
+                      if (['super_admin', 'admin', 'moderator'].includes(meData.global_role)) {
+                          const listRes = await fetch(`${API_URL}/users/`, { headers });
+                          if (listRes.ok) setUsersList(await listRes.json());
+                      }
                   } else {
-                      // 403 Forbidden or other error -> Standard User
+                      // Fallback if /me fails
                       setUserGlobalData(user);
                   }
               } catch (e) {
+                  console.error("Failed to fetch user profile", e);
                   setUserGlobalData(user);
               }
+
+              // 3. Fetch Projects
+              try {
+                  const pRes = await fetch(`${API_URL}/projects/`, { headers });
+                  if (pRes.ok) setProjects(await pRes.json());
+              } catch (e) { console.error("Failed to fetch projects", e); }
+
           } catch (e) {}
       };
+      
       initData();
   }, [user]);
 
@@ -120,10 +125,9 @@ export default function Loadflow({ user }: { user: any }) {
                 )}
             </h1>
             
-            {/* Context Role (Owner/Viewer) */}
             <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null} />
             
-            {/* Global Role (Admin/User) - Now Fetched Correctly */}
+            {/* Global Role Badge - Now backed by /users/me data */}
             {userGlobalData && userGlobalData.global_role && (
                 <div className="ml-2 scale-110">
                     <GlobalRoleBadge role={userGlobalData.global_role} />
