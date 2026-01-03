@@ -4,6 +4,7 @@ import Toast from '../components/Toast';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
+import { useAuth } from '../context/AuthContext';
 
 const MAX_HISTORY = 5;
 
@@ -17,6 +18,7 @@ interface LoadflowResponse {
     status: string; 
     results: LoadflowResult[]; 
     filename?: string; 
+    folder?: string;
 }
 
 const extractLoadNumber = (rev: string | undefined) => {
@@ -50,6 +52,7 @@ export default function Loadflow({ user }: { user: any }) {
   const [selectedCase, setSelectedCase] = useState<LoadflowResult | null>(null);
   
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
+  const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]); // Added history state
   
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   
@@ -89,7 +92,6 @@ export default function Loadflow({ user }: { user: any }) {
   // --- ACTIONS ---
   const createProject = async () => { notify("Please use the Files Dashboard to create projects.", "error"); setIsCreatingProject(false); };
   
-  // [FIX] Used projId in the string
   const deleteProject = async (projId: string, e: React.MouseEvent) => { 
       e.stopPropagation(); 
       notify(`Please use the Files Dashboard to delete project: ${projId}`, "error"); 
@@ -97,6 +99,7 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
 
+  // [FIX] Update clean logic to target the correct folder if needed (Backend handles delete by path now)
   const cleanOldScenarios = async (rootName: string) => { 
       if (!activeProjectId && !activeSessionUid) return; 
       try { 
@@ -109,13 +112,14 @@ export default function Loadflow({ user }: { user: any }) {
           if (!listRes.ok) return; 
           
           const listData = await listRes.json(); 
-          const historyFiles = (listData.files || []).filter((f: any) => f.filename.startsWith(rootName + "_") && f.filename.endsWith(".json")); 
+          // Match files starting with baseName inside loadflow_results or root
+          const historyFiles = (listData.files || []).filter((f: any) => f.filename.includes(rootName + "_") && f.filename.endsWith(".json")); 
           historyFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
           if (historyFiles.length > MAX_HISTORY) { 
               const filesToDelete = historyFiles.slice(MAX_HISTORY); 
               for (const file of filesToDelete) { 
-                  let delUrl = `${API_URL}/files/file/${file.filename}`;
+                  let delUrl = `${API_URL}/files/file/${file.filename}`; # filename includes path now
                   if (activeProjectId) delUrl += `?project_id=${activeProjectId}`;
                   else if (activeSessionUid) delUrl += `?project_id=${activeSessionUid}`;
                   
@@ -162,12 +166,15 @@ export default function Loadflow({ user }: { user: any }) {
           
           const listData = await listRes.json(); 
           const files = listData.files || []; 
-          const jsonFiles = files.filter((f: any) => f.filename.toLowerCase().endsWith('.json') && f.filename.toLowerCase() !== 'config.json'); 
+          const jsonFiles = files.filter((f: any) => f.filename.toLowerCase().endsWith('.json') && !f.filename.includes('config.json')); 
+          
+          // [FIX] Update History State for Side Panel if you have one or logic relies on it
           
           if (jsonFiles.length === 0) { setLoading(false); return; } 
           
           jsonFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
+          // Try loading the most recent valid result
           for (const candidate of jsonFiles) { 
               try { 
                   let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}`;
@@ -180,6 +187,7 @@ export default function Loadflow({ user }: { user: any }) {
                       if (jsonData && Array.isArray(jsonData.results) && jsonData.results.length > 0) { 
                           const firstItem = jsonData.results[0]; 
                           if (firstItem.mw_flow !== undefined || firstItem.transformers !== undefined) { 
+                              // Clean filename for display or baseName
                               const rawName = candidate.filename.split('/').pop().replace('.json', ''); 
                               const cleanName = rawName.replace(/_\d{8}_\d{6}$/, ""); 
                               setBaseName(cleanName); 
@@ -216,8 +224,15 @@ export default function Loadflow({ user }: { user: any }) {
       try { 
           const t = await getToken(); 
           let targetName = overrideName || baseName;
+          
+          // [FIX] Path handling
           let jsonFilename = targetName;
           if (!jsonFilename.endsWith('.json')) jsonFilename += '.json';
+          
+          // If the backend didn't return a folder path in overrideName (e.g. from typing in input), try adding it
+          // BUT backend 'ingestion' now handles relative paths via files logic, so we send what we have.
+          // Note: If user types "my_run", we assume they want to find "loadflow_results/my_run_TIMESTAMP.json"? 
+          // Manual load usually is for exact matches found in the file list or exact input.
           
           let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}`;
           if (activeProjectId) url += `&project_id=${activeProjectId}`;
@@ -253,7 +268,10 @@ export default function Loadflow({ user }: { user: any }) {
           const runData: LoadflowResponse = await runRes.json();
           
           if (runData.filename) {
-              await handleManualLoad(runData.filename);
+              // [FIX] Construct path: "loadflow_results/filename" if folder is present
+              const fullPath = runData.folder ? `${runData.folder}/${runData.filename}` : runData.filename;
+              await handleManualLoad(fullPath);
+              
               if (activeProjectId || activeSessionUid) cleanOldScenarios(cleanBaseName);
               notify("Analysis Computed & Saved");
           } else {
