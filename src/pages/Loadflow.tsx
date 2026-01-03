@@ -4,7 +4,6 @@ import * as Icons from 'lucide-react';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
-import { useAuth } from '../context/AuthContext';
 
 // --- TYPES ---
 interface StudyCase { id: string; config: string; revision: string; }
@@ -41,7 +40,6 @@ const Loadflow = ({ user }: { user: any }) => {
 
     // --- 2. PAGE STATE ---
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
-    // [FIX] Removed unused 'files' state
     const [results, setResults] = useState<LoadflowResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -53,7 +51,6 @@ const Loadflow = ({ user }: { user: any }) => {
     const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]);
 
     // --- 3. API & LOGIC ---
-    // [FIX] Removed unused 'useAuth' destructuring since user is passed as prop
     
     const apiCall = useCallback(async (endpoint: string, options: RequestInit = {}) => {
         if (!user) return;
@@ -129,7 +126,6 @@ const Loadflow = ({ user }: { user: any }) => {
             else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
 
             const data = await apiCall(url);
-            // [FIX] Removed setFiles since it's unused
 
             const archives = (data.files || [])
                 .filter((f: any) => f.filename.includes('loadflow_results') || f.filename.match(/_\d{8}_\d{6}\.json$/))
@@ -224,7 +220,6 @@ const Loadflow = ({ user }: { user: any }) => {
     };
 
     const handleCreateProject = () => { alert("Please use Files page to create projects"); setIsCreatingProject(false); };
-    // [FIX] Used 'id' in alert to satisfy strict mode
     const handleDeleteProject = (id: string, e: any) => { e.stopPropagation(); alert(`Go to Files to delete project ${id}`); };
 
     return (
