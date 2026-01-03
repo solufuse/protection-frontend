@@ -3,9 +3,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* [FIX] Disable browser scroll to let App.tsx <main> handle it exclusively */
+/* [CRITICAL FIX] Disable browser scroll to let App.tsx <main> handle it exclusively */
 html, body {
   height: 100%;
+  width: 100%;
   overflow: hidden; 
   margin: 0;
   padding: 0;
@@ -42,15 +43,70 @@ body {
 .dark ::-webkit-scrollbar-thumb:hover { background-color: #4f4f4f; }
 
 @layer utilities {
-  .text-micro { font-size: 10px; line-height: 14px; }
-  .text-xxs { font-size: 11px; line-height: 1.25rem; }
+  
+  /* --- [RESTORED] FONT SIZE UPSCALING (LISIBILITÉ) --- */
+  
+  /* 8px devient 10px (Badges minuscules) */
+  .text-\[8px\] { font-size: 10px !important; }
+  
+  /* 9px devient 11px (Dates, métadonnées) */
+  .text-\[9px\] { font-size: 11px !important; }
+  
+  /* 10px devient 12px (Contenu dense, Sidebar) */
+  .text-\[10px\] { font-size: 12px !important; }
+  
+  /* 11px devient 13px (Corps de texte secondaire) */
+  .text-\[11px\] { font-size: 13px !important; }
+  
+  /* text-xs (12px) passe à 13px pour plus de confort */
+  .text-xs { font-size: 13px !important; }
+
+  /* ---------------------------------------------- */
+
+  /* --- [RESTORED] GOOGLE COLAB / MATERIAL ROUNDING --- */
+  .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl,
+  input, select, textarea {
+      border-radius: 12px !important;
+  }
+  button { border-radius: 9999px !important; }
+  input[type="checkbox"], input[type="radio"] { border-radius: 4px !important; }
+  .rounded-full { border-radius: 9999px !important; }
+
+  /* --- DARK MODE FIXES --- */
+  .dark .bg-white {
+    background-color: #252526 !important;
+    border-color: #383838 !important;
+  }
+  .dark .bg-slate-50, .dark .bg-slate-100 { background-color: #1e1e1e !important; }
+
+  .dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700, .dark .text-gray-700 { color: #e0e0e0 !important; }
+  .dark .text-slate-600, .dark .text-slate-500 { color: #a0a0a0 !important; }
+  .dark .text-slate-400 { color: #858585 !important; } 
+
+  .dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-300,
+  .dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #383838 !important;
+  }
+
+  .dark input, .dark select, .dark textarea {
+    background-color: #2d2d2d !important;
+    color: #e0e0e0 !important;
+    border-color: #383838 !important;
+  }
+  .dark input:focus, .dark select:focus, .dark textarea:focus {
+    border-color: #f59e0b !important;
+    ring-color: #f59e0b !important;
+  }
+
+  .dark .hover\:bg-slate-50:hover { background-color: #2a2d2e !important; }
+  .dark .shadow-sm, .dark .shadow-md { box-shadow: none !important; }
 }
 
-/* Specific Dark Mode Component Fixes */
-.dark .bg-white { background-color: #252526 !important; border-color: #383838 !important; }
-.dark .bg-slate-50, .dark .bg-slate-100 { background-color: #1e1e1e !important; }
-.dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700 { color: #e0e0e0 !important; }
-.dark .text-slate-600, .dark .text-slate-500 { color: #a0a0a0 !important; }
-.dark .text-slate-400 { color: #858585 !important; }
-.dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-300 { border-color: #383838 !important; }
-.dark input, .dark select, .dark textarea { background-color: #2d2d2d !important; color: #e0e0e0 !important; border-color: #383838 !important; }
+/* Global Smooth Transition */
+*, ::before, ::after {
+   transition-property: background-color, border-color, color, fill, stroke, border-radius, font-size;
+   transition-duration: 200ms;
+   transition-timing-function: ease-in-out;
+}
