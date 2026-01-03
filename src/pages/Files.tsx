@@ -175,6 +175,8 @@ export default function Files({ user }: { user: any }) {
             {userGlobalData && userGlobalData.global_role && (
                 <div className="ml-2 scale-110">
                     <GlobalRoleBadge role={userGlobalData.global_role} />
+                </div>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
