@@ -64,9 +64,8 @@ export default function Files({ user }: { user: any }) {
   const createProject = async () => { if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); if (!newProjectName.trim()) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/create`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newProjectName, name: newProjectName }) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail); } notify("Project Created"); setNewProjectName(""); setIsCreatingProject(false); fetchProjects(); } catch (e: any) { notify(e.message || "Failed", "error"); } };
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
 
-  // --- ACTIONS ---
+  // --- ACTIONS (SECURE OPEN & DOWNLOAD) ---
 
-  // Single file operations (Open/Download)
   const fetchAndOpen = async (url: string, filename: string, mode: 'download' | 'open') => {
       try {
           const t = await getToken();
@@ -104,22 +103,34 @@ export default function Files({ user }: { user: any }) {
           const encName = encodeURIComponent(filename); 
           let url = ""; 
           let mode: 'download' | 'open' = 'download';
+          
+          // [FIX] Smart Extension Replacement
+          // If downloading a conversion (xlsx/json), we MUST change the extension
+          // so the browser saves it correctly.
+          let downloadName = filename;
 
-          if (type === 'raw') url = `${API_URL}/files/download?filename=${encName}${pParam}`; 
-          else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encName}${pParam}`; 
-          else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}${pParam}`; 
-          else if (type === 'json_tab') {
+          if (type === 'raw') {
+              url = `${API_URL}/files/download?filename=${encName}${pParam}`;
+          } else if (type === 'xlsx') {
+              url = `${API_URL}/ingestion/download/xlsx?filename=${encName}${pParam}`;
+              // Replace extension with .xlsx
+              downloadName = filename.replace(/\.[^/.]+$/, "") + ".xlsx";
+          } else if (type === 'json') {
+              url = `${API_URL}/ingestion/download/json?filename=${encName}${pParam}`;
+              // Replace extension with .json
+              downloadName = filename.replace(/\.[^/.]+$/, "") + ".json";
+          } else if (type === 'json_tab') {
               url = `${API_URL}/ingestion/preview?filename=${encName}${pParam}`;
               mode = 'open';
           }
           
-          if (url) await fetchAndOpen(url, filename, mode);
+          if (url) await fetchAndOpen(url, downloadName, mode);
 
       } catch (e) { notify("Link Error", "error"); } 
   };
 
-  // [!] UPDATED: Single function call for bulk actions (No loop)
   const onBulkDownloadTrigger = async (type: 'raw' | 'xlsx' | 'json') => {
+      // Use the bulk hook
       await handleBulkDownload(selectedFiles, type);
       setSelectedFiles(new Set());
   };
