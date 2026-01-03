@@ -34,8 +34,9 @@ export default function ResultsTable({ results, filterSearch, setFilterSearch, f
         return true; 
     });
 
+    // [FIX] 'flex-1 min-h-0' forces the table to take ONLY the remaining space and scroll internally
     return (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden flex flex-col h-full">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
             {/* Toolbar inside Table Card */}
             <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-between items-center gap-4 shrink-0">
                 <div className="flex items-center gap-2 flex-1">
@@ -50,7 +51,7 @@ export default function ResultsTable({ results, filterSearch, setFilterSearch, f
             </div>
 
             {/* Table Area */}
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto custom-scrollbar">
                 <div className="bg-slate-50 dark:bg-slate-900 px-4 py-2 border-b border-slate-200 dark:border-slate-700 font-black text-slate-700 dark:text-slate-300 uppercase flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10">
                     <div className="flex items-center gap-2"><Icons.Zap className="w-4 h-4 text-yellow-500" /> Detailed Results</div>
                 </div>
