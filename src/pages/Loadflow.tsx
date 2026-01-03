@@ -6,111 +6,131 @@ import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 import { useLoadflow } from '../hooks/useLoadflow';
 import ResultCard from '../components/Loadflow/ResultCard';
+import HistorySidebar from '../components/Loadflow/HistorySidebar';
 
 const Loadflow = ({ user }: { user: any }) => {
-    // --- STATE ---
+    // --- 1. SIDEBAR STATE (COPIED FROM FILES.TSX) ---
     const [projects, setProjects] = useState<Project[]>([]);
-    const [usersList, setUsersList] = useState<UserSummary[]>([]);
-    const [userGlobalData, setUserGlobalData] = useState<any>(null); // [!] Stocke le profil complet (Role)
-
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
+    const [usersList, setUsersList] = useState<UserSummary[]>([]);
+    
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState("");
-    
+    const [userGlobalData, setUserGlobalData] = useState<any>(null); // For Admin Role checks
+
+    // --- 2. LOADFLOW SPECIFIC STATE ---
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
     const [onlyWinners, setOnlyWinners] = useState(false); 
     const [showHistory, setShowHistory] = useState(true);
-    const [runName, setRunName] = useState("");
-    
+    const [runName, setRunName] = useState(""); 
+
+    // --- 3. HOOK ---
     const { 
         results, loading, error, historyFiles, 
         runAnalysis, loadResultFile 
     } = useLoadflow(activeProjectId, activeSessionUid, currentProject?.name);
 
-    // --- 1. INITIAL DATA LOADING (CRITICAL FOR SIDEBAR) ---
+    // --- 4. DATA FETCHING (MATCHING FILES.TSX) ---
     useEffect(() => {
-        const loadSidebarData = async () => {
+        const initData = async () => {
             if (!user) return;
             try {
                 const token = await user.getIdToken();
                 const headers = { Authorization: `Bearer ${token}` };
 
-                // A. Get My Profile (For Global Role -> ADMIN Section)
-                // On suppose que l'endpoint est /users/me ou on filtre la liste
-                // Pour l'instant on utilise l'objet user de base et on essaie d'enrichir
-                
-                // B. Get Projects
+                // A. Fetch Projects
                 const projRes = await fetch("https://api.solufuse.com/projects/", { headers });
                 if (projRes.ok) setProjects(await projRes.json());
 
-                // C. Get Users (If Admin) - On tente le fetch, si 403 c'est pas grave
-                const usersRes = await fetch("https://api.solufuse.com/users/", { headers });
-                if (usersRes.ok) {
-                    const users = await usersRes.json();
-                    setUsersList(users);
-                    
-                    // On essaie de trouver notre propre profil pour le rôle global
-                    const me = users.find((u: any) => u.uid === user.uid);
-                    if (me) setUserGlobalData(me); 
-                    else setUserGlobalData(user); // Fallback
+                // B. Fetch Users (Only if Staff) -> Enables "ADMIN" Section
+                // Logic taken from Files.tsx: Check global_role
+                // Note: user object passed prop already has global_role, but fetching /users/ ensures full list for sidebar
+                if (['super_admin', 'admin', 'moderator'].includes(user.global_role)) {
+                    const usersRes = await fetch("https://api.solufuse.com/users/", { headers });
+                    if (usersRes.ok) {
+                        const users = await usersRes.json();
+                        setUsersList(users);
+                        // Find self to set correct permissions for sidebar
+                        const self = users.find((u: any) => u.uid === user.uid);
+                        setUserGlobalData(self || user); 
+                    }
                 } else {
-                    setUserGlobalData(user); // Pas admin
+                    setUserGlobalData(user);
                 }
 
-            } catch (e) { 
-                console.error("Sidebar Data Error:", e);
-                setUserGlobalData(user);
-            }
+            } catch (e) { console.error("Init Error:", e); }
         };
-        loadSidebarData();
+        initData();
     }, [user]);
 
-    // --- 2. SYNC SELECTION ---
+    // --- 5. SELECTION LOGIC (MATCHING FILES.TSX) ---
+    // Updates currentProject label based on sidebar selection
     useEffect(() => {
         if (activeProjectId) {
+            // Project Mode
             const p = projects.find(proj => proj.id === activeProjectId);
             if (p) setCurrentProject(p);
+            // Ensure mutual exclusivity
             if (activeSessionUid) setActiveSessionUid(null);
         } else if (activeSessionUid) {
+            // Session Mode (Admin viewing someone else OR Self)
             const u = usersList.find(usr => usr.uid === activeSessionUid);
+            const isSelf = activeSessionUid === user.uid;
+            
             setCurrentProject({ 
                 id: 'SESSION', 
-                name: u ? `${u.username || 'User'}'s Session` : 'User Session', 
-                role: 'viewer' 
+                name: isSelf ? "My Session" : (u ? `${u.username}'s Session` : "User Session"), 
+                role: 'viewer' // Sessions are private/viewer mostly
             });
+            
+            // Ensure mutual exclusivity
             if (activeProjectId) setActiveProjectId(null);
         } else {
+            // Default State (No selection usually implies My Session in Files.tsx logic if nothing selected)
+            // But here we want explicit selection.
             setCurrentProject(null);
         }
-    }, [activeProjectId, activeSessionUid, projects, usersList]);
+    }, [activeProjectId, activeSessionUid, projects, usersList, user.uid]);
 
     // --- HANDLERS ---
     const handleRun = () => runAnalysis(runName);
-    const handleCreate = () => { alert("Please use Files page"); setIsCreatingProject(false); };
-    const handleDelete = (id: string, e: any) => { e.stopPropagation(); alert(`Go to Files to delete ${id}`); };
+    
+    // Stub handlers for Sidebar actions (Create/Delete handled in Files)
+    const handleCreateProject = () => { alert("Please use the Files Dashboard to create projects."); setIsCreatingProject(false); };
+    const handleDeleteProject = (id: string, e: any) => { e.stopPropagation(); alert("Please use the Files Dashboard to delete projects."); };
+
     const filteredResults = results.filter(r => (onlyWinners ? r.is_winner : true));
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
-            {/* SIDEBAR */}
+            {/* --- SIDEBAR (EXACT PROPS AS FILES.TSX) --- */}
             <ProjectsSidebar 
                 user={user} 
-                userGlobalData={userGlobalData} // [!] Passed enriched user data
+                userGlobalData={userGlobalData} // Critical for Admin View
                 projects={projects} 
-                usersList={usersList}
-                activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId}
-                activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid}
-                isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject}
-                newProjectName={newProjectName} setNewProjectName={setNewProjectName}
-                onCreateProject={handleCreate} onDeleteProject={handleDelete}
+                usersList={usersList} // Critical for 'Workspace > ADMIN' list
+                
+                activeProjectId={activeProjectId} 
+                setActiveProjectId={setActiveProjectId}
+                
+                activeSessionUid={activeSessionUid} 
+                setActiveSessionUid={setActiveSessionUid}
+                
+                isCreatingProject={isCreatingProject} 
+                setIsCreatingProject={setIsCreatingProject}
+                
+                newProjectName={newProjectName} 
+                setNewProjectName={setNewProjectName}
+                
+                onCreateProject={handleCreateProject} 
+                onDeleteProject={handleDeleteProject}
             />
 
-            {/* MAIN CONTENT - [FIX] Added 'overflow-hidden relative' to match Files.tsx layout */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                
-                {/* HEADER */}
-                <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 shrink-0 z-20 relative">
+            {/* --- MAIN CONTENT --- */}
+            <div className="flex-1 flex flex-col min-w-0">
+                {/* Header */}
+                <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400">
                             <Icons.Activity className="w-6 h-6" />
@@ -123,12 +143,12 @@ const Loadflow = ({ user }: { user: any }) => {
                                         <span className="font-medium">{currentProject.name}</span>
                                         <ContextRoleBadge role={currentProject.role} />
                                     </>
-                                ) : <span>My Session</span>}
+                                ) : <span>Select a context</span>}
                             </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <GlobalRoleBadge role={userGlobalData?.global_role} />
+                        <GlobalRoleBadge role={user?.global_role} />
                         <button 
                             onClick={() => setShowHistory(!showHistory)}
                             className={`p-2 rounded-lg transition-colors ${showHistory ? 'bg-slate-100 dark:bg-slate-700 text-blue-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
@@ -141,8 +161,8 @@ const Loadflow = ({ user }: { user: any }) => {
 
                 <div className="flex-1 flex overflow-hidden relative">
                     <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                        {/* TOOLBAR */}
-                        <div className="p-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-4 items-center justify-between z-10 shadow-sm">
+                        {/* Toolbar */}
+                        <div className="p-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-4 items-center justify-between z-10">
                             <div className="flex items-center gap-2">
                                 <input 
                                     type="text" 
@@ -154,7 +174,7 @@ const Loadflow = ({ user }: { user: any }) => {
                                 />
                                 <button
                                     onClick={handleRun}
-                                    disabled={loading || (!currentProject && !activeSessionUid && activeProjectId !== null)} // Allow run in session
+                                    disabled={loading || (!activeProjectId && !activeSessionUid)}
                                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                                 >
                                     {loading ? <Icons.Loader2 className="w-4 h-4 animate-spin" /> : <Icons.Play className="w-4 h-4" />}
@@ -178,7 +198,7 @@ const Loadflow = ({ user }: { user: any }) => {
                             </div>
                         </div>
 
-                        {/* RESULTS */}
+                        {/* Results */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-slate-900">
                             {error && (
                                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
@@ -198,27 +218,15 @@ const Loadflow = ({ user }: { user: any }) => {
                         </div>
                     </main>
 
-                    {/* HISTORY SIDEBAR */}
+                    {/* History Sidebar */}
                     {showHistory && (
-                        <div className="h-full relative z-20">
-                           {/* We render HistorySidebar directly here to ensure it sits correctly in the flex layout */}
-                           <aside className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col shadow-xl h-full">
-                                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
-                                    <h2 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                        <Icons.Archive className="w-4 h-4" /> History
-                                    </h2>
-                                    <button onClick={() => setShowHistory(false)}><Icons.X className="w-4 h-4" /></button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-2">
-                                    {historyFiles.map((file, idx) => (
-                                        <button key={idx} onClick={() => loadResultFile(file.path || file.name)} className="w-full text-left p-3 hover:bg-blue-50 dark:hover:bg-slate-700 rounded mb-1">
-                                            <div className="text-sm font-medium truncate">{file.name.replace('.json','')}</div>
-                                            <div className="text-xs text-slate-400">{new Date(file.date).toLocaleDateString()}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                           </aside>
-                        </div>
+                        <aside className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col shadow-xl z-20 h-full">
+                            <HistorySidebar 
+                                files={historyFiles} 
+                                onLoad={loadResultFile} 
+                                onClose={() => setShowHistory(false)} 
+                            />
+                        </aside>
                     )}
                 </div>
             </div>
