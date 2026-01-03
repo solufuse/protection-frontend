@@ -5,33 +5,30 @@ import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSid
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 import { useLoadflow } from '../hooks/useLoadflow';
-import ResultCard from '../components/Loadflow/ResultCard';
-import HistorySidebar from '../components/Loadflow/HistorySidebar';
+import ResultCard from '../components/Loadflow/ResultCard'; // Maintaining component for cleanliness but layout is original
 
 const Loadflow = ({ user }: { user: any }) => {
-    // --- 1. STATES REQUIRED BY SIDEBAR (Compatibility Fix) ---
+    // --- SIDEBAR STATE (Mandatory for compatibility) ---
     const [projects, setProjects] = useState<Project[]>([]);
     const [usersList, setUsersList] = useState<UserSummary[]>([]);
-    
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
-    
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState("");
     
-    // --- 2. PAGE UI STATE ---
+    // --- PAGE STATE ---
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
     const [onlyWinners, setOnlyWinners] = useState(false); 
     const [showHistory, setShowHistory] = useState(true);
-    const [runName, setRunName] = useState(""); // Needed for backend
-
-    // --- 3. LOGIC HOOK ---
+    const [runName, setRunName] = useState(""); // [!] Feature request: Naming
+    
+    // --- LOGIC HOOK ---
     const { 
         results, loading, error, historyFiles, 
         runAnalysis, loadResultFile 
     } = useLoadflow(activeProjectId, activeSessionUid, currentProject?.name);
 
-    // --- 4. DATA FETCHING (Projects & Users) ---
+    // --- DATA FETCHING ---
     useEffect(() => {
         const fetchData = async () => {
             if (!user) return;
@@ -39,11 +36,9 @@ const Loadflow = ({ user }: { user: any }) => {
                 const token = await user.getIdToken();
                 const headers = { Authorization: `Bearer ${token}` };
                 
-                // Fetch Projects
                 const projRes = await fetch("https://api.solufuse.com/projects/", { headers });
                 if (projRes.ok) setProjects(await projRes.json());
 
-                // Fetch Users (for Admin Sidebar)
                 if (['super_admin', 'admin', 'moderator'].includes(user.global_role)) {
                     const usersRes = await fetch("https://api.solufuse.com/users/", { headers });
                     if (usersRes.ok) setUsersList(await usersRes.json());
@@ -53,7 +48,7 @@ const Loadflow = ({ user }: { user: any }) => {
         fetchData();
     }, [user]);
 
-    // --- 5. SYNC SELECTION ---
+    // --- SELECTION SYNC ---
     useEffect(() => {
         if (activeProjectId) {
             const p = projects.find(proj => proj.id === activeProjectId);
@@ -72,12 +67,12 @@ const Loadflow = ({ user }: { user: any }) => {
         }
     }, [activeProjectId, activeSessionUid, projects, usersList]);
 
-    // --- HANDLERS ---
+    // --- ACTIONS ---
     const handleRun = () => runAnalysis(runName);
     
-    // Sidebar Placeholders
-    const handleCreate = () => { alert("Please use Files page to create projects"); setIsCreatingProject(false); };
-    const handleDelete = (id: string, e: any) => { e.stopPropagation(); alert(`Go to Files to delete project: ${id}`); };
+    // Stub handlers for Sidebar
+    const handleCreate = () => { alert("Please use Files page"); setIsCreatingProject(false); };
+    const handleDelete = (id: string, e: any) => { e.stopPropagation(); alert(`Go to Files to delete ${id}`); };
 
     const filteredResults = results.filter(r => {
         if (onlyWinners) return r.is_winner;
@@ -86,7 +81,7 @@ const Loadflow = ({ user }: { user: any }) => {
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
-            {/* --- SIDEBAR --- */}
+            {/* SIDEBAR (Must use new props to work) */}
             <ProjectsSidebar 
                 user={user} userGlobalData={user}
                 projects={projects} usersList={usersList}
@@ -98,7 +93,7 @@ const Loadflow = ({ user }: { user: any }) => {
             />
 
             <div className="flex-1 flex flex-col min-w-0">
-                {/* --- [ORIGINAL HEADER] --- */}
+                {/* --- HEADER (Restored Original Design) --- */}
                 <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 shrink-0">
                     <div className="flex items-center gap-4">
                         <Icons.Activity className="w-6 h-6 text-blue-600" />
@@ -127,20 +122,21 @@ const Loadflow = ({ user }: { user: any }) => {
                 </header>
 
                 <div className="flex-1 flex overflow-hidden">
+                    {/* --- MAIN CONTENT --- */}
                     <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                        {/* --- [ORIGINAL TOOLBAR LAYOUT] --- */}
+                        {/* --- TOOLBAR (Original Layout + Run Name Input) --- */}
                         <div className="p-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-4 items-center justify-between z-10">
                             <div className="flex items-center gap-2">
-                                {/* Run Name Input (Added functionality within original layout) */}
+                                {/* [!] Added Input for Filename */}
                                 <input 
                                     type="text" 
                                     placeholder="Run Name..." 
                                     value={runName}
                                     onChange={(e) => setRunName(e.target.value)}
-                                    className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-slate-900 w-32 sm:w-48"
+                                    className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-32 sm:w-48"
                                     maxLength={20}
                                 />
-                                
+
                                 <button
                                     onClick={handleRun}
                                     disabled={loading || !currentProject}
@@ -170,7 +166,7 @@ const Loadflow = ({ user }: { user: any }) => {
                             </div>
                         </div>
 
-                        {/* --- RESULTS AREA --- */}
+                        {/* --- RESULTS LIST --- */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-slate-900">
                             {error && (
                                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
@@ -192,13 +188,47 @@ const Loadflow = ({ user }: { user: any }) => {
                         </div>
                     </main>
 
-                    {/* --- HISTORY SIDEBAR --- */}
+                    {/* --- HISTORY SIDEBAR (Restored Original Position) --- */}
                     {showHistory && (
-                        <HistorySidebar 
-                            files={historyFiles} 
-                            onLoad={loadResultFile} 
-                            onClose={() => setShowHistory(false)} 
-                        />
+                        <aside className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col shadow-xl z-20">
+                            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+                                <div>
+                                    <h2 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                        <Icons.Archive className="w-4 h-4" />
+                                        Results Archive
+                                    </h2>
+                                    <p className="text-xs text-slate-500 mt-1">Saved runs for this project</p>
+                                </div>
+                                <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded">
+                                    <Icons.X className="w-4 h-4 text-slate-500" />
+                                </button>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                                {historyFiles.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-400 text-sm">No archives found</div>
+                                ) : (
+                                    historyFiles.map((file, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => loadResultFile(file.path || file.name)}
+                                            className="w-full text-left p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors group border border-transparent hover:border-blue-100 dark:hover:border-slate-600"
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Icons.FileJson className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate w-full">
+                                                    {file.name.replace(/_\d{8}_\d{6}/, '').replace('.json', '')}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px] text-slate-400 pl-6">
+                                                <span>{new Date(file.date).toLocaleDateString()} {new Date(file.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                <Icons.ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        </aside>
                     )}
                 </div>
             </div>
