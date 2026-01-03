@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as Icons from 'lucide-react'; 
+import { Icons } from '../icons'; // Safe import matching Files.tsx
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
@@ -51,7 +51,9 @@ export default function Loadflow({ user }: { user: any }) {
   const [selectedCase, setSelectedCase] = useState<LoadflowResult | null>(null);
   
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
-  
+  const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]); 
+  const [showHistory, setShowHistory] = useState(true);
+
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   
   const currentProjectRole = activeProjectId 
@@ -97,29 +99,35 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
 
-  // [FIX] Update clean logic: ONLY send project_id if it's a Project.
+  // Helper to determine the Target Folder ID (Project ID or Session UID)
+  const getTargetContextId = () => {
+      if (activeProjectId) return activeProjectId;
+      if (activeSessionUid) return activeSessionUid;
+      return null;
+  };
+
   const cleanOldScenarios = async (rootName: string) => { 
-      if (!activeProjectId && !activeSessionUid) return; 
+      const targetId = getTargetContextId();
+      if (!targetId) return; 
+
       try { 
           const t = await getToken(); 
-          let url = `${API_URL}/files/details`;
+          // [FIX] Always send project_id (which is either Project ID or Session UID)
+          let url = `${API_URL}/files/details?project_id=${targetId}`;
           
-          // [FIX] Session logic: if activeProjectId is null, don't send anything (defaults to user session)
-          if (activeProjectId) url += `?project_id=${activeProjectId}`;
-
           const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
           if (!listRes.ok) return; 
           
           const listData = await listRes.json(); 
-          const historyFiles = (listData.files || []).filter((f: any) => f.filename.includes(rootName + "_") && f.filename.endsWith(".json")); 
-          historyFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
+          const files = (listData.files || []).filter((f: any) => f.filename.includes(rootName + "_") && f.filename.endsWith(".json")); 
+          files.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
-          if (historyFiles.length > MAX_HISTORY) { 
-              const filesToDelete = historyFiles.slice(MAX_HISTORY); 
+          setHistoryFiles(files.map((f: any) => ({ name: f.filename, date: f.uploaded_at })));
+
+          if (files.length > MAX_HISTORY) { 
+              const filesToDelete = files.slice(MAX_HISTORY); 
               for (const file of filesToDelete) { 
-                  let delUrl = `${API_URL}/files/file/${file.filename}`;
-                  if (activeProjectId) delUrl += `?project_id=${activeProjectId}`;
-                  
+                  let delUrl = `${API_URL}/files/file/${file.filename}?project_id=${targetId}`; 
                   await fetch(delUrl, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); 
               } 
           } 
@@ -149,16 +157,17 @@ export default function Loadflow({ user }: { user: any }) {
   
   const detectAndLoadResults = useCallback(async () => { 
       if (!user) return; 
-      if (!activeProjectId && !activeSessionUid) return; 
+      // Use logic to get ID locally inside callback or pass as dep
+      // We rely on state activeProjectId / activeSessionUid
+      const targetId = activeProjectId || activeSessionUid;
+      if (!targetId) return; 
+
       setLoading(true); 
       setResults(null); 
       try { 
           const t = await getToken(); 
-          let url = `${API_URL}/files/details`;
-          
-          // [FIX] Correctly handle Session vs Project
-          if (activeProjectId) url += `?project_id=${activeProjectId}`;
-          // If Project ID is null, we send nothing -> Backend defaults to My Session
+          // [FIX] Explicitly send project_id={targetId}
+          let url = `${API_URL}/files/details?project_id=${targetId}`;
 
           const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
           if (!listRes.ok) throw new Error("Failed to list files"); 
@@ -167,14 +176,16 @@ export default function Loadflow({ user }: { user: any }) {
           const files = listData.files || []; 
           const jsonFiles = files.filter((f: any) => f.filename.toLowerCase().endsWith('.json') && !f.filename.includes('config.json')); 
           
+          // Update History
+          setHistoryFiles(jsonFiles.map((f: any) => ({ name: f.filename, date: f.uploaded_at })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+
           if (jsonFiles.length === 0) { setLoading(false); return; } 
           
           jsonFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
           for (const candidate of jsonFiles) { 
               try { 
-                  let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}`;
-                  if (activeProjectId) prevUrl += `&project_id=${activeProjectId}`;
+                  let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}&project_id=${targetId}`;
 
                   const dataRes = await fetch(prevUrl); 
                   if (dataRes.ok) { 
@@ -214,18 +225,18 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleManualLoad = async (overrideName?: string) => { 
       if (!user) return; 
+      const targetId = getTargetContextId();
+      if (!targetId) return;
+
       setLoading(true); 
       try { 
           const t = await getToken(); 
           let targetName = overrideName || baseName;
-          
           let jsonFilename = targetName;
           if (!jsonFilename.endsWith('.json')) jsonFilename += '.json';
           
-          let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}`;
-          
-          // [FIX] Session logic here too
-          if (activeProjectId) url += `&project_id=${activeProjectId}`;
+          // [FIX] Send project_id={targetId}
+          let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}&project_id=${targetId}`;
 
           const dataRes = await fetch(url); 
           if (!dataRes.ok) throw new Error("No results found."); 
@@ -237,7 +248,8 @@ export default function Loadflow({ user }: { user: any }) {
 
   const handleRunAnalysis = async () => { 
       if (!user) return; 
-      if (!activeProjectId && !activeSessionUid) return notify("Select a context first", "error");
+      const targetId = getTargetContextId();
+      if (!targetId) return notify("Select a context first", "error");
       
       setLoading(true); 
       setResults(null); 
@@ -247,9 +259,8 @@ export default function Loadflow({ user }: { user: any }) {
           const t = await getToken(); 
           const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 20) || "lf_run"; 
           
-          let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}`;
-          // [FIX] Don't send project_id for Sessions
-          if (activeProjectId) url += `&project_id=${activeProjectId}`;
+          // [FIX] Force project_id param even for sessions (UID is passed as project_id)
+          let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}&project_id=${targetId}`;
 
           const runRes = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } }); 
           
@@ -260,8 +271,7 @@ export default function Loadflow({ user }: { user: any }) {
           if (runData.filename) {
               const fullPath = runData.folder ? `${runData.folder}/${runData.filename}` : runData.filename;
               await handleManualLoad(fullPath);
-              
-              if (activeProjectId || activeSessionUid) cleanOldScenarios(cleanBaseName);
+              cleanOldScenarios(cleanBaseName);
               notify("Analysis Computed & Saved");
           } else {
               throw new Error("No filename returned from backend");
@@ -321,7 +331,7 @@ export default function Loadflow({ user }: { user: any }) {
 
       <div className="flex flex-1 gap-6 min-h-0">
         <ProjectsSidebar 
-            user={user} userGlobalData={userGlobalData}
+            user={user} userGlobalData={userGlobalData || user} 
             projects={projects} usersList={usersList}
             activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId}
             activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid}
@@ -377,6 +387,48 @@ export default function Loadflow({ user }: { user: any }) {
         </div>
       </div>
       {selectedCase && <div className="hidden">Selected Case for Debug: {selectedCase.filename}</div>}
+      {showHistory && (
+        <aside className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col shadow-xl z-20">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+                <div>
+                    <h2 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                        <Icons.Archive className="w-4 h-4" />
+                        Results Archive
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1">
+                        Click to load previous runs
+                    </p>
+                </div>
+                <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded">
+                    <Icons.X className="w-4 h-4 text-slate-500" />
+                </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {historyFiles.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-sm">No archives found</div>
+                ) : (
+                    historyFiles.map((file, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => handleManualLoad(file.name)}
+                            className="w-full text-left p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors group border border-transparent hover:border-blue-100 dark:hover:border-slate-600"
+                        >
+                            <div className="flex items-center gap-2 mb-1">
+                                <Icons.FileJson className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate w-full">
+                                    {file.name.replace('.json', '')}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center text-[10px] text-slate-400 pl-6">
+                                <span>{new Date(file.date).toLocaleDateString()}</span>
+                                <Icons.ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                        </button>
+                    ))
+                )}
+            </div>
+        </aside>
+      )}
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );
