@@ -43,23 +43,33 @@ export default function Loadflow({ user }: { user: any }) {
 
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
   
+  // --- DATA INIT ---
   useEffect(() => {
       const initData = async () => {
           if (!user) return;
           try {
               const t = await getToken();
-              const pRes = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } });
-              if (pRes.ok) setProjects(await pRes.json());
+              
+              // 1. Projects
+              try {
+                  const pRes = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } });
+                  if (pRes.ok) setProjects(await pRes.json());
+              } catch (e) {}
 
-              if (['super_admin', 'admin', 'moderator'].includes(user.global_role)) {
+              // 2. User Data (Try to fetch profile/list to get Role)
+              try {
                   const uRes = await fetch(`${API_URL}/users/`, { headers: { 'Authorization': `Bearer ${t}` } });
                   if (uRes.ok) {
                       const list = await uRes.json();
                       setUsersList(list);
                       const me = list.find((u: any) => u.uid === user.uid);
+                      // Use fetched profile if found, otherwise fallback to auth user
                       setUserGlobalData(me || user);
+                  } else {
+                      // Fallback for non-admins (403) -> Use Auth User object
+                      setUserGlobalData(user);
                   }
-              } else {
+              } catch (e) {
                   setUserGlobalData(user);
               }
           } catch (e) {}
@@ -84,15 +94,16 @@ export default function Loadflow({ user }: { user: any }) {
   const deleteProjectWrapper = (id: string, e: any) => { e.stopPropagation(); notify(`Go to Files to delete ${id}`, "error"); };
 
   return (
-    // [FIX] Removed 'h-[calc...]' and 'overflow-hidden'. 
-    // Added 'min-h-full' to ensure bg covers screen, but allows expansion.
     <div className="w-full px-6 py-6 text-[11px] font-sans flex flex-col relative min-h-full">
       
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
         <div className="flex flex-col">
-          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">System Analysis {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}</label>
-          <div className="flex items-center gap-2">
+          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
+              System Analysis
+          </label>
+          
+          <div className="flex items-center gap-3">
             <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">
                 {activeProjectId ? (
                     <>
@@ -106,7 +117,16 @@ export default function Loadflow({ user }: { user: any }) {
                     </>
                 )}
             </h1>
+            
+            {/* Context Role (Owner/Viewer) */}
             <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null} />
+            
+            {/* Global Role (Admin/User) - Moved Here for Visibility */}
+            {userGlobalData && (
+                <div className="ml-2 scale-110">
+                    <GlobalRoleBadge role={userGlobalData.global_role} />
+                </div>
+            )}
           </div>
         </div>
         
@@ -124,22 +144,18 @@ export default function Loadflow({ user }: { user: any }) {
         </div>
       </div>
 
-      <div className="flex flex-1 gap-6">
-        {/* Sidebar height handled by its own content or sticky behavior if added later */}
-        <div className="shrink-0">
-            <ProjectsSidebar 
-                user={user} userGlobalData={userGlobalData || user} 
-                projects={projects} usersList={usersList}
-                activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId}
-                activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid}
-                isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} 
-                newProjectName={newProjectName} setNewProjectName={setNewProjectName} 
-                onCreateProject={createProjectWrapper} onDeleteProject={deleteProjectWrapper} 
-            />
-        </div>
+      <div className="flex flex-1 gap-6 min-h-0">
+        <ProjectsSidebar 
+            user={user} userGlobalData={userGlobalData || user} 
+            projects={projects} usersList={usersList}
+            activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId}
+            activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid}
+            isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} 
+            newProjectName={newProjectName} setNewProjectName={setNewProjectName} 
+            onCreateProject={createProjectWrapper} onDeleteProject={deleteProjectWrapper} 
+        />
         
-        {/* RIGHT CONTENT - Allowed to grow infinitely */}
-        <div className="flex-1 flex flex-col gap-6 min-w-0">
+        <div className="flex-1 flex flex-col gap-4 min-w-0">
              {results.length === 0 && !loading ? (
                  <div className="h-96 flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 gap-4 border-2 border-dashed border-slate-100 dark:border-slate-700 rounded bg-slate-50/50 dark:bg-slate-900/50">
                     <Icons.Activity className="w-16 h-16" />
@@ -147,12 +163,9 @@ export default function Loadflow({ user }: { user: any }) {
                  </div>
              ) : (
                  <>
-                    {/* Chart */}
                     <div className="w-full">
                         <LoadflowChart groups={scenarioGroups} extractLoadNumber={extractLoadNumber} />
                     </div>
-                    
-                    {/* Table - No height restrictions */}
                     <div className="w-full pb-10">
                         <ResultsTable 
                             results={results} 
