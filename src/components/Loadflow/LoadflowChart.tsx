@@ -15,12 +15,15 @@ interface Props {
 
 export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
     const [showCapaComparison, setShowCapaComparison] = useState(true);
-    const [isGridView, setIsGridView] = useState(false); // [NEW] Toggle for Grid/Panel View
+    const [isGridView, setIsGridView] = useState(false);
+    
+    // [NEW] State for the Zoomed Chart
+    const [zoomedGroup, setZoomedGroup] = useState<string | null>(null);
 
     const keys = Object.keys(groups);
     if (keys.length === 0) return null;
 
-    // --- 1. GLOBAL SCALING (Must apply to all charts for fair comparison) ---
+    // --- 1. GLOBAL SCALING ---
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     Object.values(groups).forEach(group => { 
         group.forEach(r => { 
@@ -38,17 +41,14 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
     const plotMaxY = maxY + padY;
 
     // --- 2. GROUPING LOGIC ---
-    // Prepare a list of unique "Base Scenarios" (stripping _CAPA)
     const baseColorMap: Record<string, string> = {};
     const uniqueBaseKeys = new Set<string>();
-    
     const sortedKeys = [...keys].sort();
     let colorIndex = 0;
 
     sortedKeys.forEach(key => {
         const baseKey = key.replace(/_CAPA$/i, '').trim();
         uniqueBaseKeys.add(baseKey);
-        
         if (!baseColorMap[baseKey]) {
             baseColorMap[baseKey] = LINE_COLORS[colorIndex % LINE_COLORS.length];
             colorIndex++;
@@ -58,24 +58,31 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
     const sortedBaseKeys = Array.from(uniqueBaseKeys).sort();
 
     // --- HELPER: RENDER SINGLE SVG ---
-    // Can render either the full set OR a subset (for grid view)
-    const renderChartSvg = (targetBaseKeys: string[], width: number, height: number, hideAxisLabels = false) => {
-        const getX = (val: number) => ((val - minX) / rangeX) * (width - 40) + 20; 
-        const getY = (val: number) => height - ((val - plotMinY) / (plotMaxY - plotMinY)) * (height - 40) - 20;
+    const renderChartSvg = (targetBaseKeys: string[], width: string | number, height: string | number, hideAxisLabels = false) => {
+        // SVG Coordinate mapping
+        const getX = (val: number) => ((val - minX) / rangeX) * (typeof width === 'number' ? width - 40 : 800) + 20; 
+        const getY = (val: number) => (typeof height === 'number' ? height : 300) - ((val - plotMinY) / (plotMaxY - plotMinY)) * ((typeof height === 'number' ? height : 300) - 40) - 20;
+        
+        // Note: For dynamic width (100%), we use viewBox effectively
+        const vW = 800; 
+        const vH = 300;
+        
+        const mapX = (val: number) => ((val - minX) / rangeX) * (vW - 40) + 20;
+        const mapY = (val: number) => vH - ((val - plotMinY) / (plotMaxY - plotMinY)) * (vH - 40) - 20;
 
         return (
-            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+            <svg viewBox={`0 0 ${vW} ${vH}`} className="w-full h-full overflow-visible" preserveAspectRatio="none">
                 {/* Grid Lines */}
-                <line x1="20" y1={height-20} x2={width-20} y2={height-20} stroke="#cbd5e1" strokeWidth="1" />
-                <line x1="20" y1="20" x2="20" y2={height-20} stroke="#cbd5e1" strokeWidth="1" />
+                <line x1="20" y1={vH-20} x2={vW-20} y2={vH-20} stroke="#cbd5e1" strokeWidth="1" />
+                <line x1="20" y1="20" x2="20" y2={vH-20} stroke="#cbd5e1" strokeWidth="1" />
                 {[0, 0.25, 0.5, 0.75, 1].map(pct => { 
-                    const yPos = 20 + (height - 40) * pct; 
+                    const yPos = 20 + (vH - 40) * pct; 
                     const val = plotMaxY - (plotMaxY - plotMinY) * pct; 
                     return (
                         <g key={pct}>
-                            <line x1="20" y1={yPos} x2={width-20} y2={yPos} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
+                            <line x1="20" y1={yPos} x2={vW-20} y2={yPos} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4" />
                             {!hideAxisLabels && (
-                                <text x="15" y={yPos + 3} textAnchor="end" fontSize="9" fill="#94a3b8" className="font-mono">{val.toFixed(0)}</text>
+                                <text x="15" y={yPos + 3} textAnchor="end" fontSize="10" fill="#94a3b8" className="font-mono">{val.toFixed(0)}</text>
                             )}
                         </g>
                     ); 
@@ -84,7 +91,6 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                 {/* Data Lines */}
                 {sortedKeys.map((key) => {
                     const baseKey = key.replace(/_CAPA$/i, '').trim();
-                    // Filter: Only draw if this key belongs to the targets we want to render
                     if (!targetBaseKeys.includes(baseKey)) return null;
 
                     const group = groups[key];
@@ -93,9 +99,9 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                     
                     const dashArray = (showCapaComparison && isCapa) ? "5,5" : "none";
                     const opacity = (showCapaComparison && isCapa) ? 0.7 : 1;
-                    const strokeWidth = isCapa ? 1.5 : 2;
+                    const strokeWidth = isCapa ? 2 : 3;
 
-                    const pointsStr = group.map(r => `${getX(extractLoadNumber(r.study_case?.revision))},${getY(Math.abs(r.mw_flow))}`).join(" ");
+                    const pointsStr = group.map(r => `${mapX(extractLoadNumber(r.study_case?.revision))},${mapY(Math.abs(r.mw_flow))}`).join(" ");
 
                     return (
                         <g key={key}>
@@ -112,12 +118,12 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                             {group.map((r, i) => (
                                 <circle 
                                     key={i}
-                                    cx={getX(extractLoadNumber(r.study_case?.revision))} 
-                                    cy={getY(Math.abs(r.mw_flow))} 
-                                    r={isCapa ? 2 : 3} 
+                                    cx={mapX(extractLoadNumber(r.study_case?.revision))} 
+                                    cy={mapY(Math.abs(r.mw_flow))} 
+                                    r={isCapa ? 3 : 4} 
                                     fill={r.is_winner ? "#22c55e" : "white"} 
                                     stroke={color} 
-                                    strokeWidth={1.5} 
+                                    strokeWidth={2} 
                                 />
                             ))}
                         </g>
@@ -137,7 +143,6 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                 Load Analysis
             </h3>
             <div className="flex items-center gap-2">
-                {/* Toggle Grouping */}
                 <button 
                     onClick={() => setShowCapaComparison(!showCapaComparison)}
                     className={`text-[10px] font-bold px-2 py-1 rounded border transition-colors flex items-center gap-1 ${
@@ -152,19 +157,10 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
 
                 <div className="w-px h-4 bg-slate-200 dark:bg-slate-600 mx-1"></div>
 
-                {/* Toggle Grid/Single View */}
-                <button 
-                    onClick={() => setIsGridView(false)}
-                    className={`p-1.5 rounded border transition-colors ${!isGridView ? 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-slate-800 dark:text-white' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                    title="Combined View"
-                >
+                <button onClick={() => setIsGridView(false)} className={`p-1.5 rounded border transition-colors ${!isGridView ? 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-slate-800 dark:text-white' : 'border-transparent text-slate-400 hover:text-slate-600'}`} title="Combined View">
                     <Icons.Maximize className="w-3.5 h-3.5" />
                 </button>
-                <button 
-                    onClick={() => setIsGridView(true)}
-                    className={`p-1.5 rounded border transition-colors ${isGridView ? 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-slate-800 dark:text-white' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-                    title="Grid View (Panels)"
-                >
+                <button onClick={() => setIsGridView(true)} className={`p-1.5 rounded border transition-colors ${isGridView ? 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-slate-800 dark:text-white' : 'border-transparent text-slate-400 hover:text-slate-600'}`} title="Grid View">
                     <Icons.Grid className="w-3.5 h-3.5" />
                 </button>
             </div>
@@ -172,15 +168,21 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
 
         {/* CHART CONTENT AREA */}
         {isGridView ? (
-            // --- GRID VIEW (Small Multiples) ---
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {sortedBaseKeys.map((baseKey) => (
-                    <div key={baseKey} className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm p-3 flex flex-col h-[200px]">
+                    <div 
+                        key={baseKey} 
+                        onClick={() => setZoomedGroup(baseKey)} // [NEW] Click to Zoom
+                        className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm p-3 flex flex-col h-[200px] cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group relative"
+                    >
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-100 dark:bg-slate-700 p-1 rounded">
+                            <Icons.Maximize className="w-3 h-3 text-slate-500" />
+                        </div>
+                        
                         <div className="flex justify-between items-center mb-2 border-b border-slate-100 dark:border-slate-700 pb-1">
                             <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate" style={{ color: baseColorMap[baseKey] }}>
                                 {baseKey}
                             </span>
-                            {/* Mini Legend for this card */}
                             {showCapaComparison && (
                                 <div className="flex gap-1">
                                     <div className="w-3 h-0 border-t-2 border-solid opacity-100" style={{ borderColor: baseColorMap[baseKey] }} title="Base"></div>
@@ -189,28 +191,71 @@ export default function LoadflowChart({ groups, extractLoadNumber }: Props) {
                             )}
                         </div>
                         <div className="flex-1 w-full relative">
-                            {renderChartSvg([baseKey], 400, 160, false)}
+                            {renderChartSvg([baseKey], 400, 160, true)}
                         </div>
                     </div>
                 ))}
             </div>
         ) : (
-            // --- SINGLE VIEW (Combined) ---
             <div className="w-full bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col">
                 <div className="relative h-[320px] w-full">
                     {renderChartSvg(sortedBaseKeys, 800, 300)}
                 </div>
-                {/* Global Legend */}
-                <div className="flex flex-wrap gap-3 mt-4 justify-center">
-                    {sortedBaseKeys.map((key) => (
-                        <div key={key} className="flex items-center gap-1.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded border border-slate-200 dark:border-slate-600">
-                            <div className="w-4 h-0" style={{ borderTop: `2px solid ${baseColorMap[key]}` }}></div>
-                            {key}
-                        </div>
-                    ))}
+                {/* [NEW] Expanded Legend - Shows ALL keys */}
+                <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 justify-center px-4">
+                    {sortedKeys.map((key) => {
+                        const isCapa = key.toUpperCase().endsWith('_CAPA');
+                        const baseKey = key.replace(/_CAPA$/i, '').trim();
+                        // If grouping is ON, handle display logic (optional: hide CAPA specific legend if obvious, but user asked for ALL names)
+                        // User asked: "appear their names all" -> We show everything clearly.
+                        const color = baseColorMap[baseKey];
+                        
+                        return (
+                            <div key={key} className="flex items-center gap-1.5 text-[9px] font-bold text-slate-600 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded border border-slate-200 dark:border-slate-600">
+                                <div className="w-4 h-0" style={{ 
+                                    borderTop: isCapa && showCapaComparison ? `2px dashed ${color}` : `2px solid ${color}`,
+                                    opacity: isCapa && showCapaComparison ? 0.7 : 1
+                                }}></div>
+                                {key}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         )}
+
+        {/* [NEW] ZOOM MODAL */}
+        {zoomedGroup && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-in fade-in duration-200" onClick={() => setZoomedGroup(null)}>
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl h-[60vh] flex flex-col p-6 relative border border-slate-200 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                            <span style={{ color: baseColorMap[zoomedGroup] }}>{zoomedGroup}</span>
+                            <span className="text-sm font-normal text-slate-400">Detailed Analysis</span>
+                        </h2>
+                        <button onClick={() => setZoomedGroup(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
+                            <Icons.X className="w-6 h-6 text-slate-500" />
+                        </button>
+                    </div>
+                    
+                    <div className="flex-1 w-full relative bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700 p-4">
+                         {renderChartSvg([zoomedGroup], "100%", "100%")}
+                    </div>
+
+                    <div className="mt-4 flex gap-4 justify-center">
+                         <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                            <div className="w-6 h-0 border-t-4 border-solid" style={{ borderColor: baseColorMap[zoomedGroup] }}></div>
+                            Base Scenario
+                         </div>
+                         <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                            <div className="w-6 h-0 border-t-4 border-dashed opacity-60" style={{ borderColor: baseColorMap[zoomedGroup] }}></div>
+                            With CAPA
+                         </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
       </div>
     );
 }
