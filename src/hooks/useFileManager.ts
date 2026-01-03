@@ -128,7 +128,7 @@ export const useFileManager = (
         }
     };
 
-    // [decision:logic] : Unified Bulk Download (Raw OR Converted)
+    // [decision:logic] : Unified Bulk Download (Raw OR Converted) using ZIP streaming
     const handleBulkDownload = async (selectedFiles: Set<string>, format: 'raw' | 'xlsx' | 'json' = 'raw') => {
         const targets = Array.from(selectedFiles);
         if (targets.length === 0) return;
