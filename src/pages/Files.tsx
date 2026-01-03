@@ -1,4 +1,7 @@
 
+// [structure:root] : Files Page Controller
+// [context:flow] : Orchestrates Sidebar, File Table and Toolbar using the useFileManager hook.
+
 import { useEffect, useState } from 'react';
 import { Icons } from '../icons';
 import Toast from '../components/Toast';
@@ -7,65 +10,117 @@ import ContextRoleBadge from '../components/ContextRoleBadge';
 import MembersModal from '../components/MembersModal';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import FileToolbar from '../components/FileToolbar';
-import FileTable, { SessionFile, SortKey, SortOrder } from '../components/FileTable';
+import FileTable from '../components/FileTable';
+import { useFileManager } from '../hooks/useFileManager'; // [!] Custom Hook
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../firebase';
 
 export default function Files({ user }: { user: any }) {
-  const [files, setFiles] = useState<SessionFile[]>([]);
+  // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
   const [usersList, setUsersList] = useState<UserSummary[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  
+  // Sidebar State
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  
+  // UI State
   const [searchTerm, setSearchTerm] = useState("");
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'uploaded_at', order: 'desc' });
-  const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
-  const [previewData, setPreviewData] = useState<any>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
+  
+  // Bulk Selection State
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+
+  // --- CONFIG ---
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
-
-  let currentProjectRole = undefined;
-  if (activeProjectId) currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;
-  else if (activeSessionUid) currentProjectRole = 'admin';
-
-  const getActiveProjectName = () => {
-      if (!activeProjectId) return null;
-      const proj = projects.find(p => p.id === activeProjectId);
-      return proj ? proj.name : activeProjectId; 
-  };
-
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
-  const formatBytes = (bytes: number) => { if (bytes === 0) return '0 B'; const k = 1024; const sizes = ['B', 'KB', 'MB', 'GB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; };
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
+
+  // --- HOOKS ---
+  const { 
+    files, loading, uploading, sortConfig, 
+    handleSort, handleUpload, handleDelete, handleBulkDelete, refreshFiles 
+  } = useFileManager(user, activeProjectId, activeSessionUid, API_URL, notify);
+
+  // --- EFFECTS ---
+  useEffect(() => {
+    if (user) {
+        fetchGlobalProfile();
+        fetchProjects();
+    }
+  }, [user]);
+
+  // Clear selection when context changes
+  useEffect(() => { setSelectedFiles(new Set()); }, [activeProjectId, activeSessionUid]);
+
+  // --- HELPERS ---
   const handleGoogleLogin = async () => { await signInWithPopup(auth, new GoogleAuthProvider()); };
   const handleCopyToken = async () => { const t = await getToken(); if (!t) return notify("No Token", "error"); navigator.clipboard.writeText(t); notify("Token Copied"); };
+  const formatBytes = (bytes: number) => { if (bytes === 0) return '0 B'; const k = 1024; const sizes = ['B', 'KB', 'MB', 'GB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; };
 
   const fetchGlobalProfile = async () => { try { const t = await getToken(); const res = await fetch(`${API_URL}/users/me`, { headers: { 'Authorization': `Bearer ${t}` } }); if (res.ok) { const data = await res.json(); setUserGlobalData(data); if (['super_admin', 'admin', 'moderator'].includes(data.global_role)) fetchAllUsers(t); } } catch (e) {} };
   const fetchAllUsers = async (token: string) => { try { const res = await fetch(`${API_URL}/admin/users?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) setUsersList(await res.json()); } catch (e) { console.error("Admin List Error", e); } };
   const fetchProjects = async () => { try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } }); if (res.ok) setProjects(await res.json()); } catch (e) { console.error("Failed to load projects", e); } };
-  
-  const fetchFiles = async () => { setLoading(true); try { const t = await getToken(); let url = `${API_URL}/files/details`; if (activeProjectId) url += `?project_id=${activeProjectId}`; else if (activeSessionUid) url += `?project_id=${activeSessionUid}`; const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error("Failed to fetch"); const data = await res.json(); setFiles(data.files || []); } catch (e) { console.error(e); setFiles([]); } finally { setLoading(false); } };
 
-  useEffect(() => { if (user) { fetchGlobalProfile(); fetchProjects(); } }, [user]);
-  useEffect(() => { if (user) fetchFiles(); }, [activeProjectId, activeSessionUid]);
-
+  // Project Management (Keep logic here as it relates to sidebar, not files directly)
   const createProject = async () => { if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); if (!newProjectName.trim()) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/create`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newProjectName, name: newProjectName }) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail); } notify("Project Created"); setNewProjectName(""); setIsCreatingProject(false); fetchProjects(); } catch (e: any) { notify(e.message || "Failed", "error"); } };
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
-  const handleUpload = async (fileList: FileList | null) => { if (!fileList || !user) return; if (user.isAnonymous) { for (let i = 0; i < fileList.length; i++) { if (fileList[i].name.toLowerCase().match(/\.(zip|rar|7z)$/)) return notify("Guests cannot upload archives. Create account.", "error"); } } setUploading(true); const formData = new FormData(); const optimisticFiles: SessionFile[] = []; Array.from(fileList).forEach(f => { formData.append('files', f); optimisticFiles.push({ filename: f.name, path: f.name, size: f.size, content_type: f.type, uploaded_at: new Date().toISOString() }); }); try { const t = await getToken(); let url = `${API_URL}/files/upload`; if (activeProjectId) url += `?project_id=${activeProjectId}`; else if (activeSessionUid) url += `?project_id=${activeSessionUid}`; const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData }); if (!res.ok) { const err = await res.json().catch(() => ({ detail: "Upload Failed" })); throw new Error(err.detail); } notify(`${fileList.length} Uploaded`); setFiles(prev => [...optimisticFiles, ...prev]); setTimeout(() => fetchFiles(), 500); } catch (e: any) { notify(e.message || "Upload Failed", "error"); } finally { setUploading(false); } };
-  const handleDelete = async (path: string) => { if (!confirm("Delete file?")) return; try { const t = await getToken(); let url = `${API_URL}/files/file/${path}`; if (activeProjectId) url += `?project_id=${activeProjectId}`; else if (activeSessionUid) url += `?project_id=${activeSessionUid}`; await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); setFiles(p => p.filter(f => f.path !== path)); notify("Deleted"); } catch (e) { notify("Error", "error"); } };
-  const handleClear = async () => { if (!confirm("Clear all files?")) return; try { const t = await getToken(); let url = `${API_URL}/files/clear`; if (activeProjectId) url += `?project_id=${activeProjectId}`; else if (activeSessionUid) url += `?project_id=${activeSessionUid}`; const res = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if(!res.ok) throw new Error((await res.json()).detail); setFiles([]); setExpandedFileId(null); notify("Cleared"); } catch (e: any) { notify(e.message || "Error", "error"); } };
-  const togglePreview = async (filename: string) => { if (expandedFileId === filename) { setExpandedFileId(null); return; } setExpandedFileId(filename); setPreviewLoading(true); setPreviewData(null); try { const t = await getToken(); let pParam = ""; if (activeProjectId) pParam = `&project_id=${activeProjectId}`; else if (activeSessionUid) pParam = `&project_id=${activeSessionUid}`; const res = await fetch(`${API_URL}/ingestion/preview?filename=${encodeURIComponent(filename)}&token=${t}${pParam}`); if (!res.ok) throw new Error("Preview unavailable"); setPreviewData(await res.json()); } catch (e) { setExpandedFileId(null); notify("Preview Error", "error"); } finally { setPreviewLoading(false); } };
-  const handleOpenLink = async (type: string, filename: string) => { try { const t = await getToken(); let pParam = ""; if (activeProjectId) pParam = `&project_id=${activeProjectId}`; else if (activeSessionUid) pParam = `&project_id=${activeSessionUid}`; const encName = encodeURIComponent(filename); let url = ""; if (type === 'raw') url = `${API_URL}/files/download?filename=${encName}&token=${t}${pParam}`; else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encName}&token=${t}${pParam}`; else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}&token=${t}${pParam}`; else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encName}&token=${t}${pParam}`; if (url) window.open(url, '_blank'); } catch (e) { notify("Link Error", "error"); } };
-  const handleSort = (key: SortKey) => { setSortConfig(current => ({ key, order: current.key === key && current.order === 'asc' ? 'desc' : 'asc' })); };
-  const filteredFiles = files.filter(f => f.filename.toLowerCase().includes(searchTerm.toLowerCase())).sort((a, b) => { let aVal: any = a[sortConfig.key]; let bVal: any = b[sortConfig.key]; if (sortConfig.key === 'size') { aVal = a.size; bVal = b.size; } else if (sortConfig.key === 'uploaded_at') { aVal = new Date(a.uploaded_at || 0).getTime(); bVal = new Date(b.uploaded_at || 0).getTime(); } else { aVal = aVal?.toString().toLowerCase() || ""; bVal = bVal?.toString().toLowerCase() || ""; } if (aVal < bVal) return sortConfig.order === 'asc' ? -1 : 1; if (aVal > bVal) return sortConfig.order === 'asc' ? 1 : -1; return 0; });
+
+  // --- ACTIONS ---
+  const handleOpenLink = async (type: string, filename: string) => { 
+      try { 
+          const t = await getToken(); 
+          let pParam = ""; 
+          if (activeProjectId) pParam = `&project_id=${activeProjectId}`; 
+          else if (activeSessionUid) pParam = `&project_id=${activeSessionUid}`; 
+          const encName = encodeURIComponent(filename); 
+          let url = ""; 
+          if (type === 'raw') url = `${API_URL}/files/download?filename=${encName}&token=${t}${pParam}`; 
+          else if (type === 'xlsx') url = `${API_URL}/ingestion/download/xlsx?filename=${encName}&token=${t}${pParam}`; 
+          else if (type === 'json') url = `${API_URL}/ingestion/download/json?filename=${encName}&token=${t}${pParam}`; 
+          else if (type === 'json_tab') url = `${API_URL}/ingestion/preview?filename=${encName}&token=${t}${pParam}`; 
+          if (url) window.open(url, '_blank'); 
+      } catch (e) { notify("Link Error", "error"); } 
+  };
+
+  const handleBulkDownload = async (type: 'raw' | 'xlsx' | 'json') => {
+      // [?] [THOUGHT] : Triggering multiple downloads loop.
+      const filesToDownload = filteredFiles.filter(f => selectedFiles.has(f.path));
+      notify(`Preparing ${filesToDownload.length} downloads...`);
+      
+      for (const file of filesToDownload) {
+          if (type !== 'raw' && !/\.(si2s|lf1s|mdb|json)$/i.test(file.filename)) continue;
+          handleOpenLink(type === 'json' ? 'json_tab' : type, file.filename);
+          // Small delay to prevent browser choke
+          await new Promise(r => setTimeout(r, 500));
+      }
+      setSelectedFiles(new Set());
+  };
+
+  // Selection Logic
+  const toggleSelect = (path: string) => {
+      const newSet = new Set(selectedFiles);
+      if (newSet.has(path)) newSet.delete(path);
+      else newSet.add(path);
+      setSelectedFiles(newSet);
+  };
+  const selectAll = (checked: boolean) => {
+      if (checked) setSelectedFiles(new Set(filteredFiles.map(f => f.path)));
+      else setSelectedFiles(new Set());
+  };
+
+  // Filter
+  const filteredFiles = files.filter(f => f.filename.toLowerCase().includes(searchTerm.toLowerCase()));
+  
+  // Context Roles
+  let currentProjectRole = undefined;
+  if (activeProjectId) currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;
+  else if (activeSessionUid) currentProjectRole = 'admin';
+  const getActiveProjectName = () => { if (!activeProjectId) return null; const proj = projects.find(p => p.id === activeProjectId); return proj ? proj.name : activeProjectId; };
 
   return (
     <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
@@ -82,7 +137,7 @@ export default function Files({ user }: { user: any }) {
         <div className="flex gap-2">
           {userGlobalData && userGlobalData.global_role === 'super_admin' && <button onClick={() => window.open(`${API_URL}/docs`, '_blank')} className="flex items-center gap-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300 px-3 py-1.5 rounded border border-red-200 dark:border-red-900 text-red-600 font-bold transition-colors"><Icons.Shield className="w-3.5 h-3.5" /> API</button>}
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
-          <button onClick={() => fetchFiles()} className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-bold transition-colors"><Icons.Refresh className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> REFRESH</button>
+          <button onClick={() => refreshFiles()} className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-bold transition-colors"><Icons.Refresh className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> REFRESH</button>
         </div>
       </div>
 
@@ -99,12 +154,22 @@ export default function Files({ user }: { user: any }) {
       <div className="flex flex-1 gap-6 min-h-0">
         <ProjectsSidebar user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid} isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} newProjectName={newProjectName} setNewProjectName={setNewProjectName} onCreateProject={createProject} onDeleteProject={deleteProject} />
 
-        {/* [FIX] Container is now dark in dark mode */}
-        <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden font-bold relative transition-all" onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }} onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }} onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); }}>
-            {isDragging && <div className="absolute inset-0 z-50 bg-blue-50/90 dark:bg-blue-900/90 border-2 border-dashed border-blue-500 rounded flex flex-col items-center justify-center pointer-events-none"><Icons.UploadCloud className="w-12 h-12 text-blue-600 dark:text-blue-400 mb-2" /><span className="text-lg font-black text-blue-700 dark:text-blue-300 uppercase tracking-widest">Drop files to upload</span></div>}
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden font-bold relative transition-all" onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files); }}>
             
-            <FileToolbar searchTerm={searchTerm} setSearchTerm={setSearchTerm} fileCount={filteredFiles.length} activeProjectId={activeProjectId || activeSessionUid} onShowMembers={() => setShowMembers(true)} onClear={handleClear} uploading={uploading} onUpload={handleUpload} />
-            <FileTable files={filteredFiles} sortConfig={sortConfig} onSort={handleSort} searchTerm={searchTerm} expandedFileId={expandedFileId} onTogglePreview={togglePreview} previewData={previewData} previewLoading={previewLoading} onOpenLink={handleOpenLink} onDelete={handleDelete} formatBytes={formatBytes} />
+            <FileToolbar 
+                searchTerm={searchTerm} setSearchTerm={setSearchTerm} fileCount={filteredFiles.length} 
+                activeProjectId={activeProjectId || activeSessionUid} onShowMembers={() => setShowMembers(true)} 
+                uploading={uploading} onUpload={handleUpload}
+                selectedCount={selectedFiles.size} onBulkDownload={handleBulkDownload} onBulkDelete={() => handleBulkDelete(Array.from(selectedFiles)).then(() => setSelectedFiles(new Set()))}
+            />
+            
+            <FileTable 
+                files={filteredFiles} sortConfig={sortConfig} onSort={handleSort} 
+                searchTerm={searchTerm} 
+                onOpenLink={handleOpenLink} onDelete={handleDelete} formatBytes={formatBytes}
+                selectedFiles={selectedFiles} onToggleSelect={toggleSelect} onSelectAll={selectAll}
+            />
         </div>
       </div>
       
