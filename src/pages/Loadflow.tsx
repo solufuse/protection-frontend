@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Icons } from '../icons'; 
+
+import { useState, useEffect } from 'react';
+import { Icons } from '../icons';
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
@@ -76,21 +77,13 @@ export default function Loadflow({ user }: { user: any }) {
   useEffect(() => { if (activeProjectId && activeSessionUid) setActiveSessionUid(null); }, [activeProjectId]);
   useEffect(() => { if (activeSessionUid && activeProjectId) setActiveProjectId(null); }, [activeSessionUid]);
 
-  // --- HELPER: CLEAN DISPLAY NAME ---
-  // Transforms "a7VIx0..._TCR24026" into "TCR24026"
+  // --- UI HELPER: CLEAN DISPLAY NAME ---
   const getDisplayName = (fullId: string | null) => {
       if (!fullId) return "My Session";
-      
-      // 1. Try to find the official name from the project list
       const project = projects.find(p => p.id === fullId);
       if (project) return project.name;
-
-      // 2. Fallback: Split by underscore and remove the UID part (first part)
       const parts = fullId.split('_');
-      if (parts.length > 1) {
-          return parts.slice(1).join('_'); // Returns everything after the first '_'
-      }
-      
+      if (parts.length > 1) return parts.slice(1).join('_'); 
       return fullId;
   };
 
@@ -111,7 +104,7 @@ export default function Loadflow({ user }: { user: any }) {
                 {activeProjectId ? (
                     <>
                         <Icons.Folder className="w-5 h-5 text-blue-600" />
-                        <span>{getDisplayName(activeProjectId)}</span> {/* [FIX] Uses helper function */}
+                        <span>{getDisplayName(activeProjectId)}</span>
                     </>
                 ) : (
                     <>
