@@ -41,7 +41,7 @@ export default function Files({ user }: { user: any }) {
           const t = await getToken();
           const headers = { 'Authorization': `Bearer ${t}` };
 
-          // 1. Fetch User Data (Me)
+          // 1. Fetch User Data (Me) & Global Role
           try {
               const meRes = await fetch(`${API_URL}/users/me`, { headers });
               if (meRes.ok) {
@@ -167,14 +167,14 @@ export default function Files({ user }: { user: any }) {
   return (
     <div className="w-full px-6 py-6 text-[11px] font-sans flex flex-col relative min-h-full">
       
-      {/* HEADER - Updated Badge Position */}
+      {/* HEADER - With Admin Badge */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                 Files Dashboard
             </label>
-            {/* [MOVED] Badge is now here, next to the label */}
+            {/* [BADGE POSITION] */}
             {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}
           </div>
           
