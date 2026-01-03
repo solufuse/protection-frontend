@@ -1,7 +1,7 @@
 
 // [structure:hook]
 // USELOADFLOW HOOK
-// [context:flow] Handles API interaction for Loadflow.
+// [context:flow] Handles API interaction. Now supports Project AND Session contexts.
 
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -37,8 +37,12 @@ export interface HistoryFile {
     path?: string;
 }
 
-export const useLoadflow = (currentProjectId: string | undefined, currentProjectName: string | undefined) => {
-    // [FIX] Use user object to get token dynamically
+// [FIX] Added activeSessionUid to params
+export const useLoadflow = (
+    currentProjectId: string | null, 
+    activeSessionUid: string | null,
+    currentProjectName: string | undefined
+) => {
     const { user } = useAuth();
     
     // State
@@ -47,7 +51,6 @@ export const useLoadflow = (currentProjectId: string | undefined, currentProject
     const [error, setError] = useState<string | null>(null);
     const [historyFiles, setHistoryFiles] = useState<HistoryFile[]>([]);
 
-    // [?] [THOUGHT] Standardized API fetcher with async token retrieval
     const apiCall = useCallback(async (endpoint: string, options: RequestInit = {}) => {
         if (!user) return;
         const token = await user.getIdToken();
@@ -64,52 +67,61 @@ export const useLoadflow = (currentProjectId: string | undefined, currentProject
         return response.json();
     }, [user]);
 
-    // [+] [INFO] Refresh available archives from backend
+    // [+] [INFO] Refresh available archives
     const refreshHistory = useCallback(async () => {
-        if (!currentProjectId) return;
+        // [logic] Work in Project OR Session mode
+        if (!currentProjectId && !activeSessionUid) return;
+
         try {
-            const data = await apiCall(`/files/details?project_id=${currentProjectId}`);
+            // Build URL based on context (Project vs Session)
+            let url = '/files/details';
+            if (currentProjectId) url += `?project_id=${currentProjectId}`;
+            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`; // Backend treats session UID as project_id param often
+
+            const data = await apiCall(url);
             
-            // [decision:logic] Filter only JSONs in 'loadflow_results' or following the timestamp pattern
             const archives = (data.files || [])
                 .filter((f: any) => 
                     f.filename.includes('loadflow_results') || 
                     f.filename.match(/_\d{8}_\d{6}\.json$/)
                 )
                 .map((f: any) => ({ 
-                    name: f.filename.split('/').pop(), // Display name only
+                    name: f.filename.split('/').pop(),
                     date: f.uploaded_at,
                     path: f.filename
                 }))
-                .sort((a: any, b: any) => b.name.localeCompare(a.name)); // Newest first
+                .sort((a: any, b: any) => b.name.localeCompare(a.name));
 
             setHistoryFiles(archives);
         } catch (err) { console.error("Failed to load history", err); }
-    }, [currentProjectId, apiCall]);
+    }, [currentProjectId, activeSessionUid, apiCall]);
 
-    // Trigger refresh when project changes
+    // Trigger refresh when context changes
     useEffect(() => {
-        if (currentProjectId) refreshHistory();
-    }, [currentProjectId, refreshHistory]);
+        if (currentProjectId || activeSessionUid) refreshHistory();
+    }, [currentProjectId, activeSessionUid, refreshHistory]);
 
     // [+] [INFO] Run Analysis
     const runAnalysis = async () => {
-        if (!currentProjectId) return;
+        if (!currentProjectId && !activeSessionUid) return;
         setLoading(true);
         setError(null);
         setResults([]);
         
         try {
-            // [decision:logic] Generate basename based on Project Name
-            const safeName = (currentProjectName || 'run').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 15);
+            const safeName = (currentProjectName || 'session_run').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 15);
             
-            const data: LoadflowResponse = await apiCall(
-                `/loadflow/run-and-save?project_id=${currentProjectId}&basename=${safeName}`, 
-                { method: 'POST' }
-            );
+            let url = `/loadflow/run-and-save?basename=${safeName}`;
+            if (currentProjectId) url += `&project_id=${currentProjectId}`;
+            // If session, we don't send project_id, backend defaults to user session
+            
+            // [!] Edge case: If viewing ANOTHER user's session (Admin), we might need specific backend support
+            // For now, assuming standard /run-and-save uses current auth user or project_id.
+            
+            const data: LoadflowResponse = await apiCall(url, { method: 'POST' });
 
             if (data.results) setResults(data.results);
-            await refreshHistory(); // Update sidebar immediately
+            await refreshHistory();
 
         } catch (err: any) {
             setError(err.message);
@@ -120,14 +132,17 @@ export const useLoadflow = (currentProjectId: string | undefined, currentProject
 
     // [+] [INFO] Load specific result file
     const loadResultFile = async (filename: string) => {
-        if (!currentProjectId) return;
+        if (!currentProjectId && !activeSessionUid) return;
         setLoading(true);
         setError(null);
         try {
-            // Workaround: Use download endpoint to get content
             const cleanPath = filename.includes('/') ? filename : `loadflow_results/${filename}`;
             
-            const response = await fetch(`https://api.solufuse.com/files/download?project_id=${currentProjectId}&filename=${cleanPath}`, {
+            let url = `https://api.solufuse.com/files/download?filename=${cleanPath}`;
+            if (currentProjectId) url += `&project_id=${currentProjectId}`;
+            else if (activeSessionUid) url += `&project_id=${activeSessionUid}`;
+
+            const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${(await user?.getIdToken())}` }
             });
             
@@ -137,10 +152,9 @@ export const useLoadflow = (currentProjectId: string | undefined, currentProject
             const text = await blob.text();
             const json = JSON.parse(text); 
             
-            // Handle different JSON structures (Array or Object wrapper)
             if (Array.isArray(json)) setResults(json);
             else if (json.results) setResults(json.results);
-            else if (Array.isArray(json.data)) setResults(json.data); // Safety fallback
+            else if (Array.isArray(json.data)) setResults(json.data);
             else throw new Error("Invalid JSON Format");
 
         } catch (err: any) {

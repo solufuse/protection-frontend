@@ -1,12 +1,13 @@
 
 // [structure:root]
 // LOADFLOW PAGE
-// [context:flow] Main entry point. Updated to match Files.tsx layout strictly.
+// [context:flow] Updated to fully mirror Files.tsx sidebar behavior (Sessions, Admins, etc.)
 
 import { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react'; 
-import ProjectsSidebar, { Project } from '../components/ProjectsSidebar';
+import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import { useLoadflow } from '../hooks/useLoadflow';
+import ContextRoleBadge from '../components/ContextRoleBadge';
 
 // Imported Modular Components
 import LoadflowToolbar from '../components/Loadflow/LoadflowToolbar';
@@ -14,9 +15,13 @@ import ResultCard from '../components/Loadflow/ResultCard';
 import HistorySidebar from '../components/Loadflow/HistorySidebar';
 
 const Loadflow = ({ user }: { user: any }) => {
-    // --- SIDEBAR STATE ---
+    // --- SIDEBAR STATE (FULL PARITY) ---
     const [projects, setProjects] = useState<Project[]>([]);
+    const [usersList, setUsersList] = useState<UserSummary[]>([]); // [!] Added for Admin View
+    
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+    const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null); // [!] Added for Session View
+    
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState("");
     
@@ -29,37 +34,57 @@ const Loadflow = ({ user }: { user: any }) => {
     const { 
         results, loading, error, historyFiles, 
         runAnalysis, loadResultFile 
-    } = useLoadflow(currentProject?.id, currentProject?.name);
+    } = useLoadflow(activeProjectId, activeSessionUid, currentProject?.name);
 
-    // --- EFFECTS ---
+    // --- DATA FETCHING ---
     useEffect(() => {
-        const fetchProjects = async () => {
+        const fetchData = async () => {
             if (!user) return;
             try {
                 const token = await user.getIdToken();
-                const res = await fetch("https://api.solufuse.com/projects/", {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    setProjects(data);
+                const headers = { Authorization: `Bearer ${token}` };
+
+                // 1. Fetch Projects
+                const projRes = await fetch("https://api.solufuse.com/projects/", { headers });
+                if (projRes.ok) setProjects(await projRes.json());
+
+                // 2. Fetch Users (If Admin/Staff) - for the "Sessions" section
+                // [decision:logic] Only try if user has role (optimization)
+                if (['super_admin', 'admin', 'moderator'].includes(user.global_role)) {
+                    const usersRes = await fetch("https://api.solufuse.com/users/", { headers });
+                    if (usersRes.ok) setUsersList(await usersRes.json());
                 }
-            } catch (e) { console.error("Failed to load projects", e); }
+
+            } catch (e) { console.error("Failed to load sidebar data", e); }
         };
-        fetchProjects();
+        fetchData();
     }, [user]);
 
+    // --- SELECTION LOGIC ---
     useEffect(() => {
         if (activeProjectId) {
+            // Project Mode
             const p = projects.find(proj => proj.id === activeProjectId);
             if (p) setCurrentProject(p);
+            // Ensure Session is off
+            if (activeSessionUid) setActiveSessionUid(null);
+        } else if (activeSessionUid) {
+            // Session Mode (Admin viewing user session)
+            const u = usersList.find(usr => usr.uid === activeSessionUid);
+            setCurrentProject({ 
+                id: 'SESSION', 
+                name: u ? `${u.username || 'User'}'s Session` : 'User Session', 
+                role: 'viewer' 
+            });
+            // Ensure Project is off
+            if (activeProjectId) setActiveProjectId(null);
         } else {
-            setCurrentProject(null);
+            // My Session (Default)
+            setCurrentProject(null); // Indicates "My Session" in UI
         }
-    }, [activeProjectId, projects]);
+    }, [activeProjectId, activeSessionUid, projects, usersList]);
 
     const handleCreateProject = () => { alert("Create project via Files page"); setIsCreatingProject(false); };
-    // [FIX] Used 'id' to satisfy unused variable check
     const handleDeleteProject = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         alert(`Please delete project ${id} from the Files Dashboard.`);
@@ -72,15 +97,19 @@ const Loadflow = ({ user }: { user: any }) => {
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
-            {/* 1. SIDEBAR (Same as Files) */}
+            {/* FULLY FUNCTIONAL SIDEBAR */}
             <ProjectsSidebar 
                 user={user}
                 userGlobalData={user}
                 projects={projects}
+                usersList={usersList} // [!] Passed for Admin View
+                
                 activeProjectId={activeProjectId}
                 setActiveProjectId={setActiveProjectId}
-                activeSessionUid={null}
-                setActiveSessionUid={() => {}} 
+                
+                activeSessionUid={activeSessionUid}
+                setActiveSessionUid={setActiveSessionUid} // [!] Passed for Session switching
+                
                 isCreatingProject={isCreatingProject}
                 setIsCreatingProject={setIsCreatingProject}
                 newProjectName={newProjectName}
@@ -89,7 +118,6 @@ const Loadflow = ({ user }: { user: any }) => {
                 onDeleteProject={handleDeleteProject}
             />
 
-            {/* 2. MAIN CONTENT (No Top Header, Toolbar is first element) */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
                 
                 <LoadflowToolbar 
@@ -98,7 +126,7 @@ const Loadflow = ({ user }: { user: any }) => {
                     onlyWinners={onlyWinners}
                     setOnlyWinners={setOnlyWinners}
                     count={filteredResults.length}
-                    project={currentProject}
+                    project={currentProject} // Null implies "My Session"
                     showHistory={showHistory}
                     onToggleHistory={() => setShowHistory(!showHistory)}
                 />
@@ -115,8 +143,10 @@ const Loadflow = ({ user }: { user: any }) => {
                         {!loading && results.length === 0 && !error && (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                 <Icons.Activity className="w-16 h-16 mb-4 opacity-20" />
-                                <p className="text-xs font-bold uppercase tracking-widest">Ready to analyze</p>
-                                <p className="text-[10px] mt-1">Select a project and press Run</p>
+                                <p className="text-xs font-bold uppercase tracking-widest">
+                                    {currentProject ? `Ready to analyze ${currentProject.name}` : "Ready to analyze Session"}
+                                </p>
+                                <p className="text-[10px] mt-1">Press Run to start</p>
                             </div>
                         )}
 
