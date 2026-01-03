@@ -139,7 +139,7 @@ export const useLoadflow = (currentProjectId: string | undefined, currentProject
             // Handle different JSON structures (Array or Object wrapper)
             if (Array.isArray(json)) setResults(json);
             else if (json.results) setResults(json.results);
-            else if (Array.isArray(json.data)) setResults(json.data); # Safety fallback
+            else if (Array.isArray(json.data)) setResults(json.data); // Safety fallback
             else throw new Error("Invalid JSON Format");
 
         } catch (err: any) {
