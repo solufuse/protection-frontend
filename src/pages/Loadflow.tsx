@@ -52,7 +52,7 @@ export default function Loadflow({ user }: { user: any }) {
   
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]); 
-  const [showHistory, setShowHistory] = useState(false); // Default hidden, toggled by button
+  const [showHistory, setShowHistory] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   
@@ -99,21 +99,23 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
 
-  // [LOGIC FIX] Helper to generate the URL suffix. 
-  // If Project -> return "&project_id=XYZ"
-  // If Session -> return "" (Backend uses Token to find UID folder)
-  const getQueryParam = () => {
-      if (activeProjectId) return `&project_id=${activeProjectId}`;
-      return ""; // My Session = No param
+  // [CRITICAL LOGIC] Determine Target ID (Project OR User UID)
+  // If activeProjectId -> use it.
+  // If activeSessionUid -> use it (Admin viewing session).
+  // If neither -> use user.uid (Default My Session).
+  const getTargetId = () => {
+      if (activeProjectId) return activeProjectId;
+      if (activeSessionUid) return activeSessionUid;
+      return user?.uid; 
   };
 
   const cleanOldScenarios = async (rootName: string) => { 
-      if (!activeProjectId && !activeSessionUid) return; 
       try { 
           const t = await getToken(); 
-          // Use helper to determine if we send project_id or not
-          const query = getQueryParam().replace('&', '?'); // Handle first param syntax
-          const url = `${API_URL}/files/details${query}`;
+          const targetId = getTargetId();
+          if (!targetId) return;
+
+          let url = `${API_URL}/files/details?project_id=${targetId}`;
           
           const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
           if (!listRes.ok) return; 
@@ -125,10 +127,8 @@ export default function Loadflow({ user }: { user: any }) {
           if (files.length > MAX_HISTORY) { 
               const filesToDelete = files.slice(MAX_HISTORY); 
               for (const file of filesToDelete) { 
-                  let delUrl = `${API_URL}/files/file/${file.filename}`;
-                  // Append correct param
-                  if (activeProjectId) delUrl += `?project_id=${activeProjectId}`;
-                  
+                  // Use targetId as project_id for deletion too
+                  let delUrl = `${API_URL}/files/file/${file.filename}?project_id=${targetId}`;
                   await fetch(delUrl, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); 
               } 
           } 
@@ -158,18 +158,14 @@ export default function Loadflow({ user }: { user: any }) {
   
   const detectAndLoadResults = useCallback(async () => { 
       if (!user) return; 
-      if (!activeProjectId && !activeSessionUid) return; 
+      // Always calculate targetId (don't return early if null, user.uid is fallback)
+      const targetId = activeProjectId || activeSessionUid || user.uid;
+      
       setLoading(true); 
       setResults(null); 
       try { 
           const t = await getToken(); 
-          
-          // [FIX] Use Logic
-          let query = "";
-          if (activeProjectId) query = `?project_id=${activeProjectId}`;
-          // Session = empty query
-          
-          let url = `${API_URL}/files/details${query}`;
+          let url = `${API_URL}/files/details?project_id=${targetId}`;
 
           const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
           if (!listRes.ok) throw new Error("Failed to list files"); 
@@ -178,7 +174,6 @@ export default function Loadflow({ user }: { user: any }) {
           const files = listData.files || []; 
           const jsonFiles = files.filter((f: any) => f.filename.toLowerCase().endsWith('.json') && !f.filename.includes('config.json')); 
           
-          // Sync History Sidebar
           setHistoryFiles(jsonFiles.map((f: any) => ({ name: f.filename, date: f.uploaded_at })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
           if (jsonFiles.length === 0) { setLoading(false); return; } 
@@ -187,8 +182,8 @@ export default function Loadflow({ user }: { user: any }) {
           
           for (const candidate of jsonFiles) { 
               try { 
-                  let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}`;
-                  if (activeProjectId) prevUrl += `&project_id=${activeProjectId}`;
+                  // Pass targetId as project_id
+                  let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}&project_id=${targetId}`;
 
                   const dataRes = await fetch(prevUrl); 
                   if (dataRes.ok) { 
@@ -221,7 +216,7 @@ export default function Loadflow({ user }: { user: any }) {
   useEffect(() => { 
       let mounted = true; 
       if (user && mounted) { 
-          if (activeProjectId || activeSessionUid) detectAndLoadResults(); 
+          detectAndLoadResults(); 
       } 
       return () => { mounted = false; }; 
   }, [activeProjectId, activeSessionUid, user]); 
@@ -235,8 +230,10 @@ export default function Loadflow({ user }: { user: any }) {
           let jsonFilename = targetName;
           if (!jsonFilename.endsWith('.json')) jsonFilename += '.json';
           
-          let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}`;
-          if (activeProjectId) url += `&project_id=${activeProjectId}`;
+          const targetId = getTargetId();
+          
+          // Pass targetId as project_id
+          let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}&project_id=${targetId}`;
 
           const dataRes = await fetch(url); 
           if (!dataRes.ok) throw new Error("No results found."); 
@@ -248,7 +245,8 @@ export default function Loadflow({ user }: { user: any }) {
 
   const handleRunAnalysis = async () => { 
       if (!user) return; 
-      if (!activeProjectId && !activeSessionUid) return notify("Select a context first", "error");
+      // No blocker here, we always have at least user.uid
+      const targetId = getTargetId();
       
       setLoading(true); 
       setResults(null); 
@@ -258,9 +256,8 @@ export default function Loadflow({ user }: { user: any }) {
           const t = await getToken(); 
           const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 20) || "lf_run"; 
           
-          let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}`;
-          // [FIX] Don't send project_id for Sessions
-          if (activeProjectId) url += `&project_id=${activeProjectId}`;
+          // Force sending project_id even for sessions (User UID)
+          let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}&project_id=${targetId}`;
 
           const runRes = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } }); 
           
@@ -324,7 +321,6 @@ export default function Loadflow({ user }: { user: any }) {
           
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
           
-          {/* [NEW] Archive Button */}
           <button 
             onClick={() => setShowHistory(!showHistory)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded border font-bold transition-all text-[10px] ${
