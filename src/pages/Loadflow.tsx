@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Icons } from '../icons'; // Safe import matching Files.tsx
+import { Icons } from '../icons'; 
 import Toast from '../components/Toast';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import GlobalRoleBadge from '../components/GlobalRoleBadge';
@@ -52,7 +52,7 @@ export default function Loadflow({ user }: { user: any }) {
   
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]); 
-  const [showHistory, setShowHistory] = useState(true);
+  const [showHistory, setShowHistory] = useState(false); // Default hidden, toggled by button
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   
@@ -99,21 +99,21 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
 
-  // Helper to determine the Target Folder ID (Project ID or Session UID)
-  const getTargetContextId = () => {
-      if (activeProjectId) return activeProjectId;
-      if (activeSessionUid) return activeSessionUid;
-      return null;
+  // [LOGIC FIX] Helper to generate the URL suffix. 
+  // If Project -> return "&project_id=XYZ"
+  // If Session -> return "" (Backend uses Token to find UID folder)
+  const getQueryParam = () => {
+      if (activeProjectId) return `&project_id=${activeProjectId}`;
+      return ""; // My Session = No param
   };
 
   const cleanOldScenarios = async (rootName: string) => { 
-      const targetId = getTargetContextId();
-      if (!targetId) return; 
-
+      if (!activeProjectId && !activeSessionUid) return; 
       try { 
           const t = await getToken(); 
-          // [FIX] Always send project_id (which is either Project ID or Session UID)
-          let url = `${API_URL}/files/details?project_id=${targetId}`;
+          // Use helper to determine if we send project_id or not
+          const query = getQueryParam().replace('&', '?'); // Handle first param syntax
+          const url = `${API_URL}/files/details${query}`;
           
           const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
           if (!listRes.ok) return; 
@@ -122,12 +122,13 @@ export default function Loadflow({ user }: { user: any }) {
           const files = (listData.files || []).filter((f: any) => f.filename.includes(rootName + "_") && f.filename.endsWith(".json")); 
           files.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
-          setHistoryFiles(files.map((f: any) => ({ name: f.filename, date: f.uploaded_at })));
-
           if (files.length > MAX_HISTORY) { 
               const filesToDelete = files.slice(MAX_HISTORY); 
               for (const file of filesToDelete) { 
-                  let delUrl = `${API_URL}/files/file/${file.filename}?project_id=${targetId}`; 
+                  let delUrl = `${API_URL}/files/file/${file.filename}`;
+                  // Append correct param
+                  if (activeProjectId) delUrl += `?project_id=${activeProjectId}`;
+                  
                   await fetch(delUrl, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); 
               } 
           } 
@@ -157,17 +158,18 @@ export default function Loadflow({ user }: { user: any }) {
   
   const detectAndLoadResults = useCallback(async () => { 
       if (!user) return; 
-      // Use logic to get ID locally inside callback or pass as dep
-      // We rely on state activeProjectId / activeSessionUid
-      const targetId = activeProjectId || activeSessionUid;
-      if (!targetId) return; 
-
+      if (!activeProjectId && !activeSessionUid) return; 
       setLoading(true); 
       setResults(null); 
       try { 
           const t = await getToken(); 
-          // [FIX] Explicitly send project_id={targetId}
-          let url = `${API_URL}/files/details?project_id=${targetId}`;
+          
+          // [FIX] Use Logic
+          let query = "";
+          if (activeProjectId) query = `?project_id=${activeProjectId}`;
+          // Session = empty query
+          
+          let url = `${API_URL}/files/details${query}`;
 
           const listRes = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } }); 
           if (!listRes.ok) throw new Error("Failed to list files"); 
@@ -176,7 +178,7 @@ export default function Loadflow({ user }: { user: any }) {
           const files = listData.files || []; 
           const jsonFiles = files.filter((f: any) => f.filename.toLowerCase().endsWith('.json') && !f.filename.includes('config.json')); 
           
-          // Update History
+          // Sync History Sidebar
           setHistoryFiles(jsonFiles.map((f: any) => ({ name: f.filename, date: f.uploaded_at })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
           if (jsonFiles.length === 0) { setLoading(false); return; } 
@@ -185,7 +187,8 @@ export default function Loadflow({ user }: { user: any }) {
           
           for (const candidate of jsonFiles) { 
               try { 
-                  let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}&project_id=${targetId}`;
+                  let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}`;
+                  if (activeProjectId) prevUrl += `&project_id=${activeProjectId}`;
 
                   const dataRes = await fetch(prevUrl); 
                   if (dataRes.ok) { 
@@ -225,9 +228,6 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleManualLoad = async (overrideName?: string) => { 
       if (!user) return; 
-      const targetId = getTargetContextId();
-      if (!targetId) return;
-
       setLoading(true); 
       try { 
           const t = await getToken(); 
@@ -235,8 +235,8 @@ export default function Loadflow({ user }: { user: any }) {
           let jsonFilename = targetName;
           if (!jsonFilename.endsWith('.json')) jsonFilename += '.json';
           
-          // [FIX] Send project_id={targetId}
-          let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}&project_id=${targetId}`;
+          let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}`;
+          if (activeProjectId) url += `&project_id=${activeProjectId}`;
 
           const dataRes = await fetch(url); 
           if (!dataRes.ok) throw new Error("No results found."); 
@@ -248,8 +248,7 @@ export default function Loadflow({ user }: { user: any }) {
 
   const handleRunAnalysis = async () => { 
       if (!user) return; 
-      const targetId = getTargetContextId();
-      if (!targetId) return notify("Select a context first", "error");
+      if (!activeProjectId && !activeSessionUid) return notify("Select a context first", "error");
       
       setLoading(true); 
       setResults(null); 
@@ -259,8 +258,9 @@ export default function Loadflow({ user }: { user: any }) {
           const t = await getToken(); 
           const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 20) || "lf_run"; 
           
-          // [FIX] Force project_id param even for sessions (UID is passed as project_id)
-          let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}&project_id=${targetId}`;
+          let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}`;
+          // [FIX] Don't send project_id for Sessions
+          if (activeProjectId) url += `&project_id=${activeProjectId}`;
 
           const runRes = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } }); 
           
@@ -323,8 +323,23 @@ export default function Loadflow({ user }: { user: any }) {
           <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wide mr-2">_TIMESTAMP.json</span>
           
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
+          
+          {/* [NEW] Archive Button */}
+          <button 
+            onClick={() => setShowHistory(!showHistory)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded border font-bold transition-all text-[10px] ${
+                showHistory 
+                ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-200 border-blue-200 dark:border-blue-700' 
+                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Icons.Archive className="w-3.5 h-3.5" /> RESULTS ARCHIVE
+          </button>
+
           <button onClick={handleCopyToken} className="flex items-center gap-1 bg-white dark:bg-slate-800 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-yellow-600 font-bold transition-colors"><Icons.Key className="w-3.5 h-3.5" /> TOKEN</button>
+          
           <button onClick={() => handleManualLoad()} disabled={loading} className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 px-4 py-1.5 rounded font-bold shadow-sm disabled:opacity-50 transition-all border border-slate-300 dark:border-slate-600"><Icons.Search className="w-3.5 h-3.5" /> LOAD</button>
+          
           <button onClick={handleRunAnalysis} disabled={loading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded font-black shadow-sm disabled:opacity-50 transition-all">{loading ? <Icons.Activity className="w-3.5 h-3.5 animate-spin"/> : <Icons.Play className="w-3.5 h-3.5 fill-current" />} {loading ? "CALCULATING..." : "RUN"}</button>
         </div>
       </div>
