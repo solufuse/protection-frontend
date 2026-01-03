@@ -52,7 +52,7 @@ export default function Loadflow({ user }: { user: any }) {
   
   const [toast, setToast] = useState<{show: boolean, msg: string, type: 'success' | 'error'}>({ show: false, msg: '', type: 'success' });
   const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]); 
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(false); // Controls Modal Visibility
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   
@@ -99,15 +99,11 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
 
-  // [CRITICAL LOGIC] 
-  // Returns the ID to send as 'project_id' to the backend.
-  // 1. If Project Selected -> Return Project ID (e.g. "UID_ProjectName")
-  // 2. If Session Selected (Admin viewing User) -> Return that User's UID
-  // 3. If My Session (Default) -> Return MY UID
+  // Determine Target ID (Project OR User UID)
   const getTargetId = () => {
       if (activeProjectId) return activeProjectId;
       if (activeSessionUid) return activeSessionUid;
-      return user?.uid; // Fallback to current user's UID for "My Session"
+      return user?.uid; 
   };
 
   const cleanOldScenarios = async (rootName: string) => { 
@@ -158,7 +154,6 @@ export default function Loadflow({ user }: { user: any }) {
   
   const detectAndLoadResults = useCallback(async () => { 
       if (!user) return; 
-      
       const targetId = activeProjectId || activeSessionUid || user.uid;
       
       setLoading(true); 
@@ -223,6 +218,9 @@ export default function Loadflow({ user }: { user: any }) {
   const handleManualLoad = async (overrideName?: string) => { 
       if (!user) return; 
       setLoading(true); 
+      // Close modal when loading a file manually
+      setShowHistory(false); 
+      
       try { 
           const t = await getToken(); 
           let targetName = overrideName || baseName;
@@ -243,7 +241,6 @@ export default function Loadflow({ user }: { user: any }) {
 
   const handleRunAnalysis = async () => { 
       if (!user) return; 
-      
       const targetId = getTargetId();
       if (!targetId) return notify("Context Error: No ID found", "error");
 
@@ -255,7 +252,6 @@ export default function Loadflow({ user }: { user: any }) {
           const t = await getToken(); 
           const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 20) || "lf_run"; 
           
-          // [FIX] Explicitly sending project_id={targetId} (UID or Project)
           let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}&project_id=${targetId}`;
 
           const runRes = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } }); 
@@ -304,7 +300,7 @@ export default function Loadflow({ user }: { user: any }) {
   const toggleRow = (idx: number) => { const newSet = new Set(expandedRows); if (newSet.has(idx)) newSet.delete(idx); else newSet.add(idx); setExpandedRows(newSet); };
 
   return (
-    <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
+    <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col relative">
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
         <div className="flex flex-col">
           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">System Analysis {userGlobalData && <GlobalRoleBadge role={userGlobalData.global_role} />}</label>
@@ -320,13 +316,10 @@ export default function Loadflow({ user }: { user: any }) {
           
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
           
+          {/* RESULTS ARCHIVE TOGGLE BUTTON */}
           <button 
-            onClick={() => setShowHistory(!showHistory)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded border font-bold transition-all text-[10px] ${
-                showHistory 
-                ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-200 border-blue-200 dark:border-blue-700' 
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
-            }`}
+            onClick={() => setShowHistory(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded border font-bold transition-all text-[10px] bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
           >
             <Icons.Archive className="w-3.5 h-3.5" /> RESULTS ARCHIVE
           </button>
@@ -397,48 +390,78 @@ export default function Loadflow({ user }: { user: any }) {
         </div>
       </div>
       {selectedCase && <div className="hidden">Selected Case for Debug: {selectedCase.filename}</div>}
+      
+      {/* MODAL ARCHIVE (Pop-up Overlay) */}
       {showHistory && (
-        <aside className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col shadow-xl z-20">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
-                <div>
-                    <h2 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                        <Icons.Archive className="w-4 h-4" />
-                        Results Archive
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-1">
-                        Click to load previous runs
-                    </p>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg border border-slate-200 dark:border-slate-700 flex flex-col max-h-[80vh] overflow-hidden animate-in zoom-in-95 duration-200">
+                
+                {/* Header */}
+                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                    <div>
+                        <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                            <Icons.Archive className="w-4 h-4 text-blue-600" />
+                            Results Archive
+                        </h2>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            Select a previous run to load
+                        </p>
+                    </div>
+                    <button 
+                        onClick={() => setShowHistory(false)} 
+                        className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500"
+                    >
+                        <Icons.X className="w-4 h-4" />
+                    </button>
                 </div>
-                <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded">
-                    <Icons.X className="w-4 h-4 text-slate-500" />
-                </button>
+
+                {/* Content List */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-white dark:bg-slate-900">
+                    {historyFiles.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-xs">
+                            <Icons.Inbox className="w-8 h-8 mb-2 opacity-20" />
+                            No archived results found.
+                        </div>
+                    ) : (
+                        historyFiles.map((file, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => handleManualLoad(file.name)}
+                                className="w-full text-left p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-800/50 transition-all group border border-transparent hover:border-blue-100 dark:hover:border-slate-700 flex items-center justify-between"
+                            >
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400 shrink-0 group-hover:scale-110 transition-transform">
+                                        <Icons.FileJson className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
+                                            {file.name.replace('.json', '')}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                                            <Icons.Calendar className="w-3 h-3" />
+                                            {new Date(file.date).toLocaleString()}
+                                        </div>
+                                    </div>
+                                </div>
+                                <Icons.ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                            </button>
+                        ))
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-right">
+                    <button 
+                        onClick={() => setShowHistory(false)}
+                        className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
+                    >
+                        Close
+                    </button>
+                </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {historyFiles.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400 text-sm">No archives found</div>
-                ) : (
-                    historyFiles.map((file, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => handleManualLoad(file.name)}
-                            className="w-full text-left p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors group border border-transparent hover:border-blue-100 dark:hover:border-slate-600"
-                        >
-                            <div className="flex items-center gap-2 mb-1">
-                                <Icons.FileJson className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
-                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate w-full">
-                                    {file.name.replace('.json', '')}
-                                </span>
-                            </div>
-                            <div className="flex justify-between items-center text-[10px] text-slate-400 pl-6">
-                                <span>{new Date(file.date).toLocaleDateString()}</span>
-                                <Icons.ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                        </button>
-                    ))
-                )}
-            </div>
-        </aside>
+        </div>
       )}
+
       {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );
