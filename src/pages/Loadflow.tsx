@@ -16,7 +16,7 @@ interface LoadflowResult {
 interface LoadflowResponse { 
     status: string; 
     results: LoadflowResult[]; 
-    filename?: string; // [!] Added to type definition for backend response
+    filename?: string; 
 }
 
 const extractLoadNumber = (rev: string | undefined) => {
@@ -25,16 +25,14 @@ const extractLoadNumber = (rev: string | undefined) => {
     return match ? parseInt(match[0]) : 0;
 };
 
-// [FIX] Removed getTimestampSuffix - Backend handles this now
-
 const LINE_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#6366f1", "#84cc16"];
 
 export default function Loadflow({ user }: { user: any }) {
   // --- STATE ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null); // [!] Restore Session Support
-  const [usersList, setUsersList] = useState<UserSummary[]>([]); // [!] Restore Admin List
+  const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
+  const [usersList, setUsersList] = useState<UserSummary[]>([]);
   
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -55,10 +53,9 @@ export default function Loadflow({ user }: { user: any }) {
   
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   
-  // Logic to determine current role context (Project vs Session)
   const currentProjectRole = activeProjectId 
       ? projects.find(p => p.id === activeProjectId)?.role 
-      : 'owner'; // Session is always owner
+      : 'owner';
 
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
@@ -67,8 +64,6 @@ export default function Loadflow({ user }: { user: any }) {
   const fetchGlobalProfile = async () => { 
       try { 
           const t = await getToken(); 
-          // Use /users/ endpoint or /admin/me if available, logic adapted from Files.tsx
-          // Assuming user prop has basics, but we try to fetch more if needed
           if (['super_admin', 'admin', 'moderator'].includes(user.global_role)) {
              const res = await fetch(`${API_URL}/users/`, { headers: { 'Authorization': `Bearer ${t}` } });
              if (res.ok) {
@@ -93,11 +88,15 @@ export default function Loadflow({ user }: { user: any }) {
 
   // --- ACTIONS ---
   const createProject = async () => { notify("Please use the Files Dashboard to create projects.", "error"); setIsCreatingProject(false); };
-  const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); notify("Please use the Files Dashboard to delete projects.", "error"); };
+  
+  // [FIX] Used projId in the string
+  const deleteProject = async (projId: string, e: React.MouseEvent) => { 
+      e.stopPropagation(); 
+      notify(`Please use the Files Dashboard to delete project: ${projId}`, "error"); 
+  };
   
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
 
-  // Clean old scenarios logic (Updated to match backend naming if needed, but mostly relies on list)
   const cleanOldScenarios = async (rootName: string) => { 
       if (!activeProjectId && !activeSessionUid) return; 
       try { 
@@ -147,7 +146,6 @@ export default function Loadflow({ user }: { user: any }) {
       setResults(data); 
   };
   
-  // Auto-load Logic
   const detectAndLoadResults = useCallback(async () => { 
       if (!user) return; 
       if (!activeProjectId && !activeSessionUid) return; 
@@ -164,14 +162,12 @@ export default function Loadflow({ user }: { user: any }) {
           
           const listData = await listRes.json(); 
           const files = listData.files || []; 
-          // Look for JSONs (excluding config) and prioritize 'loadflow_results' if possible
           const jsonFiles = files.filter((f: any) => f.filename.toLowerCase().endsWith('.json') && f.filename.toLowerCase() !== 'config.json'); 
           
           if (jsonFiles.length === 0) { setLoading(false); return; } 
           
           jsonFiles.sort((a: any, b: any) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()); 
           
-          // Try loading the most recent valid result
           for (const candidate of jsonFiles) { 
               try { 
                   let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}`;
@@ -198,7 +194,6 @@ export default function Loadflow({ user }: { user: any }) {
       } catch (e: any) { console.warn("Auto-load failed", e); } finally { setLoading(false); } 
   }, [user, activeProjectId, activeSessionUid, API_URL]);
 
-  // Sidebar Selection Logic (Mutual Exclusivity)
   useEffect(() => {
       if (activeProjectId && activeSessionUid) setActiveSessionUid(null);
   }, [activeProjectId]);
@@ -220,16 +215,9 @@ export default function Loadflow({ user }: { user: any }) {
       setLoading(true); 
       try { 
           const t = await getToken(); 
-          
           let targetName = overrideName || baseName;
-          // [FIX] Ensure we handle the folder path if returned by backend, or stripped
-          // Backend returns filename like "name_timestamp.json", preview needs full path usually or just name if flat
-          // Since we moved to /loadflow_results folder in backend, ingestion/preview might need adjustment or filename must include folder
-          // However, ingestion/preview usually searches. Let's try passing the exact filename if we have it.
-          
           let jsonFilename = targetName;
           if (!jsonFilename.endsWith('.json')) jsonFilename += '.json';
-          // If the backend returned a path "loadflow_results/file.json", use it. Otherwise rely on search.
           
           let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}`;
           if (activeProjectId) url += `&project_id=${activeProjectId}`;
@@ -253,14 +241,10 @@ export default function Loadflow({ user }: { user: any }) {
       
       try { 
           const t = await getToken(); 
-          
-          // [FIX] No timestamp generation here! Just clean the base name.
           const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 20) || "lf_run"; 
           
           let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}`;
           if (activeProjectId) url += `&project_id=${activeProjectId}`;
-          // Session is implied by token usually, or if Admin viewing session, backend needs logic. 
-          // For now assume standard flow.
 
           const runRes = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } }); 
           
@@ -268,7 +252,6 @@ export default function Loadflow({ user }: { user: any }) {
           
           const runData: LoadflowResponse = await runRes.json();
           
-          // [FIX] Use the filename returned by the backend to load the result
           if (runData.filename) {
               await handleManualLoad(runData.filename);
               if (activeProjectId || activeSessionUid) cleanOldScenarios(cleanBaseName);
@@ -320,7 +303,6 @@ export default function Loadflow({ user }: { user: any }) {
         <div className="flex gap-2 items-center">
           <input value={baseName} onChange={(e) => setBaseName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleManualLoad()} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 w-40 text-right font-bold text-slate-600 dark:text-slate-200 focus:ring-1 focus:ring-yellow-500 outline-none" placeholder="Analysis Name"/>
           
-          {/* [FIX] Keeping the text for user info, but logic is handled by backend */}
           <span className="text-slate-400 font-bold text-[9px] uppercase tracking-wide mr-2">_TIMESTAMP.json</span>
           
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
