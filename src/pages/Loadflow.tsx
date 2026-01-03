@@ -99,14 +99,15 @@ export default function Loadflow({ user }: { user: any }) {
   
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } else { notify("No token available", "error"); } };
 
-  // [CRITICAL LOGIC] Determine Target ID (Project OR User UID)
-  // If activeProjectId -> use it.
-  // If activeSessionUid -> use it (Admin viewing session).
-  // If neither -> use user.uid (Default My Session).
+  // [CRITICAL LOGIC] 
+  // Returns the ID to send as 'project_id' to the backend.
+  // 1. If Project Selected -> Return Project ID (e.g. "UID_ProjectName")
+  // 2. If Session Selected (Admin viewing User) -> Return that User's UID
+  // 3. If My Session (Default) -> Return MY UID
   const getTargetId = () => {
       if (activeProjectId) return activeProjectId;
       if (activeSessionUid) return activeSessionUid;
-      return user?.uid; 
+      return user?.uid; // Fallback to current user's UID for "My Session"
   };
 
   const cleanOldScenarios = async (rootName: string) => { 
@@ -127,7 +128,6 @@ export default function Loadflow({ user }: { user: any }) {
           if (files.length > MAX_HISTORY) { 
               const filesToDelete = files.slice(MAX_HISTORY); 
               for (const file of filesToDelete) { 
-                  // Use targetId as project_id for deletion too
                   let delUrl = `${API_URL}/files/file/${file.filename}?project_id=${targetId}`;
                   await fetch(delUrl, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); 
               } 
@@ -158,7 +158,7 @@ export default function Loadflow({ user }: { user: any }) {
   
   const detectAndLoadResults = useCallback(async () => { 
       if (!user) return; 
-      // Always calculate targetId (don't return early if null, user.uid is fallback)
+      
       const targetId = activeProjectId || activeSessionUid || user.uid;
       
       setLoading(true); 
@@ -182,7 +182,6 @@ export default function Loadflow({ user }: { user: any }) {
           
           for (const candidate of jsonFiles) { 
               try { 
-                  // Pass targetId as project_id
                   let prevUrl = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(candidate.filename)}&token=${t}&project_id=${targetId}`;
 
                   const dataRes = await fetch(prevUrl); 
@@ -232,7 +231,6 @@ export default function Loadflow({ user }: { user: any }) {
           
           const targetId = getTargetId();
           
-          // Pass targetId as project_id
           let url = `${API_URL}/ingestion/preview?filename=${encodeURIComponent(jsonFilename)}&token=${t}&project_id=${targetId}`;
 
           const dataRes = await fetch(url); 
@@ -245,9 +243,10 @@ export default function Loadflow({ user }: { user: any }) {
 
   const handleRunAnalysis = async () => { 
       if (!user) return; 
-      // No blocker here, we always have at least user.uid
-      const targetId = getTargetId();
       
+      const targetId = getTargetId();
+      if (!targetId) return notify("Context Error: No ID found", "error");
+
       setLoading(true); 
       setResults(null); 
       setSelectedCase(null); 
@@ -256,7 +255,7 @@ export default function Loadflow({ user }: { user: any }) {
           const t = await getToken(); 
           const cleanBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 20) || "lf_run"; 
           
-          // Force sending project_id even for sessions (User UID)
+          // [FIX] Explicitly sending project_id={targetId} (UID or Project)
           let url = `${API_URL}/loadflow/run-and-save?basename=${cleanBaseName}&project_id=${targetId}`;
 
           const runRes = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` } }); 
