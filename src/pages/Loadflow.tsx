@@ -7,7 +7,6 @@ import { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react'; 
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import { useLoadflow } from '../hooks/useLoadflow';
-import ContextRoleBadge from '../components/ContextRoleBadge';
 
 // Imported Modular Components
 import LoadflowToolbar from '../components/Loadflow/LoadflowToolbar';
@@ -17,10 +16,10 @@ import HistorySidebar from '../components/Loadflow/HistorySidebar';
 const Loadflow = ({ user }: { user: any }) => {
     // --- SIDEBAR STATE (FULL PARITY) ---
     const [projects, setProjects] = useState<Project[]>([]);
-    const [usersList, setUsersList] = useState<UserSummary[]>([]); // [!] Added for Admin View
+    const [usersList, setUsersList] = useState<UserSummary[]>([]);
     
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-    const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null); // [!] Added for Session View
+    const [activeSessionUid, setActiveSessionUid] = useState<string | null>(null);
     
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [newProjectName, setNewProjectName] = useState("");
@@ -48,8 +47,7 @@ const Loadflow = ({ user }: { user: any }) => {
                 const projRes = await fetch("https://api.solufuse.com/projects/", { headers });
                 if (projRes.ok) setProjects(await projRes.json());
 
-                // 2. Fetch Users (If Admin/Staff) - for the "Sessions" section
-                // [decision:logic] Only try if user has role (optimization)
+                // 2. Fetch Users (If Admin/Staff)
                 if (['super_admin', 'admin', 'moderator'].includes(user.global_role)) {
                     const usersRes = await fetch("https://api.solufuse.com/users/", { headers });
                     if (usersRes.ok) setUsersList(await usersRes.json());
@@ -66,21 +64,19 @@ const Loadflow = ({ user }: { user: any }) => {
             // Project Mode
             const p = projects.find(proj => proj.id === activeProjectId);
             if (p) setCurrentProject(p);
-            // Ensure Session is off
             if (activeSessionUid) setActiveSessionUid(null);
         } else if (activeSessionUid) {
-            // Session Mode (Admin viewing user session)
+            // Session Mode
             const u = usersList.find(usr => usr.uid === activeSessionUid);
             setCurrentProject({ 
                 id: 'SESSION', 
                 name: u ? `${u.username || 'User'}'s Session` : 'User Session', 
                 role: 'viewer' 
             });
-            // Ensure Project is off
             if (activeProjectId) setActiveProjectId(null);
         } else {
             // My Session (Default)
-            setCurrentProject(null); // Indicates "My Session" in UI
+            setCurrentProject(null);
         }
     }, [activeProjectId, activeSessionUid, projects, usersList]);
 
@@ -102,13 +98,13 @@ const Loadflow = ({ user }: { user: any }) => {
                 user={user}
                 userGlobalData={user}
                 projects={projects}
-                usersList={usersList} // [!] Passed for Admin View
+                usersList={usersList}
                 
                 activeProjectId={activeProjectId}
                 setActiveProjectId={setActiveProjectId}
                 
                 activeSessionUid={activeSessionUid}
-                setActiveSessionUid={setActiveSessionUid} // [!] Passed for Session switching
+                setActiveSessionUid={setActiveSessionUid}
                 
                 isCreatingProject={isCreatingProject}
                 setIsCreatingProject={setIsCreatingProject}
@@ -126,7 +122,7 @@ const Loadflow = ({ user }: { user: any }) => {
                     onlyWinners={onlyWinners}
                     setOnlyWinners={setOnlyWinners}
                     count={filteredResults.length}
-                    project={currentProject} // Null implies "My Session"
+                    project={currentProject} 
                     showHistory={showHistory}
                     onToggleHistory={() => setShowHistory(!showHistory)}
                 />
