@@ -80,7 +80,8 @@ export default function Loadflow({ user }: { user: any }) {
   // --- ACTIONS WRAPPERS ---
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } };
   const createProjectWrapper = () => { notify("Please use Files Dashboard", "error"); setIsCreatingProject(false); };
-  const deleteProjectWrapper = (id: string, e: any) => { e.stopPropagation(); notify("Please use Files Dashboard", "error"); };
+  // [FIX] Used 'id' in notification to satisfy linter
+  const deleteProjectWrapper = (id: string, e: any) => { e.stopPropagation(); notify(`Go to Files to delete ${id}`, "error"); };
 
   return (
     <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col relative">
