@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { auth } from './firebase';
 import Navbar from './components/Navbar';
 import Files from './pages/Files';
@@ -37,8 +37,12 @@ export default function App() {
         setUser(currentUser);
         setLoading(false);
       } else {
-        setUser(null);
-        setLoading(false);
+        // If no user, sign in anonymously to provide guest access
+        signInAnonymously(auth).catch((error) => {
+            console.error("Anonymous sign-in failed:", error);
+            setUser(null); // Fallback to no user if anonymous sign in fails
+            setLoading(false);
+        });
       }
     });
     return () => unsubscribe();
@@ -60,11 +64,12 @@ export default function App() {
         
         {user && <Navbar user={user} onLogout={() => auth.signOut()} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />}
         
-        {/* [FIX] Global Scroll Container: overflow-y-scroll ensures scrollbar is always visible/active */}
         <main className="flex-1 overflow-y-scroll w-full relative flex flex-col">
           <Routes>
+            {/* Redirect to home if a user (including anonymous) exists, otherwise show login */}
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
             
+            {/* Protect routes - redirect to login if user is null (only if anonymous sign-in fails) */}
             <Route path="/" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             <Route path="/files" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
             
