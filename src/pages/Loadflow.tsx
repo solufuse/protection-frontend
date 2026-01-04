@@ -42,8 +42,59 @@ export default function Loadflow({ user }: { user: any }) {
   const currentProjectRole = activeProjectId ? projects.find(p => p.id === activeProjectId)?.role : 'owner';
 
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
+
+  // --- PROJECT MANAGEMENT LOGIC (Ported from Files.tsx) ---
+
+  const fetchProjects = async () => { 
+      try { 
+          const t = await getToken(); 
+          const res = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } }); 
+          if (res.ok) setProjects(await res.json()); 
+      } catch (e) { console.error("Failed to fetch projects", e); } 
+  };
+
+  const createProject = async () => { 
+      if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); 
+      if (!newProjectName.trim()) return; 
+      try { 
+          const t = await getToken(); 
+          const res = await fetch(`${API_URL}/projects/create`, { 
+              method: 'POST', 
+              headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, 
+              body: JSON.stringify({ id: newProjectName, name: newProjectName }) 
+          }); 
+          if (!res.ok) { 
+              const err = await res.json(); 
+              throw new Error(err.detail); 
+          } 
+          notify("Project Created"); 
+          setNewProjectName(""); 
+          setIsCreatingProject(false); 
+          fetchProjects(); 
+      } catch (e: any) { 
+          notify(e.message || "Failed", "error"); 
+      } 
+  };
+
+  const deleteProject = async (projId: string, e: React.MouseEvent) => { 
+      e.stopPropagation(); 
+      if (!confirm(`Delete project "${projId}" permanently?`)) return; 
+      try { 
+          const t = await getToken(); 
+          const res = await fetch(`${API_URL}/projects/${projId}`, { 
+              method: 'DELETE', 
+              headers: { 'Authorization': `Bearer ${t}` } 
+          }); 
+          if (!res.ok) throw new Error(); 
+          notify("Project Deleted"); 
+          if (activeProjectId === projId) setActiveProjectId(null); 
+          fetchProjects(); 
+      } catch (e) { 
+          notify("Delete failed", "error"); 
+      } 
+  };
   
-  // --- DATA INIT (CRITICAL FIX) ---
+  // --- DATA INIT ---
   useEffect(() => {
       const initData = async () => {
           if (!user) return;
@@ -51,32 +102,27 @@ export default function Loadflow({ user }: { user: any }) {
               const t = await getToken();
               const headers = { 'Authorization': `Bearer ${t}` };
 
-              // 1. Fetch "ME" (Fastest way to get Global Role) - Like Files page
+              // 1. Fetch "ME"
               try {
                   const meRes = await fetch(`${API_URL}/users/me`, { headers });
                   if (meRes.ok) {
                       const meData = await meRes.json();
-                      setUserGlobalData(meData); // <--- Sets the Badge!
+                      setUserGlobalData(meData);
                       
-                      // 2. If Admin, Fetch Full User List (For Sidebar)
+                      // 2. If Admin, Fetch Full User List
                       if (['super_admin', 'admin', 'moderator'].includes(meData.global_role)) {
                           const listRes = await fetch(`${API_URL}/users/`, { headers });
                           if (listRes.ok) setUsersList(await listRes.json());
                       }
                   } else {
-                      // Fallback if /me fails
                       setUserGlobalData(user);
                   }
               } catch (e) {
-                  console.error("Failed to fetch user profile", e);
                   setUserGlobalData(user);
               }
 
-              // 3. Fetch Projects
-              try {
-                  const pRes = await fetch(`${API_URL}/projects/`, { headers });
-                  if (pRes.ok) setProjects(await pRes.json());
-              } catch (e) { console.error("Failed to fetch projects", e); }
+              // 3. Fetch Projects (Initial load)
+              fetchProjects();
 
           } catch (e) {}
       };
@@ -97,8 +143,6 @@ export default function Loadflow({ user }: { user: any }) {
   };
 
   const handleCopyToken = async () => { const t = await getToken(); if (t) { navigator.clipboard.writeText(t); notify("Token Copied"); } };
-  const createProjectWrapper = () => { notify("Please use Files Dashboard", "error"); setIsCreatingProject(false); };
-  const deleteProjectWrapper = (id: string, e: any) => { e.stopPropagation(); notify(`Go to Files to delete ${id}`, "error"); };
 
   return (
     <div className="w-full px-6 py-6 text-[11px] font-sans flex flex-col relative min-h-full">
@@ -127,7 +171,6 @@ export default function Loadflow({ user }: { user: any }) {
             
             <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null} />
             
-            {/* Global Role Badge - Now backed by /users/me data */}
             {userGlobalData && userGlobalData.global_role && (
                 <div className="ml-2 scale-110">
                     <GlobalRoleBadge role={userGlobalData.global_role} />
@@ -158,7 +201,7 @@ export default function Loadflow({ user }: { user: any }) {
             activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid}
             isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} 
             newProjectName={newProjectName} setNewProjectName={setNewProjectName} 
-            onCreateProject={createProjectWrapper} onDeleteProject={deleteProjectWrapper} 
+            onCreateProject={createProject} onDeleteProject={deleteProject} 
         />
         
         <div className="flex-1 flex flex-col gap-4 min-w-0">
