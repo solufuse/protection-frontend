@@ -14,6 +14,7 @@ import ReactFlow, {
   Connection,
   ReactFlowProvider,
   MarkerType,
+  MiniMap,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -291,6 +292,18 @@ export default function DiagramEditor({ user }: { user: any }) {
                     >
                         <Controls />
                         <Background />
+                        <MiniMap 
+                            nodeStrokeColor={(n: Node) => {
+                                if (n.type === 'custom') return '#0041d0';
+                                return '#eee';
+                            }}
+                            nodeColor={(n: Node) => {
+                                if (n.data.label === 'Busbar') return '#374151';
+                                return '#fff';
+                            }}
+                            nodeBorderRadius={2}
+                            maskColor="rgba(200, 200, 200, 0.6)"
+                        />
                     </ReactFlow>
                     {contextMenu && <ContextMenu {...contextMenu} onClose={() => setContextMenu(null)} onSelect={addNode} />}
                 </ReactFlowProvider>

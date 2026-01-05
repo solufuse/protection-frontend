@@ -7,7 +7,7 @@ import { Trash2 } from 'lucide-react';
 // SVG Contents from files
 const GridSvg = `<svg viewBox="0 0 100 150" xmlns="http://www.w3.org/2000/svg"><g stroke="black" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="20" y="10" width="60" height="60" /><line x1="20" y1="10" x2="80" y2="70" /> <line x1="80" y1="10" x2="20" y2="70" /> <polygon points="50,10 80,40 50,70 20,40" /><line x1="50" y1="70" x2="50" y2="140" /></g></svg>`;
 const TransformerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 165"><line x1="30" y1="0" x2="30" y2="25" stroke="black" stroke-width="4" /><circle cx="30" cy="53" r="28" stroke="black" stroke-width="4" fill="none" /><circle cx="30" cy="85" r="28" stroke="black" stroke-width="4" fill="none" /><line x1="30" y1="113" x2="30" y2="138" stroke="black" stroke-width="4" /></svg>`;
-const CircuitBreakerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 160"><g stroke="black" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="30" y1="0" x2="30" y2="40" /><line x1="20" y1="30" x2="40" y2="50" /><line x1="40" y1="30" x2="20" y2="50" /><line x1="15" y1="55" x2="30" y2="105" /><line x1="30" y1="105" x2="30" y2="160" /></g></svg>`;
+const CircuitBreakerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 160"><g stroke="black" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="30" y1="0" x2="30" y2="40" /><line x1="20" y1="30" x2="40" y1="50" /><line x1="40" y1="30" x2="20" y1="50" /><line x1="15" y1="55" x2="30" y1="105" /><line x1="30" y1="105" x2="30" y1="160" /></g></svg>`;
 
 const SvgComponents: { [key: string]: React.FC<{width?: string, height?: string}> } = {
   Grid: ({ width = "40", height = "40" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: GridSvg }} />,
@@ -67,6 +67,13 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
           />
           
           <Handle type="target" position={Position.Top} style={{ background: '#555', top: 0, width: 8, height: 8 }} />
+          <Handle type="source" position={Position.Top} style={{ background: '#555', top: 0, width: 8, height: 8 }} />
+          <Handle type="target" position={Position.Bottom} style={{ background: '#555', bottom: 0, top: 'auto', width: 8, height: 8 }} />
+          <Handle type="source" position={Position.Bottom} style={{ background: '#555', bottom: 0, top: 'auto', width: 8, height: 8 }} />
+          <Handle type="target" position={Position.Left} style={{ background: '#555', left: 0, top: '50%', transform: 'translateY(-50%)', width: 8, height: 8 }} />
+          <Handle type="source" position={Position.Left} style={{ background: '#555', left: 0, top: '50%', transform: 'translateY(-50%)', width: 8, height: 8 }} />
+          <Handle type="target" position={Position.Right} style={{ background: '#555', right: 0, top: '50%', transform: 'translateY(-50%)', width: 8, height: 8 }} />
+          <Handle type="source" position={Position.Right} style={{ background: '#555', right: 0, top: '50%', transform: 'translateY(-50%)', width: 8, height: 8 }} />
           
           {/* Main Busbar Body */}
           <div 
@@ -85,8 +92,6 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
               </span>
           </div>
 
-          <Handle type="source" position={Position.Bottom} style={{ background: '#555', bottom: 0, top: 'auto', width: 8, height: 8 }} />
-          
           {/* Contextual Delete Button */}
           {selected && (
               <button
@@ -135,6 +140,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
         onDoubleClick={onDoubleClick}
     >
       <Handle type="target" position={Position.Top} className="!bg-slate-400 !w-3 !h-3" />
+      <Handle type="source" position={Position.Top} className="!bg-slate-400 !w-3 !h-3" />
       
       <div className="text-slate-700 dark:text-slate-200 mb-1">
         <IconComponent />
@@ -144,6 +150,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
         {currentData.name || data.label}
       </div>
 
+      <Handle type="target" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3" />
       <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3" />
 
       {selected && (
