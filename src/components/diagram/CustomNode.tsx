@@ -17,7 +17,7 @@ const SvgComponents: { [key: string]: React.FC<{width?: string, height?: string}
   Default: ({ width = "40", height = "40" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" /></svg>' }} />
 };
 
-const CustomNode = ({ id, data, selected, width, height }: NodeProps) => {
+const CustomNode = ({ id, data, selected, width: nodeWidth, height: nodeHeight }: NodeProps) => {
   const { setNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(false);
   const [currentData, setCurrentData] = useState(data);
@@ -70,6 +70,20 @@ const CustomNode = ({ id, data, selected, width, height }: NodeProps) => {
             isVisible={selected} 
             lineStyle={{ border: '1px solid #4f46e5' }} 
             handleStyle={{ width: 8, height: 8, borderRadius: '50%' }}
+            onResizeEnd={(_event, { width, height }) => {
+              setNodes((nds) =>
+                nds.map((node) => {
+                  if (node.id === id) {
+                    return {
+                      ...node,
+                      style: { ...node.style, width, height },
+                      data: { ...node.data, width, height },
+                    };
+                  }
+                  return node;
+                })
+              );
+            }}
           />
           
           {/* Top and Bottom Handles */}
@@ -94,9 +108,9 @@ const CustomNode = ({ id, data, selected, width, height }: NodeProps) => {
 
           {/* Main Busbar Body */}
           <div 
-              style={{ 
-                  width: width || data.width || 200, 
-                  height: height || 14,
+              style={{
+                  width: nodeWidth || data.width || 200, 
+                  height: nodeHeight || 14,
                   backgroundColor: '#374151', // Dark grey bg
                   border: selected ? '2px solid #4f46e5' : '2px solid #1f2937',
                   borderRadius: 2
