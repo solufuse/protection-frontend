@@ -19,11 +19,8 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Save, Plus, Trash2, Upload } from 'lucide-react';
+import { Save, Plus, Upload } from 'lucide-react';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
-import { useFileManager } from '../hooks/useFileManager';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from '../firebase';
 import Toast from '../components/Toast';
 
 // Initial nodes and edges for the diagram
