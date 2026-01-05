@@ -81,7 +81,7 @@ export default function App() {
             <Route path="/loadflow" element={user ? <Loadflow user={user} /> : <Navigate to="/login" />} />
             <Route path="/ingestion" element={user ? <Ingestion /> : <Navigate to="/login" />} />
             <Route path="/config" element={user ? <Config user={user} /> : <Navigate to="/login" />} />
-            <Route path="/diagram" element={user ? <DiagramEditor /> : <Navigate to="/login" />} />
+            <Route path="/diagram" element={user ? <DiagramEditor user={user} /> : <Navigate to="/login" />} />
             <Route path="/extraction" element={user ? <Extraction /> : <Navigate to="/login" />} />
             
             <Route path="*" element={<Navigate to="/" />} />
