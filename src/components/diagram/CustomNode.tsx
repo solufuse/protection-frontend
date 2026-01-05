@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, NodeResizer } from 'reactflow';
 import { Trash2 } from 'lucide-react';
-import { Icons } from '../../icons'; // Assuming you have an icon for Busbar
 
 const CustomNode = ({ id, data, selected }: NodeProps) => {
   const { setNodes } = useReactFlow();
