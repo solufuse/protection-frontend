@@ -10,11 +10,11 @@ const TransformerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 
 const CircuitBreakerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 160"><g stroke="black" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="30" y1="0" x2="30" y2="40" /><line x1="20" y1="30" x2="40" y1="50" /><line x1="40" y1="30" x2="20" y1="50" /><line x1="15" y1="55" x2="30" y1="105" /><line x1="30" y1="105" x2="30" y1="160" /></g></svg>`;
 
 const SvgComponents: { [key: string]: React.FC<{width?: string, height?: string}> } = {
-  Grid: ({ width = "40", height = "40" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: GridSvg }} />,
-  Transformer: ({ width = "40", height = "60" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: TransformerSvg }} />,
-  'Circuit Breaker': ({ width = "40", height = "40" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: CircuitBreakerSvg }} />,
+  Grid: ({ width = "40px", height = "40px" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: GridSvg }} />,
+  Transformer: ({ width = "40px", height = "60px" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: TransformerSvg }} />,
+  'Circuit Breaker': ({ width = "40px", height = "40px" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: CircuitBreakerSvg }} />,
   // Default fallback icon
-  Default: ({ width = "40", height = "40" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" /></svg>' }} />
+  Default: ({ width = "40px", height = "40px" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" /></svg>' }} />
 };
 
 const CustomNode = ({ id, data, selected }: NodeProps) => {
@@ -62,22 +62,26 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
       return `${offset}%`;
     });
 
+    // Get the initial busbar height, default to 14 if not present
+    const busbarHeight = data.height || 14;
+
     return (
-      <div className={`relative group ${selected ? 'selected' : ''}`} style={{ minWidth: '50px', minHeight: '10px' }}>
+      <div className={`relative group ${selected ? 'selected' : ''}`} style={{ minWidth: '50px', minHeight: `${busbarHeight}px` }}>
           <NodeResizer 
             minWidth={50} 
-            minHeight={10} 
+            minHeight={busbarHeight} // Fixed height
+            maxHeight={busbarHeight} // Fixed height
             isVisible={selected} 
             lineStyle={{ border: '1px solid #4f46e5' }} 
-            handleStyle={{ width: 8, height: 8, borderRadius: '50%' }}
-            onResizeEnd={(_event, { width, height }) => {
+            handleStyle={{ opacity: 0, width: 0, height: 0 }} // Make handles invisible
+            onResizeEnd={(_event, { width }) => {
               setNodes((nds) =>
                 nds.map((node) => {
                   if (node.id === id) {
                     return {
                       ...node,
-                      style: { ...node.style, width, height },
-                      data: { ...node.data, width, height },
+                      style: { ...node.style, width, height: busbarHeight },
+                      data: { ...node.data, width, height: busbarHeight },
                     };
                   }
                   return node;
@@ -110,7 +114,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
           <div 
               style={{
                   width: data.width || 200, 
-                  height: data.height || 14,
+                  height: busbarHeight,
                   backgroundColor: '#374151', // Dark grey bg
                   border: selected ? '2px solid #4f46e5' : '2px solid #1f2937',
                   borderRadius: 2
@@ -138,7 +142,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
             <div className="absolute top-6 left-0 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded p-2 min-w-[150px]">
                 <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">Properties</div>
                 {Object.keys(currentData).map(key => {
-                    if (key === 'width' || key === 'label') return null; // Skip internal props
+                    if (key === 'width' || key === 'height' || key === 'label') return null; // Skip internal props, including height now
                     return (
                         <div key={key} className="mb-1">
                             <label className="text-[9px] block text-slate-500">{key}</label>
