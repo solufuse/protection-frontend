@@ -1,9 +1,5 @@
 
 // DiagramEditor.tsx
-// This component provides a visual editor for creating and manipulating electrical diagrams
-// using React Flow. It includes a project sidebar for managing projects, a main canvas
-// for the diagram, and an elements sidebar for adding new components via drag-and-drop.
-
 import { useState, useCallback, useEffect, useRef, MouseEvent, DragEvent } from 'react';
 import ReactFlow, {
   Controls,
@@ -17,6 +13,8 @@ import ReactFlow, {
   EdgeChange,
   Connection,
   ReactFlowProvider,
+  useReactFlow,
+  MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -44,9 +42,9 @@ const initialNodes: Node[] = [
 ];
 
 const initialEdges: Edge[] = [
-    { id: 'e1-2', source: '1', target: '2' },
-    { id: 'e2-3', source: '2', target: '3', data: { id: 'LINK-1', length_km: 1.0, impedance_zd: "0+j0", impedance_z0: "0+j0" } },
-    { id: 'e2-4', source: '2', target: '4' },
+    { id: 'e1-2', source: '1', target: '2', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
+    { id: 'e2-3', source: '2', target: '3', label: 'Câble 1', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, data: { id: 'LINK-1', length_km: 1.0, impedance_zd: "0+j0", impedance_z0: "0+j0" } },
+    { id: 'e2-4', source: '2', target: '4', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
 ];
 
 const nodeTypes = {
@@ -56,6 +54,12 @@ const nodeTypes = {
 const defaultConfig = { project_name: "NEW_PROJECT", settings: { ansi_51: { transformer: { factor_I1: 1.2, time_dial_I1: { value: 0.5, curve: "VIT", comment: "Surcharge Transfo" }, factor_I2: 0.8, time_dial_I2: { value: 0.1, curve: "DT", comment: "Secours Court-Circuit" }, factor_I4: 6.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "High-Set Inst." } }, incomer: { factor_I1: 1.0, time_dial_I1: { value: 0.5, curve: "SIT", comment: "Incomer Std" }, factor_I2: 1.0, time_dial_I2: { value: 0.2, curve: "DT", comment: "Backup" }, factor_I4: 10.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "Inst." } }, coupling: { factor_I1: 1.0, time_dial_I1: { value: 0.5, curve: "SIT", comment: "Cpl Std" }, factor_I2: 1.0, time_dial_I2: { value: 0.2, curve: "DT", comment: "Backup" }, factor_I4: 10.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "Inst." } } } }, transformers: [], links_data: [], loadflow_settings: { target_mw: 0, tolerance_mw: 0.3, swing_bus_id: "" }, plans: [] };
 
 export default function DiagramEditor({ user }: { user: any }) {
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [nodes, setNodes] = useState<Node[]>(initialNodes);
+  const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
+
   // State for project management
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -66,13 +70,6 @@ export default function DiagramEditor({ user }: { user: any }) {
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Diagram State
-  const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes] = useState<Node[]>(initialNodes);
-  const [edges, setEdges] = useState<Edge[]>(initialEdges);
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
@@ -89,7 +86,7 @@ export default function DiagramEditor({ user }: { user: any }) {
   const fetchGlobalProfile = async () => { try { const t = await getToken(); const res = await fetch(`${API_URL}/users/me`, { headers: { 'Authorization': `Bearer ${t}` } }); if (res.ok) { const data = await res.json(); setUserGlobalData(data); if (['super_admin', 'admin', 'moderator'].includes(data.global_role)) fetchAllUsers(t); } } catch (e) {} };
   const fetchAllUsers = async (token: string) => { try { const res = await fetch(`${API_URL}/admin/users?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) setUsersList(await res.json()); } catch (e) { console.error("Admin List Error", e); } };
   const fetchProjects = async () => { try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/`, { headers: { 'Authorization': `Bearer ${t}` } }); if (res.ok) setProjects(await res.json()); } catch (e) { console.error("Failed to load projects", e); } };
-  const createProject = async () => { if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); if (!newProjectName.trim()) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/create`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newProjectName, name: newProjectName }) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail); } notify("Project Created"); setNewProjectName(""); setIsCreatingProject(false); fetchProjects(); } catch (e: any) { notify(e.message || "Failed", "error"); } };
+  const createProject = async () => { if (user?.isAnonymous) return notify("Guest users cannot create projects.", "error"); if (!newProjectName.trim()) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/create`, { method: 'POST', headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: newProjectName, name: newProjectName }) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail); } notify("Project Created"); setNewProjectName(""); setIsCreatingProject(false); fetchProjects(); } catch (e) { notify("Creation failed", "error"); } };
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
   const handleCopyProjectName = () => { if (!activeProjectId) return; navigator.clipboard.writeText(activeProjectId); notify("Project ID Copied to Clipboard"); };
   const getActiveProjectName = () => { if (!activeProjectId) return null; const proj = projects.find(p => p.id === activeProjectId); return proj ? proj.name : activeProjectId; };
@@ -97,7 +94,19 @@ export default function DiagramEditor({ user }: { user: any }) {
   // --- React Flow Callbacks ---
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
-  const onConnect = useCallback((connection: Connection) => setEdges((eds) => addEdge(connection, eds)), [setEdges]);
+  const onConnect = useCallback((connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } }, eds)), [setEdges]);
+
+  const onEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+      const newLabel = prompt("Enter connection name:", edge.label as string || "");
+      if (newLabel !== null) {
+          setEdges((eds) => eds.map((e) => {
+              if (e.id === edge.id) {
+                  return { ...e, label: newLabel };
+              }
+              return e;
+          }));
+      }
+  }, []);
 
   const onPaneContextMenu = useCallback((event: MouseEvent) => {
       event.preventDefault();
@@ -124,7 +133,6 @@ export default function DiagramEditor({ user }: { user: any }) {
       if (!nodeInfoStr) return;
       const { label } = JSON.parse(nodeInfoStr);
 
-      // Use nodeType 'custom' for all drag-and-drop nodes based on our sidebar logic
       const position = reactFlowInstance.project({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top,
@@ -157,11 +165,10 @@ export default function DiagramEditor({ user }: { user: any }) {
 
   // --- Diagram Save and Import ---
   const handleSave = () => {
-    // Generate config similar to default config but with diagram data
     const config = {
         ...defaultConfig,
         project_name: activeProjectId || "DIAGRAM_PROJECT", 
-        diagram_data: { nodes, edges }, // Save raw diagram data for restore
+        diagram_data: { nodes, edges }, // Save raw diagram data
         transformers: nodes
             .filter(node => node.data.label === 'Transformer')
             .map(node => ({
@@ -172,12 +179,12 @@ export default function DiagramEditor({ user }: { user: any }) {
                 tau_ms: node.data.tau_ms || 400,
             })),
         links_data: edges
-            .filter(edge => edge.data) 
+            .filter(edge => edge.label) // Only export named links
             .map(edge => ({
-                id: edge.data.id || edge.id,
-                length_km: edge.data.length_km || 1.0,
-                impedance_zd: edge.data.impedance_zd || "0+j0",
-                impedance_z0: edge.data.impedance_z0 || "0+j0",
+                id: edge.label || edge.id,
+                length_km: edge.data?.length_km || 1.0,
+                impedance_zd: edge.data?.impedance_zd || "0+j0",
+                impedance_z0: edge.data?.impedance_z0 || "0+j0",
                 bus_from: edge.source,
                 bus_to: edge.target
             })),
@@ -195,7 +202,7 @@ export default function DiagramEditor({ user }: { user: any }) {
     a.download = 'diagram_config.json';
     a.click();
     URL.revokeObjectURL(url);
-    notify('Diagram configuration saved!');
+    notify('Diagram saved as diagram_config.json');
   };
 
   const handleImportClick = () => fileInputRef.current?.click();
@@ -209,12 +216,11 @@ export default function DiagramEditor({ user }: { user: any }) {
         try {
             const json = JSON.parse(event.target?.result as string);
             
-            // Try to load raw diagram nodes first if available
             if (json.diagram_data) {
                 setNodes(json.diagram_data.nodes || []);
                 setEdges(json.diagram_data.edges || []);
             } else {
-                // Fallback: reconstruct from transformers/links if raw diagram missing
+                // Fallback logic
                 const newNodes: Node[] = [];
                 const newEdges: Edge[] = [];
                 let yPos = 50;
@@ -222,10 +228,6 @@ export default function DiagramEditor({ user }: { user: any }) {
                     const id = `tx-${index + 1}`;
                     newNodes.push({ id, position: { x: 250, y: yPos }, type: 'custom', data: { label: 'Transformer', ...tx } });
                     yPos += 150;
-                });
-                json.links_data?.forEach((link: any, index: number) => {
-                    const id = `edge-${index + 1}`;
-                    newEdges.push({ id, source: link.bus_from, target: link.bus_to, data: { ...link } });
                 });
                 setNodes(newNodes);
                 setEdges(newEdges);
@@ -273,30 +275,29 @@ export default function DiagramEditor({ user }: { user: any }) {
         <div className="flex flex-1 gap-6 min-h-0">
             <ProjectsSidebar user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid} isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} newProjectName={newProjectName} setNewProjectName={setNewProjectName} onCreateProject={createProject} onDeleteProject={deleteProject} />
             
-            <div className="flex-1 flex gap-4 h-full">
-                <div ref={reactFlowWrapper} className="flex-1 h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden relative" onDrop={onDrop} onDragOver={onDragOver}>
-                    <ReactFlowProvider>
-                        <ReactFlow
-                            nodes={nodes}
-                            edges={edges}
-                            onNodesChange={onNodesChange}
-                            onEdgesChange={onEdgesChange}
-                            onConnect={onConnect}
-                            onPaneClick={onPaneClick}
-                            onPaneContextMenu={onPaneContextMenu}
-                            nodeTypes={nodeTypes}
-                            onInit={setReactFlowInstance}
-                            fitView
-                        >
-                            <Controls />
-                            <Background />
-                        </ReactFlow>
-                        {contextMenu && <ContextMenu {...contextMenu} onClose={() => setContextMenu(null)} onSelect={addNode} />}
-                    </ReactFlowProvider>
-                </div>
-                
-                <ElementsSidebar />
+            <div ref={reactFlowWrapper} className="flex-1 h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden relative" onDrop={onDrop} onDragOver={onDragOver}>
+                <ReactFlowProvider>
+                    <ReactFlow
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onConnect={onConnect}
+                        onPaneClick={onPaneClick}
+                        onPaneContextMenu={onPaneContextMenu}
+                        onEdgeDoubleClick={onEdgeDoubleClick}
+                        nodeTypes={nodeTypes}
+                        onInit={setReactFlowInstance}
+                        fitView
+                    >
+                        <Controls />
+                        <Background />
+                    </ReactFlow>
+                    {contextMenu && <ContextMenu {...contextMenu} onClose={() => setContextMenu(null)} onSelect={addNode} />}
+                </ReactFlowProvider>
             </div>
+            
+            <ElementsSidebar />
         </div>
         
         {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
