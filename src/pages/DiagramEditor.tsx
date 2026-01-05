@@ -19,7 +19,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Save, Plus, Upload } from 'lucide-react';
+import { Save, Plus, Upload, Trash2 } from 'lucide-react';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import Toast from '../components/Toast';
 
@@ -44,6 +44,7 @@ export default function DiagramEditor({ user }: { user: any }) {
   // State for React Flow nodes and edges
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   // State for project management from ProjectsSidebar
   const [projects, setProjects] = useState<Project[]>([]);
@@ -82,6 +83,30 @@ export default function DiagramEditor({ user }: { user: any }) {
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
   const onConnect = useCallback((connection: Connection) => setEdges((eds) => addEdge(connection, eds)), [setEdges]);
+  const onNodeClick = useCallback((_: any, node: Node) => {
+    setSelectedNode(node);
+  }, []);
+
+  // --- Block Management ---
+  const addNode = (type: string) => {
+    const newNode: Node = {
+      id: `${+new Date()}`,
+      data: { label: type },
+      position: {
+        x: Math.random() * 400,
+        y: Math.random() * 400,
+      },
+    };
+    setNodes((nds) => nds.concat(newNode));
+  };
+
+  const deleteNode = () => {
+    if (selectedNode) {
+      setNodes((nds) => nds.filter((node) => node.id !== selectedNode.id));
+      setSelectedNode(null);
+    }
+  };
+
 
   // --- Diagram Save and Import/Export ---
 
@@ -218,6 +243,7 @@ export default function DiagramEditor({ user }: { user: any }) {
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
+                        onNodeClick={onNodeClick}
                     >
                         <Controls />
                         <Background />
@@ -233,16 +259,27 @@ export default function DiagramEditor({ user }: { user: any }) {
                         <div key={index} className="flex items-center justify-between p-2 border rounded">
                             <span className="font-mono">{block.icon}</span>
                             <span>{block.type}</span>
-                            <button className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                            <button onClick={() => addNode(block.type)} className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600">
                                 <Plus size={16} />
                             </button>
                         </div>
                     ))}
                 </div>
                 <h2 className="font-bold text-lg mt-4">Selected Block</h2>
-                <div className="flex flex-col gap-2 p-2 border rounded">
-                    <p>No block selected</p>
-                </div>
+                {selectedNode ? (
+                    <div className="flex flex-col gap-2 p-2 border rounded">
+                        <p>ID: {selectedNode.id}</p>
+                        <p>Type: {selectedNode.data.label}</p>
+                        <button onClick={deleteNode} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold transition-all text-[10px]">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            DELETE
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-2 p-2 border rounded">
+                        <p>No block selected</p>
+                    </div>
+                )}
             </div>
         </div>
         
