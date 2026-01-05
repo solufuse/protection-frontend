@@ -1,6 +1,6 @@
 
 // src/components/diagram/ContextMenu.tsx
-import React from 'react';
+import { MouseEvent } from 'react';
 
 interface ContextMenuProps {
   x: number;
@@ -9,24 +9,31 @@ interface ContextMenuProps {
   onSelect: (type: string) => void;
 }
 
-const electricalBlocks = [
-    { type: 'Busbar', icon: ' Minus ' },
-    { type: 'Transformer', icon: ' T ' },
-    { type: 'Circuit Breaker', icon: ' [ ] ' },
-    { type: 'Grid', icon: ' G ' },
-  ];
+const CONTEXT_MENU_ITEMS = ['Grid', 'Busbar', 'Transformer', 'Circuit Breaker'];
 
 const ContextMenu = ({ x, y, onClose, onSelect }: ContextMenuProps) => {
+  const handleSelect = (e: MouseEvent, type: string) => {
+    e.stopPropagation();
+    onSelect(type);
+    onClose();
+  };
+
   return (
-    <div 
-      style={{ position: 'absolute', top: y, left: x, background: 'white', border: '1px solid #ddd', zIndex: 1000, borderRadius: '8px', padding: '5px' }}
-      onMouseLeave={onClose}
+    <div
+      style={{ top: y, left: x }}
+      className="absolute z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg text-xs font-semibold"
+      onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
     >
-      <ul>
-        {electricalBlocks.map((block) => (
-          <li key={block.type} onClick={() => onSelect(block.type)} style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'}}>
-            <span className="font-mono">{block.icon}</span>
-            <span>{block.type}</span>
+      <ul className="py-1">
+        {CONTEXT_MENU_ITEMS.map((item) => (
+          <li key={item}>
+            <a
+              href="#"
+              className="block px-4 py-1.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+              onClick={(e) => handleSelect(e, item)}
+            >
+              {item}
+            </a>
           </li>
         ))}
       </ul>
