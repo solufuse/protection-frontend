@@ -3,20 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, NodeResizer } from 'reactflow';
 import { Trash2 } from 'lucide-react';
 
-// SVG Contents from files for different components.
-const GridSvg = `<svg viewBox="0 0 100 150" xmlns="http://www.w3.org/2000/svg"><g stroke="black" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="20" y="10" width="60" height="60" /><line x1="20" y1="10" x2="80" y2="70" /> <line x1="80" y1="10" x2="20" y2="70" /> <polygon points="50,10 80,40 50,70 20,40" /><line x1="50" y1="70" x2="50" y2="140" /></g></svg>`;
-const TransformerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 165"><line x1="30" y1="0" x2="30" y2="25" stroke="black" stroke-width="4" /><circle cx="30" cy="53" r="28" stroke="black" stroke-width="4" fill="none" /><circle cx="30" cy="85" r="28" stroke="black" stroke-width="4" fill="none" /><line x1="30" y1="113" x2="30" y2="138" stroke="black" stroke-width="4" /></svg>`;
-const CircuitBreakerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 160"><g stroke="black" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="30" y1="0" x2="30" y2="40" /><line x1="20" y1="30" x2="40" y1="50" /><line x1="40" y1="30" x2="20" y1="50" /><line x1="15" y1="55" x2="30" y1="105" /><line x1="30" y1="105" x2="30" y1="160" /></g></svg>`;
-
-// Map component labels to their corresponding SVG React components.
-const SvgComponents: { [key: string]: React.FC<{width?: string, height?: string}> } = {
-  Grid: ({ width = "40px", height = "40px" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: GridSvg }} />,
-  Transformer: ({ width = "40px", height = "60px" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: TransformerSvg }} />,
-  'Circuit Breaker': ({ width = "40px", height = "40px" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: CircuitBreakerSvg }} />,
-  // Default fallback icon for any unhandled type.
-  Default: ({ width = "40px", height = "40px" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" /></svg>' }} />
-};
-
 // CustomNode component definition.
 const CustomNode = ({ id, data, selected }: NodeProps) => {
   const { setNodes } = useReactFlow(); // Hook to interact with the React Flow instance.
@@ -60,17 +46,16 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
     setIsEditing(true);
   };
 
-  // Style for Busbar handles: invisible by default, slightly visible when selected.
+  // Style for Busbar handles: always visible, styled as connection blocks.
   const busbarHandleStyle = {
-    background: selected ? '#a3a3a3' : 'transparent', // Grey when selected, transparent otherwise.
-    opacity: selected ? 0.3 : 0, // 30% visible when selected, invisible otherwise.
-    width: 8, // Fixed width for discreet appearance.
-    height: 8, // Fixed height for discreet appearance.
-    transition: 'opacity 0.2s ease-in-out, background 0.2s ease-in-out', // Smooth transition for opacity and background.
+    background: '#a3a3a3', // Solid grey background.
+    border: '1px solid #717171', // Darker grey border.
+    width: 10, // Slightly larger width for easier interaction.
+    height: 10, // Slightly larger height.
   };
 
   // Special rendering logic for the 'Busbar' node.
-  if (data.label === 'Busbar') {
+  if (currentData.label === 'Busbar') {
     // Define a higher number of connection points for a multi-point busbar.
     const numHandles = 10; 
     // Calculate positions for handles to distribute them evenly across the busbar's length.
@@ -80,7 +65,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
     });
 
     // Get the initial busbar height, defaulting to 14px if not specified.
-    const busbarHeight = data.height || 14;
+    const busbarHeight = currentData.height || 14;
 
     return (
       <div 
@@ -116,7 +101,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
             }}
           />
           
-          {/* Top and Bottom Handles for Busbar: These are the actual connection points, now invisible by default, but slightly visible on selection. */}
+          {/* Top and Bottom Handles for Busbar: Always visible connection blocks. */}
           {handlePositions.map((pos, index) => (
             <React.Fragment key={`busbar-handle-${index}`}>
               <Handle type="target" position={Position.Top} style={{ ...busbarHandleStyle, left: pos, top: 0 }} />
@@ -129,7 +114,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
           {/* Main Busbar Body */}
           <div 
               style={{
-                  width: data.width || 200, 
+                  width: currentData.width || 200, 
                   height: busbarHeight,
                   backgroundColor: '#374151', // Dark grey background.
                   border: selected ? '2px solid #4f46e5' : '2px solid #1f2937', // Border color based on selection.
@@ -141,11 +126,11 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
               onDoubleClick={onDoubleClick}
           >
               <span className="text-[9px] text-white font-bold select-none px-1 overflow-hidden whitespace-nowrap">
-                  {currentData.name || data.label}
+                  {currentData.name || currentData.label}
               </span>
           </div>
 
-          {/* Contextual Delete Button */}
+          {/* Contextual Delete Button */} 
           {selected && (
               <button
                   className="nodrag absolute -top-5 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center cursor-pointer shadow-sm z-50 transition-colors"
@@ -183,10 +168,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
     );
   }
 
-  // Get the icon component based on the node's label, or use a default fallback.
-  const IconComponent = SvgComponents[data.label as keyof typeof SvgComponents] || SvgComponents.Default;
-
-  // Default rendering for other nodes (Grid, Transformer, etc.) using SVG Icons.
+  // Default rendering for other nodes (Grid, Transformer, etc.)
   return (
     <div 
         className={`relative flex flex-col items-center justify-center p-2 rounded-md bg-white dark:bg-slate-900 border-2 transition-all ${selected ? 'border-blue-500 shadow-lg' : 'border-slate-200 dark:border-slate-700'}`}
@@ -194,7 +176,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
         onDoubleClick={onDoubleClick}
     >
       {/* Conditionally render handles for Grid node. */}
-      {data.label === 'Grid' ? (
+      {currentData.label === 'Grid' ? (
         <>
           {/* Grid as an incomer, source handle at the bottom. */}
           <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3" />
@@ -207,16 +189,13 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
         </>
       )}
       
-      <div className="text-slate-700 dark:text-slate-200 mb-1">
-        <IconComponent />
-      </div>
-      
-      <div className="text-[10px] font-bold text-slate-600 dark:text-slate-300 text-center leading-tight">
-        {currentData.name || data.label}
+      {/* Display node label/name */}
+      <div className="text-slate-700 dark:text-slate-200 mb-1 font-bold">
+        {currentData.name || currentData.label}
       </div>
 
       {/* Only show bottom handles for non-Grid nodes. */}
-      {data.label !== 'Grid' && ( 
+      {currentData.label !== 'Grid' && ( 
         <>
           <Handle type="target" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3" />
           <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3" />
