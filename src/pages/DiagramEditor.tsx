@@ -167,7 +167,7 @@ export default function DiagramEditor({ user }: { user: any }) {
                     <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null && activeSessionUid === null} />
                     {userGlobalData && userGlobalData.global_role && (
                         <div className="ml-2 scale-110">
-                            <GlobalRoleBadge role={userGlobal-data.global_role} />
+                            <GlobalRoleBadge role={userGlobalData.global_role} />
                         </div>
                     )}
                 </div>
