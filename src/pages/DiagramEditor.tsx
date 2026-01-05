@@ -17,7 +17,6 @@ import ReactFlow, {
   EdgeChange,
   Connection,
   ReactFlowProvider,
-  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -56,93 +55,6 @@ const nodeTypes = {
 
 const defaultConfig = { project_name: "NEW_PROJECT", settings: { ansi_51: { transformer: { factor_I1: 1.2, time_dial_I1: { value: 0.5, curve: "VIT", comment: "Surcharge Transfo" }, factor_I2: 0.8, time_dial_I2: { value: 0.1, curve: "DT", comment: "Secours Court-Circuit" }, factor_I4: 6.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "High-Set Inst." } }, incomer: { factor_I1: 1.0, time_dial_I1: { value: 0.5, curve: "SIT", comment: "Incomer Std" }, factor_I2: 1.0, time_dial_I2: { value: 0.2, curve: "DT", comment: "Backup" }, factor_I4: 10.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "Inst." } }, coupling: { factor_I1: 1.0, time_dial_I1: { value: 0.5, curve: "SIT", comment: "Cpl Std" }, factor_I2: 1.0, time_dial_I2: { value: 0.2, curve: "DT", comment: "Backup" }, factor_I4: 10.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "Inst." } } } }, transformers: [], links_data: [], loadflow_settings: { target_mw: 0, tolerance_mw: 0.3, swing_bus_id: "" }, plans: [] };
 
-function DiagramEditorContent({ user, projectData }: { user: any, projectData: any }) {
-    const reactFlowWrapper = useRef<HTMLDivElement>(null);
-    const [nodes, setNodes] = useState<Node[]>(initialNodes);
-    const [edges, setEdges] = useState<Edge[]>(initialEdges);
-    const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
-    const { project } = useReactFlow();
-
-    // --- React Flow Callbacks ---
-    const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
-    const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
-    const onConnect = useCallback((connection: Connection) => setEdges((eds) => addEdge(connection, eds)), [setEdges]);
-
-    const onPaneContextMenu = useCallback((event: MouseEvent) => {
-        event.preventDefault();
-        setContextMenu({ x: event.clientX, y: event.clientY });
-    }, []);
-
-    const onPaneClick = useCallback(() => setContextMenu(null), []);
-
-    // --- Drag and Drop Logic ---
-    const onDragOver = useCallback((event: DragEvent) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-    }, []);
-
-    const onDrop = useCallback(
-        (event: DragEvent) => {
-            event.preventDefault();
-            if (!reactFlowInstance || !reactFlowWrapper.current) return;
-
-            const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
-            const nodeInfoStr = event.dataTransfer.getData('application/reactflow');
-
-            if (!nodeInfoStr) return;
-            const { nodeType, label } = JSON.parse(nodeInfoStr);
-
-            // Calculate position relative to the react flow bounds
-            const position = reactFlowInstance.project({
-                x: event.clientX - reactFlowBounds.left,
-                y: event.clientY - reactFlowBounds.top,
-            });
-
-            const newNode: Node = {
-                id: `${label}-${+new Date()}`,
-                type: 'custom', // Using our custom node type
-                position,
-                data: { label, width: label === 'Busbar' ? 400 : undefined },
-            };
-
-            setNodes((nds) => nds.concat(newNode));
-        },
-        [reactFlowInstance]
-    );
-
-    // --- Block Management (Context Menu) ---
-    const addNode = (type: string) => {
-        if (!reactFlowInstance || !contextMenu) return;
-        const position = reactFlowInstance.project({ x: contextMenu.x, y: contextMenu.y });
-        const newNode: Node = {
-            id: `${+new Date()}`,
-            type: 'custom',
-            data: { label: type, width: type === 'Busbar' ? 400 : undefined },
-            position,
-        };
-        setNodes((nds) => nds.concat(newNode));
-        setContextMenu(null);
-    };
-
-    // Expose save/load functions to parent via ref or context could be done here, 
-    // but for now we share state or logic if needed. 
-    // Actually, to keep it simple, we can move the save/load logic inside here or 
-    // pass it down. For this refactor, I will attach these handlers to the window or 
-    // use a context, but simpler is to keep the logic in the main component if possible.
-    // However, since ReactFlowProvider must wrap useReactFlow, we are split.
-    // Let's pass the set functions up or keep the logic here.
-    
-    // For this specific request, I will implement the save/load logic INSIDE this component
-    // and pass the triggers from the parent via props or context if necessary.
-    // BUT, the buttons are in the parent. Let's move the header INSIDE the provider wrapper 
-    // or keep the buttons here. To match the design, the header is outside the canvas.
-    
-    // REFACTOR STRATEGY: Move the entire page content inside ReactFlowProvider.
-    
-    return null; // This is just a helper logic block, actual render is below
-}
-
 export default function DiagramEditor({ user }: { user: any }) {
   // State for project management
   const [projects, setProjects] = useState<Project[]>([]);
@@ -155,7 +67,7 @@ export default function DiagramEditor({ user }: { user: any }) {
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Diagram State (Lifted up or accessible via Provider if we wrap everything)
+  // Diagram State
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
@@ -210,8 +122,9 @@ export default function DiagramEditor({ user }: { user: any }) {
       const nodeInfoStr = event.dataTransfer.getData('application/reactflow');
       
       if (!nodeInfoStr) return;
-      const { nodeType, label } = JSON.parse(nodeInfoStr);
+      const { label } = JSON.parse(nodeInfoStr);
 
+      // Use nodeType 'custom' for all drag-and-drop nodes based on our sidebar logic
       const position = reactFlowInstance.project({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top,
@@ -244,16 +157,45 @@ export default function DiagramEditor({ user }: { user: any }) {
 
   // --- Diagram Save and Import ---
   const handleSave = () => {
-    const diagram = { nodes, edges };
-    const jsonDiagram = JSON.stringify(diagram, null, 2);
-    const blob = new Blob([jsonDiagram], { type: 'application/json' });
+    // Generate config similar to default config but with diagram data
+    const config = {
+        ...defaultConfig,
+        project_name: activeProjectId || "DIAGRAM_PROJECT", 
+        diagram_data: { nodes, edges }, // Save raw diagram data for restore
+        transformers: nodes
+            .filter(node => node.data.label === 'Transformer')
+            .map(node => ({
+                name: node.data.name || node.id,
+                sn_kva: node.data.sn_kva || 0,
+                u_kv: node.data.u_kv || 0,
+                ratio_iencl: node.data.ratio_iencl || 8,
+                tau_ms: node.data.tau_ms || 400,
+            })),
+        links_data: edges
+            .filter(edge => edge.data) 
+            .map(edge => ({
+                id: edge.data.id || edge.id,
+                length_km: edge.data.length_km || 1.0,
+                impedance_zd: edge.data.impedance_zd || "0+j0",
+                impedance_z0: edge.data.impedance_z0 || "0+j0",
+                bus_from: edge.source,
+                bus_to: edge.target
+            })),
+        loadflow_settings: {
+            ...defaultConfig.loadflow_settings,
+            swing_bus_id: nodes.find(n => n.data.label === 'Grid')?.id || ""
+        },
+    };
+
+    const jsonConfig = JSON.stringify(config, null, 2);
+    const blob = new Blob([jsonConfig], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'diagram.json';
+    a.download = 'diagram_config.json';
     a.click();
     URL.revokeObjectURL(url);
-    notify('Diagram saved as diagram.json');
+    notify('Diagram configuration saved!');
   };
 
   const handleImportClick = () => fileInputRef.current?.click();
@@ -265,9 +207,29 @@ export default function DiagramEditor({ user }: { user: any }) {
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
-            const { nodes: importedNodes, edges: importedEdges } = JSON.parse(event.target?.result as string);
-            setNodes(importedNodes || []);
-            setEdges(importedEdges || []);
+            const json = JSON.parse(event.target?.result as string);
+            
+            // Try to load raw diagram nodes first if available
+            if (json.diagram_data) {
+                setNodes(json.diagram_data.nodes || []);
+                setEdges(json.diagram_data.edges || []);
+            } else {
+                // Fallback: reconstruct from transformers/links if raw diagram missing
+                const newNodes: Node[] = [];
+                const newEdges: Edge[] = [];
+                let yPos = 50;
+                json.transformers?.forEach((tx: any, index: number) => {
+                    const id = `tx-${index + 1}`;
+                    newNodes.push({ id, position: { x: 250, y: yPos }, type: 'custom', data: { label: 'Transformer', ...tx } });
+                    yPos += 150;
+                });
+                json.links_data?.forEach((link: any, index: number) => {
+                    const id = `edge-${index + 1}`;
+                    newEdges.push({ id, source: link.bus_from, target: link.bus_to, data: { ...link } });
+                });
+                setNodes(newNodes);
+                setEdges(newEdges);
+            }
             notify("Diagram imported successfully!");
         } catch (err) {
             notify("Invalid JSON file", "error");
