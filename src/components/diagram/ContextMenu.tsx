@@ -21,7 +21,8 @@ const ContextMenu = ({ x, y, onClose, onSelect }: ContextMenuProps) => {
   return (
     <div
       style={{ top: y, left: x }}
-      className="absolute z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg text-xs font-semibold"
+      // Use position: fixed to position relative to the viewport
+      className="fixed z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg text-xs font-semibold"
       onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
     >
       <ul className="py-1">
