@@ -83,7 +83,14 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
     const busbarHeight = data.height || 14;
 
     return (
-      <div className={`relative group ${selected ? 'selected' : ''}`} style={{ minWidth: '50px', minHeight: `${busbarHeight}px`, zIndex: 10 }}> {/* Added zIndex to ensure busbar is above edges */} 
+      <div 
+        className={`relative group ${selected ? 'selected' : ''}`}
+        style={{
+          minWidth: '50px',
+          minHeight: `${busbarHeight}px`,
+          zIndex: 10, // Ensure busbar is always rendered above edges
+        }}
+      > 
           {/* NodeResizer for controlling resize behavior. */}
           <NodeResizer 
             minWidth={50} 
@@ -127,8 +134,8 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
                   backgroundColor: '#374151', // Dark grey background.
                   border: selected ? '2px solid #4f46e5' : '2px solid #1f2937', // Border color based on selection.
                   borderRadius: 2,
-                  position: 'relative', // Ensure z-index context
-                  zIndex: 1 // Ensure this is above its own handles if they were to overlap visually
+                  position: 'relative', // Essential for z-index to work correctly on children if needed
+                  zIndex: 1, // Ensures this div is above its own handles (though handles are typically children of the outer div)
               }}
               className="flex items-center justify-center transition-all"
               onDoubleClick={onDoubleClick}
