@@ -17,7 +17,7 @@ const SvgComponents: { [key: string]: React.FC<{width?: string, height?: string}
   Default: ({ width = "40", height = "40" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" /></svg>' }} />
 };
 
-const CustomNode = ({ id, data, selected }: NodeProps) => {
+const CustomNode = ({ id, data, selected, width, height }: NodeProps) => {
   const { setNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(false);
   const [currentData, setCurrentData] = useState(data);
@@ -56,8 +56,14 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
 
   // Special rendering for Busbar
   if (data.label === 'Busbar') {
+    const numHandles = 5; // Number of handles on each side (top, bottom, left, right)
+    const handlePositions = Array.from({ length: numHandles }).map((_, i) => {
+      const offset = (i + 1) * (100 / (numHandles + 1));
+      return `${offset}%`;
+    });
+
     return (
-      <div className={`relative group ${selected ? 'selected' : ''}`} style={{ minWidth: '50px' }}>
+      <div className={`relative group ${selected ? 'selected' : ''}`} style={{ minWidth: '50px', minHeight: '10px' }}>
           <NodeResizer 
             minWidth={50} 
             minHeight={10} 
@@ -66,20 +72,31 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
             handleStyle={{ width: 8, height: 8, borderRadius: '50%' }}
           />
           
-          <Handle type="target" position={Position.Top} style={{ background: '#555', top: 0, width: 8, height: 8 }} />
-          <Handle type="source" position={Position.Top} style={{ background: '#555', top: 0, width: 8, height: 8 }} />
-          <Handle type="target" position={Position.Bottom} style={{ background: '#555', bottom: 0, top: 'auto', width: 8, height: 8 }} />
-          <Handle type="source" position={Position.Bottom} style={{ background: '#555', bottom: 0, top: 'auto', width: 8, height: 8 }} />
-          <Handle type="target" position={Position.Left} style={{ background: '#555', left: 0, top: '50%', transform: 'translateY(-50%)', width: 8, height: 8 }} />
-          <Handle type="source" position={Position.Left} style={{ background: '#555', left: 0, top: '50%', transform: 'translateY(-50%)', width: 8, height: 8 }} />
-          <Handle type="target" position={Position.Right} style={{ background: '#555', right: 0, top: '50%', transform: 'translateY(-50%)', width: 8, height: 8 }} />
-          <Handle type="source" position={Position.Right} style={{ background: '#555', right: 0, top: '50%', transform: 'translateY(-50%)', width: 8, height: 8 }} />
-          
+          {/* Top and Bottom Handles */}
+          {handlePositions.map((pos, index) => (
+            <React.Fragment key={`top-${index}`}>
+              <Handle type="target" position={Position.Top} style={{ background: '#555', left: pos, top: 0, width: 8, height: 8 }} />
+              <Handle type="source" position={Position.Top} style={{ background: '#555', left: pos, top: 0, width: 8, height: 8 }} />
+              <Handle type="target" position={Position.Bottom} style={{ background: '#555', left: pos, bottom: 0, top: 'auto', width: 8, height: 8 }} />
+              <Handle type="source" position={Position.Bottom} style={{ background: '#555', left: pos, bottom: 0, top: 'auto', width: 8, height: 8 }} />
+            </React.Fragment>
+          ))}
+
+          {/* Left and Right Handles */}
+          {handlePositions.map((pos, index) => (
+            <React.Fragment key={`side-${index}`}>
+              <Handle type="target" position={Position.Left} style={{ background: '#555', top: pos, left: 0, width: 8, height: 8, transform: 'translateY(-50%)' }} />
+              <Handle type="source" position={Position.Left} style={{ background: '#555', top: pos, left: 0, width: 8, height: 8, transform: 'translateY(-50%)' }} />
+              <Handle type="target" position={Position.Right} style={{ background: '#555', top: pos, right: 0, width: 8, height: 8, transform: 'translateY(-50%)' }} />
+              <Handle type="source" position={Position.Right} style={{ background: '#555', top: pos, right: 0, width: 8, height: 8, transform: 'translateY(-50%)' }} />
+            </React.Fragment>
+          ))}
+
           {/* Main Busbar Body */}
           <div 
               style={{ 
-                  width: data.width || 200, 
-                  height: 14,
+                  width: width || data.width || 200, 
+                  height: height || 14,
                   backgroundColor: '#374151', // Dark grey bg
                   border: selected ? '2px solid #4f46e5' : '2px solid #1f2937',
                   borderRadius: 2
