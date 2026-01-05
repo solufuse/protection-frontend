@@ -4,35 +4,17 @@ import React, { useState, useEffect } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, NodeResizer } from 'reactflow';
 import { Trash2 } from 'lucide-react';
 
-// SVG Icons for Electrical Components
-// Added Grid, Transformer, Circuit Breaker icons
-const Icons = {
-  Grid: () => (
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2v20" />
-      <path d="M2 12h20" />
-      <circle cx="12" cy="12" r="4" />
-    </svg>
-  ),
-  Transformer: () => (
-    <svg width="40" height="60" viewBox="0 0 40 60" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="20" cy="15" r="12" />
-      <circle cx="20" cy="45" r="12" />
-    </svg>
-  ),
-  'Circuit Breaker': () => (
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="6" y="6" width="12" height="12" rx="2" />
-      <path d="M6 6l12 12" />
-      <path d="M18 6l-12 12" />
-    </svg>
-  ),
+// SVG Contents from files
+const GridSvg = `<svg viewBox="0 0 100 150" xmlns="http://www.w3.org/2000/svg"><g stroke="black" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="20" y="10" width="60" height="60" /><line x1="20" y1="10" x2="80" y2="70" /> <line x1="80" y1="10" x2="20" y2="70" /> <polygon points="50,10 80,40 50,70 20,40" /><line x1="50" y1="70" x2="50" y2="140" /></g></svg>`;
+const TransformerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 165"><line x1="30" y1="0" x2="30" y2="25" stroke="black" stroke-width="4" /><circle cx="30" cy="53" r="28" stroke="black" stroke-width="4" fill="none" /><circle cx="30" cy="85" r="28" stroke="black" stroke-width="4" fill="none" /><line x1="30" y1="113" x2="30" y2="138" stroke="black" stroke-width="4" /></svg>`;
+const CircuitBreakerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 160"><g stroke="black" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="30" y1="0" x2="30" y2="40" /><line x1="20" y1="30" x2="40" y2="50" /><line x1="40" y1="30" x2="20" y2="50" /><line x1="15" y1="55" x2="30" y2="105" /><line x1="30" y1="105" x2="30" y2="160" /></g></svg>`;
+
+const SvgComponents: { [key: string]: React.FC<{width?: string, height?: string}> } = {
+  Grid: ({ width = "40", height = "40" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: GridSvg }} />,
+  Transformer: ({ width = "40", height = "60" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: TransformerSvg }} />,
+  'Circuit Breaker': ({ width = "40", height = "40" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: CircuitBreakerSvg }} />,
   // Default fallback icon
-  Default: () => (
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="2" y="2" width="20" height="20" />
-    </svg>
-  )
+  Default: ({ width = "40", height = "40" }) => <div style={{width, height}} dangerouslySetInnerHTML={{ __html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" /></svg>' }} />
 };
 
 const CustomNode = ({ id, data, selected }: NodeProps) => {
@@ -143,7 +125,7 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
   }
 
   // Get the icon component based on label or use fallback
-  const IconComponent = Icons[data.label as keyof typeof Icons] || Icons.Default;
+  const IconComponent = SvgComponents[data.label as keyof typeof SvgComponents] || SvgComponents.Default;
 
   // Default rendering for other nodes (Grid, Transformer, etc.) using SVG Icons
   return (
