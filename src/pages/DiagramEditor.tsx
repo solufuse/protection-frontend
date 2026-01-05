@@ -13,7 +13,6 @@ import ReactFlow, {
   EdgeChange,
   Connection,
   ReactFlowProvider,
-  useReactFlow,
   MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -96,7 +95,7 @@ export default function DiagramEditor({ user }: { user: any }) {
   const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
   const onConnect = useCallback((connection: Connection) => setEdges((eds) => addEdge({ ...connection, type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } }, eds)), [setEdges]);
 
-  const onEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+  const onEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
       const newLabel = prompt("Enter connection name:", edge.label as string || "");
       if (newLabel !== null) {
           setEdges((eds) => eds.map((e) => {
