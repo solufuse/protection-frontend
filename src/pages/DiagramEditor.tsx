@@ -204,7 +204,7 @@ export default function DiagramEditor({ user }: { user: any }) {
   ];
 
   const activeProject = projects.find(p => p.id === activeProjectId);
-  const activeRole = activeProject?.users.find(u => u.uid === user?.uid)?.role || 'admin';
+  const activeRole = activeProject?.role || 'admin';
 
   return (
     <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
