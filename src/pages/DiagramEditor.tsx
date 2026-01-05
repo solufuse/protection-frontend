@@ -178,11 +178,22 @@ export default function DiagramEditor({ user }: { user: any }) {
     { type: 'Grid', icon: ' G ' },
   ];
 
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  const activeRole = activeProject?.users.find(u => u.uid === user?.uid)?.role || 'admin';
+
   return (
     <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
         {/* Header section with title and action buttons */}
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
-            <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase">Diagram Editor</h1>
+            <div className="flex items-center gap-4">
+                <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase">Diagram Editor</h1>
+                {activeProject && (
+                    <div className="flex items-center gap-2 text-xs">
+                        <span className="font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded">{activeProject.id}</span>
+                        <span className="font-semibold text-slate-500 dark:text-slate-400">{activeRole}</span>
+                    </div>
+                )}
+            </div>
             <div className="flex gap-2">
                 <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleFileChange} />
                 <button onClick={handleImportClick} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded font-bold transition-all text-[10px]"><Upload className="w-3.5 h-3.5" /> IMPORT</button>
