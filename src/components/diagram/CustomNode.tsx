@@ -5,6 +5,7 @@ import { Handle, Position, NodeProps, useReactFlow, NodeResizer } from 'reactflo
 import { Trash2 } from 'lucide-react';
 
 // SVG Icons for Electrical Components
+// Added Grid, Transformer, Circuit Breaker icons
 const Icons = {
   Grid: () => (
     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
