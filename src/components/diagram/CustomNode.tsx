@@ -62,11 +62,11 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
 
   // Style for Busbar handles: invisible by default, slightly visible when selected.
   const busbarHandleStyle = {
-    background: selected ? '#a3a3a3' : '#555', // Grey when selected, default otherwise.
+    background: selected ? '#a3a3a3' : 'transparent', // Grey when selected, transparent otherwise.
     opacity: selected ? 0.3 : 0, // 30% visible when selected, invisible otherwise.
     width: 8, // Fixed width for discreet appearance.
     height: 8, // Fixed height for discreet appearance.
-    transition: 'opacity 0.2s ease-in-out', // Smooth transition for opacity.
+    transition: 'opacity 0.2s ease-in-out, background 0.2s ease-in-out', // Smooth transition for opacity and background.
   };
 
   // Special rendering logic for the 'Busbar' node.
