@@ -1,10 +1,10 @@
 
 // DiagramEditor.tsx
 // This component provides a visual editor for creating and manipulating electrical diagrams
-// using React Flow. It includes a project sidebar for managing projects, a main canvas
-// for the diagram, and a right sidebar for adding and managing electrical blocks.
+// using React Flow. It includes a project sidebar for managing projects and a main canvas
+// for the diagram with context menu and direct node deletion.
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, MouseEvent } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -19,16 +19,18 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Save, Plus, Upload, Trash2 } from 'lucide-react';
+import { Save, Upload } from 'lucide-react';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import Toast from '../components/Toast';
+import CustomNode from '../components/diagram/CustomNode';
+import ContextMenu from '../components/diagram/ContextMenu';
 
 // Initial nodes and edges for the diagram
 const initialNodes: Node[] = [
-  { id: '1', type: 'input', data: { label: 'Grid' }, position: { x: 250, y: 5 } },
-  { id: '2', data: { label: 'Busbar' }, position: { x: 250, y: 100 } },
-  { id: '3', data: { label: 'Transformer', name: 'TX-1', sn_kva: 1000, u_kv: 20, ratio_iencl: 8, tau_ms: 400 }, position: { x: 100, y: 200 } },
-  { id: '4', data: { label: 'Circuit Breaker' }, position: { x: 400, y: 200 } },
+  { id: '1', type: 'custom', data: { label: 'Grid' }, position: { x: 250, y: 5 } },
+  { id: '2', type: 'custom', data: { label: 'Busbar' }, position: { x: 250, y: 100 } },
+  { id: '3', type: 'custom', data: { label: 'Transformer', name: 'TX-1', sn_kva: 1000, u_kv: 20, ratio_iencl: 8, tau_ms: 400 }, position: { x: 100, y: 200 } },
+  { id: '4', type: 'custom', data: { label: 'Circuit Breaker' }, position: { x: 400, y: 200 } },
 ];
 
 const initialEdges: Edge[] = [
@@ -37,14 +39,17 @@ const initialEdges: Edge[] = [
     { id: 'e2-4', source: '2', target: '4' },
 ];
 
-// Default configuration for a new project
-const defaultConfig = { project_name: "NEW_PROJECT", settings: { ansi_51: { transformer: { factor_I1: 1.2, time_dial_I1: { value: 0.5, curve: "VIT", comment: "Surcharge Transfo" }, factor_I2: 0.8, time_dial_I2: { value: 0.1, curve: "DT", comment: "Secours Court-Circuit" }, factor_I4: 6.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "High-Set Inst." } }, incomer: { factor_I1: 1.0, time_dial_I1: { value: 0.5, curve: "SIT", comment: "Incomer Std" }, factor_I2: 1.0, time_dial_I2: { value: 0.2, curve: "DT", comment: "Backup" }, factor_I4: 10.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "Inst." } }, coupling: { factor_I1: 1.0, time_dial_I1: { value: 0.5, curve: "SIT", comment: "Cpl Std" }, factor_I2: 1.0, time_dial_I2: { value: 0.2, curve: "DT", comment: "Backup" }, factor_I4: 10.0, time_dial_I4: { value: 0.05, curve: "DT", comment: "Inst." } } } }, transformers: [], links_data: [], loadflow_settings: { target_mw: 0, tolerance_mw: 0.3, swing_bus_id: "" }, plans: [] };
+const nodeTypes = {
+    custom: CustomNode,
+};
+
 
 export default function DiagramEditor({ user }: { user: any }) {
   // State for React Flow nodes and edges
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
 
   // State for project management from ProjectsSidebar
   const [projects, setProjects] = useState<Project[]>([]);
@@ -83,66 +88,47 @@ export default function DiagramEditor({ user }: { user: any }) {
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
   const onEdgesChange = useCallback((changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)), [setEdges]);
   const onConnect = useCallback((connection: Connection) => setEdges((eds) => addEdge(connection, eds)), [setEdges]);
-  const onNodeClick = useCallback((_: any, node: Node) => {
-    setSelectedNode(node);
-  }, []);
+
+  const onPaneContextMenu = useCallback((event: MouseEvent) => {
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY });
+    },
+    [setContextMenu]
+  );
+
+  const onPaneClick = useCallback(() => setContextMenu(null), [setContextMenu]);
 
   // --- Block Management ---
   const addNode = (type: string) => {
+    if (!reactFlowInstance || !contextMenu) return;
+    const position = reactFlowInstance.project({ x: contextMenu.x, y: contextMenu.y });
     const newNode: Node = {
       id: `${+new Date()}`,
+      type: 'custom',
       data: { label: type },
-      position: {
-        x: Math.random() * 400,
-        y: Math.random() * 400,
-      },
+      position,
     };
     setNodes((nds) => nds.concat(newNode));
-  };
-
-  const deleteNode = () => {
-    if (selectedNode) {
-      setNodes((nds) => nds.filter((node) => node.id !== selectedNode.id));
-      setSelectedNode(null);
-    }
+    setContextMenu(null);
   };
 
 
   // --- Diagram Save and Import/Export ---
 
-  // Saves the current diagram to a JSON config object
   const handleSave = () => {
-    const config = {
-        ...defaultConfig,
-        project_name: "DIAGRAM_PROJECT", 
-        transformers: nodes
-            .filter(node => node.data.label === 'Transformer')
-            .map(node => ({
-                name: node.data.name || node.id,
-                sn_kva: node.data.sn_kva || 0,
-                u_kv: node.data.u_kv || 0,
-                ratio_iencl: node.data.ratio_iencl || 8,
-                tau_ms: node.data.tau_ms || 400,
-            })),
-        links_data: edges
-            .filter(edge => edge.data) 
-            .map(edge => ({
-                id: edge.data.id || edge.id,
-                length_km: edge.data.length_km || 1.0,
-                impedance_zd: edge.data.impedance_zd || "0+j0",
-                impedance_z0: edge.data.impedance_z0 || "0+j0",
-                bus_from: edge.source,
-                bus_to: edge.target
-            })),
-        loadflow_settings: {
-            ...defaultConfig.loadflow_settings,
-            swing_bus_id: nodes.find(n => n.data.label === 'Grid')?.id || ""
-        },
+    const diagram = {
+      nodes: nodes,
+      edges: edges,
     };
-
-    const jsonConfig = JSON.stringify(config, null, 2);
-    console.log(jsonConfig);
-    alert('Diagram configuration generated! Check the developer console.');
+    const jsonDiagram = JSON.stringify(diagram, null, 2);
+    const blob = new Blob([jsonDiagram], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'diagram.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    notify('Diagram saved as diagram.json');
   };
 
   // Triggers the hidden file input for JSON import
@@ -156,52 +142,16 @@ export default function DiagramEditor({ user }: { user: any }) {
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
-            const json = JSON.parse(event.target?.result as string);
-            
-            const newNodes: Node[] = [];
-            const newEdges: Edge[] = [];
-
-            let yPos = 50;
-            json.transformers?.forEach((tx: any, index: number) => {
-                const id = `tx-${index + 1}`;
-                newNodes.push({ 
-                    id, 
-                    position: { x: 250, y: yPos }, 
-                    data: { label: 'Transformer', ...tx },
-                });
-                yPos += 150;
-            });
-
-            json.links_data?.forEach((link: any, index: number) => {
-                const id = `edge-${index + 1}`;
-                newEdges.push({ 
-                    id, 
-                    source: link.bus_from, 
-                    target: link.bus_to, 
-                    data: { ...link },
-                });
-            });
-            
-            setNodes(newNodes);
-            setEdges(newEdges);
-            notify("Configuration imported successfully!");
-
+            const { nodes, edges } = JSON.parse(event.target?.result as string);
+            setNodes(nodes || []);
+            setEdges(edges || []);
+            notify("Diagram imported successfully!");
         } catch (err) {
             notify("Invalid JSON file", "error");
         }
     };
     reader.readAsText(file);
   };
-
-  // --- UI Configuration ---
-
-  // List of available electrical blocks for the right sidebar
-  const electricalBlocks = [
-    { type: 'Busbar', icon: ' Minus ' },
-    { type: 'Transformer', icon: ' T ' },
-    { type: 'Circuit Breaker', icon: ' [ ] ' },
-    { type: 'Grid', icon: ' G ' },
-  ];
 
   const activeProject = projects.find(p => p.id === activeProjectId);
   const activeRole = activeProject?.role || 'admin';
@@ -236,50 +186,22 @@ export default function DiagramEditor({ user }: { user: any }) {
             
             {/* Center column for the React Flow diagram canvas */}
             <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden relative">
-                <div style={{ width: '100%', height: '100%' }}>
-                    <ReactFlow
-                        nodes={nodes}
-                        edges={edges}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        onConnect={onConnect}
-                        onNodeClick={onNodeClick}
-                    >
-                        <Controls />
-                        <Background />
-                    </ReactFlow>
-                </div>
-            </div>
-
-            {/* Right sidebar for electrical blocks and properties */}
-            <div className="w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm p-4 flex flex-col gap-4">
-                <h2 className="font-bold text-lg">Electrical Blocks</h2>
-                <div className="flex flex-col gap-2">
-                    {electricalBlocks.map((block, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 border rounded">
-                            <span className="font-mono">{block.icon}</span>
-                            <span>{block.type}</span>
-                            <button onClick={() => addNode(block.type)} className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                <Plus size={16} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-                <h2 className="font-bold text-lg mt-4">Selected Block</h2>
-                {selectedNode ? (
-                    <div className="flex flex-col gap-2 p-2 border rounded">
-                        <p>ID: {selectedNode.id}</p>
-                        <p>Type: {selectedNode.data.label}</p>
-                        <button onClick={deleteNode} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold transition-all text-[10px]">
-                            <Trash2 className="w-3.5 h-3.5" />
-                            DELETE
-                        </button>
-                    </div>
-                ) : (
-                    <div className="flex flex-col gap-2 p-2 border rounded">
-                        <p>No block selected</p>
-                    </div>
-                )}
+                <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    onPaneClick={onPaneClick}
+                    onPaneContextMenu={onPaneContextMenu}
+                    nodeTypes={nodeTypes}
+                    onInit={setReactFlowInstance}
+                    fitView
+                >
+                    <Controls />
+                    <Background />
+                </ReactFlow>
+                {contextMenu && <ContextMenu {...contextMenu} onClose={() => setContextMenu(null)} onSelect={addNode} />}
             </div>
         </div>
         
