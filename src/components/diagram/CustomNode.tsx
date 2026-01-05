@@ -60,6 +60,15 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
     setIsEditing(true);
   };
 
+  // Style for Busbar handles: invisible by default, slightly visible when selected.
+  const busbarHandleStyle = {
+    background: selected ? '#a3a3a3' : '#555', // Grey when selected, default otherwise.
+    opacity: selected ? 0.3 : 0, // 30% visible when selected, invisible otherwise.
+    width: 8, // Fixed width for discreet appearance.
+    height: 8, // Fixed height for discreet appearance.
+    transition: 'opacity 0.2s ease-in-out', // Smooth transition for opacity.
+  };
+
   // Special rendering logic for the 'Busbar' node.
   if (data.label === 'Busbar') {
     // Define a higher number of connection points for a multi-point busbar.
@@ -100,13 +109,13 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
             }}
           />
           
-          {/* Top and Bottom Handles for Busbar: These are the actual connection points. */}
+          {/* Top and Bottom Handles for Busbar: These are the actual connection points, now invisible by default, but slightly visible on selection. */}
           {handlePositions.map((pos, index) => (
             <React.Fragment key={`busbar-handle-${index}`}>
-              <Handle type="target" position={Position.Top} style={{ background: '#555', left: pos, top: 0, width: 8, height: 8 }} />
-              <Handle type="source" position={Position.Top} style={{ background: '#555', left: pos, top: 0, width: 8, height: 8 }} />
-              <Handle type="target" position={Position.Bottom} style={{ background: '#555', left: pos, bottom: 0, top: 'auto', width: 8, height: 8 }} />
-              <Handle type="source" position={Position.Bottom} style={{ background: '#555', left: pos, bottom: 0, top: 'auto', width: 8, height: 8 }} />
+              <Handle type="target" position={Position.Top} style={{ ...busbarHandleStyle, left: pos, top: 0 }} />
+              <Handle type="source" position={Position.Top} style={{ ...busbarHandleStyle, left: pos, top: 0 }} />
+              <Handle type="target" position={Position.Bottom} style={{ ...busbarHandleStyle, left: pos, bottom: 0, top: 'auto' }} />
+              <Handle type="source" position={Position.Bottom} style={{ ...busbarHandleStyle, left: pos, bottom: 0, top: 'auto' }} />
             </React.Fragment>
           ))}
 
