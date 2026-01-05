@@ -43,6 +43,7 @@ export default function Navbar({ user, onLogout, isDarkMode, toggleTheme }: Navb
     { to: "/loadflow", icon: Icons.Activity, label: "Loadflow" },
     { to: "/protection", icon: Icons.Shield, label: "Protection" },
     { to: "/config", icon: Icons.Settings, label: "Config" },
+    { to: "/diagram", icon: Icons.Share2, label: "Diagram" },
   ];
 
   return (

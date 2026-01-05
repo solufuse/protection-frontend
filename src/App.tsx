@@ -9,6 +9,7 @@ import Protection from './pages/Protection';
 import Loadflow from './pages/Loadflow';
 import Ingestion from './pages/Ingestion';
 import Config from './pages/Config';
+import DiagramEditor from './pages/DiagramEditor';
 import Extraction from './pages/Extraction';
 import Login from './pages/Login';
 import Forum from './pages/Forum'; 
@@ -80,6 +81,7 @@ export default function App() {
             <Route path="/loadflow" element={user ? <Loadflow user={user} /> : <Navigate to="/login" />} />
             <Route path="/ingestion" element={user ? <Ingestion /> : <Navigate to="/login" />} />
             <Route path="/config" element={user ? <Config user={user} /> : <Navigate to="/login" />} />
+            <Route path="/diagram" element={user ? <DiagramEditor user={user} /> : <Navigate to="/login" />} />
             <Route path="/extraction" element={user ? <Extraction /> : <Navigate to="/login" />} />
             
             <Route path="*" element={<Navigate to="/" />} />
