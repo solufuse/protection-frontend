@@ -3,7 +3,7 @@
 // [context:flow] : Displays files list with checkboxes, stars, single-line dates, and actions.
 
 import { Fragment } from 'react';
-import { Icons } from '../icons';
+import { Icons } from '../../icons';
 
 export interface SessionFile {
   path: string;

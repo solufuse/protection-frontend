@@ -1,5 +1,5 @@
 
-import { Icons } from '../icons';
+import { Icons } from '../../icons';
 
 interface FileToolbarProps {
   searchTerm: string;

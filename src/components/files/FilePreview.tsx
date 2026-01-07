@@ -1,4 +1,4 @@
-import { Icons } from '../icons';
+import { Icons } from '../../icons';
 
 interface FilePreviewProps {
   data: any;
