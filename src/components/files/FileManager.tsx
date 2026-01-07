@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, MouseEvent } from 'react';
 import { Icons } from '../../icons';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import Toast from '../Toast';
 import GlobalRoleBadge from '../GlobalRoleBadge';
 import ContextRoleBadge from '../ContextRoleBadge';
@@ -29,6 +30,7 @@ export default function FileManager({ user }: { user: any }) {
   // Resize State
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [isResizing, setIsResizing] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // --- CONFIG ---
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
@@ -161,7 +163,16 @@ export default function FileManager({ user }: { user: any }) {
     <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col select-none">
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
         <div className="flex flex-col">
-          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">Workspace</label>
+          <div className="flex items-center gap-2 mb-1">
+            <button 
+                onClick={() => setIsSidebarOpen(prev => !prev)} 
+                className="p-1 -ml-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+            >
+                {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+            </button>
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">Workspace</label>
+          </div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">
                 {activeProjectId ? <><Icons.Folder className="w-5 h-5 text-blue-600" /><span>{getActiveProjectName()}</span><button onClick={handleCopyProjectName} className="opacity-20 hover:opacity-100 transition-opacity"><Icons.Copy className="w-4 h-4" /></button></> : activeSessionUid ? <><Icons.Shield className="w-5 h-5 text-red-500" /><span className="text-red-600">Session: {usersList.find(u => u.uid === activeSessionUid)?.username || activeSessionUid.slice(0,6)}</span></> : <><Icons.HardDrive className="w-5 h-5 text-slate-600 dark:text-slate-400" /><span>My Session</span><span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">PRIVATE</span></>}
@@ -191,24 +202,26 @@ export default function FileManager({ user }: { user: any }) {
 
       <div className="flex flex-1 gap-0 min-h-0">
          {/* Resizable Sidebar Container */}
-        <div style={{ width: sidebarWidth }} className="relative flex-shrink-0 pr-2">
-            <ProjectsSidebar 
-                user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} 
-                activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} 
-                activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid} 
-                isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} 
-                newProjectName={newProjectName} setNewProjectName={setNewProjectName} 
-                onCreateProject={createProject} onDeleteProject={deleteProject} 
-                className="w-full"
-            />
-            {/* Handle */}
-            <div
-                onMouseDown={startResizing}
-                className={`absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 flex justify-center items-center hover:bg-blue-500/10 transition-colors group ${isResizing ? 'bg-blue-500/10' : ''}`}
-            >
-                <div className={`w-[1px] h-full bg-slate-200 dark:bg-slate-800 group-hover:bg-blue-400 ${isResizing ? 'bg-blue-500' : ''}`} />
+        {isSidebarOpen && (
+            <div style={{ width: sidebarWidth }} className="relative flex-shrink-0 pr-2">
+                <ProjectsSidebar 
+                    user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} 
+                    activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} 
+                    activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid} 
+                    isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} 
+                    newProjectName={newProjectName} setNewProjectName={setNewProjectName} 
+                    onCreateProject={createProject} onDeleteProject={deleteProject} 
+                    className="w-full"
+                />
+                {/* Handle */}
+                <div
+                    onMouseDown={startResizing}
+                    className={`absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 flex justify-center items-center hover:bg-blue-500/10 transition-colors group ${isResizing ? 'bg-blue-500/10' : ''}`}
+                >
+                    <div className={`w-[1px] h-full bg-slate-200 dark:bg-slate-800 group-hover:bg-blue-400 ${isResizing ? 'bg-blue-500' : ''}`} />
+                </div>
             </div>
-        </div>
+        )}
 
         <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden font-bold relative transition-all" onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files as any); }}>
             

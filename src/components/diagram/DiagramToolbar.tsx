@@ -1,6 +1,6 @@
 
 import { RefObject } from 'react';
-import { Save, Upload, Zap, Download } from 'lucide-react';
+import { Save, Upload, Zap, Download, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Icons } from '../../icons';
 import GlobalRoleBadge from '../GlobalRoleBadge';
 import ContextRoleBadge from '../ContextRoleBadge';
@@ -22,6 +22,8 @@ interface DiagramToolbarProps {
     isLoading: boolean;
     API_URL: string;
     currentProjectRole?: string;
+    onToggleSidebar?: () => void;
+    isSidebarOpen?: boolean;
 }
 
 const DiagramToolbar = ({
@@ -40,13 +42,26 @@ const DiagramToolbar = ({
     setShowHistory,
     isLoading,
     API_URL,
-    currentProjectRole
+    currentProjectRole,
+    onToggleSidebar,
+    isSidebarOpen = true
 }: DiagramToolbarProps) => {
 
     return (
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
             <div className="flex flex-col">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">Workspace</label>
+                <div className="flex items-center gap-2 mb-1">
+                    {onToggleSidebar && (
+                        <button 
+                            onClick={onToggleSidebar} 
+                            className="p-1 -ml-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+                        >
+                            {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+                        </button>
+                    )}
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">Workspace</label>
+                </div>
                 <div className="flex items-center gap-2">
                     <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">
                         {activeProjectId ? (
