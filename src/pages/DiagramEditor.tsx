@@ -18,15 +18,13 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Save, Upload, Zap } from 'lucide-react';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import Toast from '../components/Toast';
 import CustomNode from '../components/diagram/CustomNode';
 import ContextMenu from '../components/diagram/ContextMenu';
 import ElementsSidebar from '../components/diagram/ElementsSidebar';
-import { Icons } from '../icons';
-import GlobalRoleBadge from '../components/GlobalRoleBadge';
-import ContextRoleBadge from '../components/ContextRoleBadge';
+import ArchiveModal from '../components/Loadflow/ArchiveModal';
+import DiagramToolbar from '../components/diagram/DiagramToolbar';
 
 // Initial nodes and edges for the diagram
 const initialNodes: Node[] = [];
@@ -56,6 +54,8 @@ export default function DiagramEditor({ user }: { user: any }) {
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   const [isLoading, setIsLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyFiles, setHistoryFiles] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
@@ -67,6 +67,7 @@ export default function DiagramEditor({ user }: { user: any }) {
         fetchGlobalProfile();
         fetchProjects();
         loadFromSession();
+        fetchHistoryFiles();
     }
   }, [user, activeProjectId]);
 
@@ -78,6 +79,60 @@ export default function DiagramEditor({ user }: { user: any }) {
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
   const handleCopyProjectName = () => { if (!activeProjectId) return; navigator.clipboard.writeText(activeProjectId); notify("Project ID Copied to Clipboard"); };
   const getActiveProjectName = () => { if (!activeProjectId) return null; const proj = projects.find(p => p.id === activeProjectId); return proj ? proj.name : activeProjectId; };
+
+  // --- History Management ---
+  const fetchHistoryFiles = async () => {
+      if (!user) return;
+      try {
+          const t = await getToken();
+          const pParam = activeProjectId ? `?project_id=${activeProjectId}` : "";
+          const res = await fetch(`${API_URL}/files/details${pParam}`, { headers: { 'Authorization': `Bearer ${t}` } });
+          if (res.ok) {
+              const data = await res.json();
+              const files = data.files
+                .map((f: any) => f.filename)
+                .filter((name: string) => name.includes('diagram_result') && name.endsWith('.json'))
+                .sort()
+                .reverse();
+              setHistoryFiles(files);
+          }
+      } catch (e) { console.error("Failed to fetch history", e); }
+  };
+
+  const handleManualLoad = async (filename: string) => {
+      if (!user) return;
+      setIsLoading(true);
+      try {
+          const token = await getToken();
+          const dlParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
+          const fileRes = await fetch(`${API_URL}/files/download?filename=${encodeURIComponent(filename)}&token=${token}${dlParam}`);
+          
+          if (!fileRes.ok) throw new Error("Failed to download file");
+          
+          const blob = await fileRes.blob();
+          const text = await blob.text();
+          const json = JSON.parse(text);
+
+          if (json.results && json.results.length > 0) {
+             const firstRes = json.results[0];
+             if(firstRes.diagram) {
+                setNodes(firstRes.diagram.nodes || []);
+                setEdges(firstRes.diagram.edges || []);
+             }
+          } else if (json.diagram) {
+             setNodes(json.diagram.nodes || []);
+             setEdges(json.diagram.edges || []);
+          }
+          
+          notify(`Loaded: ${filename}`);
+          setShowHistory(false);
+      } catch (e) {
+          notify("Failed to load file", "error");
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
 
   // --- Session Management (Load/Save like Config.tsx) ---
   const loadFromSession = async () => {
@@ -172,8 +227,6 @@ export default function DiagramEditor({ user }: { user: any }) {
         const pParam = activeProjectId ? `project_id=${activeProjectId}` : "";
         
         // Step 1: Run Analysis on single main file if we knew it, or just trigger the bulk one.
-        // Assuming we want to run analysis on all SI2S/LF1S files in project and save topology results first.
-        // The backend `run-and-save/all` does exactly this.
         const response1 = await fetch(`${API_URL}/topology/run-and-save/all?${pParam}&basename=topology`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -184,8 +237,7 @@ export default function DiagramEditor({ user }: { user: any }) {
            throw new Error(err.detail || "Failed to run topology analysis");
         }
 
-        // Step 2: Generate Diagram from those results (or re-process files to diagram).
-        // The backend `diagram/save/all` generates diagrams from the source files.
+        // Step 2: Generate Diagram from those results
         const response2 = await fetch(`${API_URL}/topology/diagram/save/all?${pParam}&basename=diagram_result`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -200,10 +252,7 @@ export default function DiagramEditor({ user }: { user: any }) {
         
         if (result.filename) {
              notify(`Diagram Generated: ${result.filename}`);
-             // Reload to see changes if we want to auto-load the NEW file. 
-             // Note: loadFromSession logic picks 'diagram_config.json' or .json files. 
-             // It might pick up this new file if it's latest.
-             loadFromSession(); 
+             fetchHistoryFiles(); // Refresh history
         } else {
              notify("Diagram Run Complete");
         }
@@ -267,7 +316,7 @@ export default function DiagramEditor({ user }: { user: any }) {
         id: `${label}-${+new Date()}`,
         type: 'custom',
         position,
-        data: { ...droppedData }, // Use the data from the sidebar (contains component_type etc.)
+        data: { ...droppedData }, 
       };
 
       setNodes((nds) => nds.concat(newNode));
@@ -306,7 +355,7 @@ export default function DiagramEditor({ user }: { user: any }) {
     const config = {
         ...defaultConfig,
         project_name: activeProjectId || "DIAGRAM_PROJECT", 
-        diagram: { nodes, edges }, // Save full diagram data as received from backend
+        diagram: { nodes, edges }, 
     };
 
     const jsonConfig = JSON.stringify(config, null, 2);
@@ -332,15 +381,12 @@ export default function DiagramEditor({ user }: { user: any }) {
             const json = JSON.parse(event.target?.result as string);
             
             if (json.diagram) {
-                // If the structure matches the backend response
                 setNodes(json.diagram.nodes || []);
                 setEdges(json.diagram.edges || []);
             } else if (json.diagram_data) {
-                // Legacy support
                 setNodes(json.diagram_data.nodes || []);
                 setEdges(json.diagram_data.edges || []);
             } else {
-                // Try to see if it's the backend result format directly (list of results)
                  if (json.results && json.results.length > 0) {
                      const firstRes = json.results[0];
                      if(firstRes.diagram) {
@@ -350,7 +396,6 @@ export default function DiagramEditor({ user }: { user: any }) {
                         return;
                      }
                  }
-                // Fallback logic
                 notify("Unknown file format", "error");
                 return;
             }
@@ -368,43 +413,24 @@ export default function DiagramEditor({ user }: { user: any }) {
 
   return (
     <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
-        <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
-            <div className="flex flex-col">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">Workspace</label>
-                <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">
-                        {activeProjectId ? <><Icons.Folder className="w-5 h-5 text-blue-600" /><span>{getActiveProjectName()}</span><button onClick={handleCopyProjectName} className="opacity-20 hover:opacity-100 transition-opacity"><Icons.Copy className="w-4 h-4" /></button></> : activeSessionUid ? <><Icons.Shield className="w-5 h-5 text-red-500" /><span className="text-red-600">Session: {usersList.find(u => u.uid === activeSessionUid)?.username || activeSessionUid.slice(0,6)}</span></> : <><Icons.HardDrive className="w-5 h-5 text-slate-600 dark:text-slate-400" /><span>Diagram Editor</span></>}
-                    </h1>
-                    <ContextRoleBadge role={currentProjectRole} isSession={activeProjectId === null && activeSessionUid === null} />
-                    {userGlobalData && userGlobalData.global_role && (
-                        <div className="ml-2 scale-110">
-                            <GlobalRoleBadge role={userGlobalData.global_role} />
-                        </div>
-                    )}
-                </div>
-            </div>
-            <div className="flex gap-2">
-                <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleFileChange} />
-                {userGlobalData && userGlobalData.global_role === 'super_admin' && <button onClick={() => window.open(`${API_URL}/docs`, '_blank')} className="flex items-center gap-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300 px-3 py-1.5 rounded border border-red-200 dark:border-red-900 text-red-600 font-bold transition-colors"><Icons.Shield className="w-3.5 h-3.5" /> API</button>}
-                
-                <button onClick={handleRunDiagram} disabled={isLoading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px] disabled:opacity-50">
-                    <Zap className="w-3.5 h-3.5" />
-                    RUN DIAGRAM
-                </button>
-
-                <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-
-                <button onClick={handleImportClick} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded font-bold transition-all text-[10px]"><Upload className="w-3.5 h-3.5" /> IMPORT</button>
-                <button onClick={handleDownload} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded font-bold transition-all text-[10px]">
-                    <Icons.Download className="w-3.5 h-3.5" />
-                    EXPORT
-                </button>
-                <button onClick={handleSaveToSession} disabled={isLoading} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px] disabled:opacity-50">
-                    <Save className="w-3.5 h-3.5" />
-                    {isLoading ? "SAVING..." : "SAVE CLOUD"}
-                </button>
-            </div>
-        </div>
+        <DiagramToolbar 
+            activeProjectId={activeProjectId}
+            activeSessionUid={activeSessionUid}
+            usersList={usersList}
+            userGlobalData={userGlobalData}
+            getActiveProjectName={getActiveProjectName}
+            handleCopyProjectName={handleCopyProjectName}
+            fileInputRef={fileInputRef}
+            handleFileChange={handleFileChange}
+            handleImportClick={handleImportClick}
+            handleDownload={handleDownload}
+            handleSaveToSession={handleSaveToSession}
+            handleRunDiagram={handleRunDiagram}
+            setShowHistory={setShowHistory}
+            isLoading={isLoading}
+            API_URL={API_URL}
+            currentProjectRole={currentProjectRole}
+        />
 
         <div className="flex flex-1 gap-6 min-h-0">
             <ProjectsSidebar user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid} isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} newProjectName={newProjectName} setNewProjectName={setNewProjectName} onCreateProject={createProject} onDeleteProject={deleteProject} />
@@ -446,6 +472,7 @@ export default function DiagramEditor({ user }: { user: any }) {
             <ElementsSidebar />
         </div>
         
+        {showHistory && <ArchiveModal historyFiles={historyFiles} onClose={() => setShowHistory(false)} onLoad={handleManualLoad} />}
         {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
   );
