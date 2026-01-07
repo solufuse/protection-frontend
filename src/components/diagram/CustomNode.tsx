@@ -1,8 +1,7 @@
-
 // src/components/diagram/CustomNode.tsx
 import React, { useState, useEffect } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
-import { Trash2, Settings, Info } from 'lucide-react';
+import { Trash2, Settings } from 'lucide-react';
 
 // CustomNode component definition.
 const CustomNode = ({ id, data, selected }: NodeProps) => {
