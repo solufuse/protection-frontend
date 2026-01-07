@@ -1,7 +1,4 @@
 
-// [structure:root] : Custom Hook for File Management logic
-// [context:flow] : Handles fetching, uploading, deleting, sorting AND starring of files.
-
 import { useState, useEffect, useCallback } from 'react';
 import { SessionFile, SortKey, SortOrder } from '../components/files/FileTable';
 
@@ -9,11 +6,13 @@ interface UseFileManagerReturn {
     files: SessionFile[];
     loading: boolean;
     uploading: boolean;
+    currentPath: string;
+    setCurrentPath: (path: string) => void;
     sortConfig: { key: SortKey; order: SortOrder };
     handleSort: (key: SortKey) => void;
     handleUpload: (fileList: FileList | null) => Promise<void>;
-    handleDelete: (path: string) => Promise<void>;
-    handleBulkDelete: (paths: string[]) => Promise<void>;
+    handleDelete: (paths: string[]) => Promise<void>; // Changed to handle bulk delete
+    handleCreateFolder: (folderName: string) => Promise<void>;
     handleBulkDownload: (selectedFiles: Set<string>, format?: 'raw' | 'xlsx' | 'json') => Promise<void>; 
     refreshFiles: () => void;
     starredFiles: Set<string>;
@@ -31,7 +30,8 @@ export const useFileManager = (
     const [files, setFiles] = useState<SessionFile[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'uploaded_at', order: 'desc' });
+    const [currentPath, setCurrentPath] = useState(''); // NEW: Current path state
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'type', order: 'asc' });
     
     const [starredFiles, setStarredFiles] = useState<Set<string>>(() => {
         const saved = localStorage.getItem('solufuse_starred_files');
@@ -58,21 +58,31 @@ export const useFileManager = (
         setLoading(true);
         try {
             const t = await getToken();
-            let url = `${apiUrl}/files/details`;
-            if (activeProjectId) url += `?project_id=${activeProjectId}`;
-            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+            const params = new URLSearchParams();
+            if (activeProjectId) params.append('project_id', activeProjectId);
+            else if (activeSessionUid) params.append('project_id', activeSessionUid);
+            if (currentPath) params.append('path', currentPath); // NEW: Add path to request
 
-            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${t}` } });
-            if (!res.ok) throw new Error("Failed to fetch");
+            const res = await fetch(`${apiUrl}/files/details?${params.toString()}`, { 
+                headers: { 'Authorization': `Bearer ${t}` } 
+            });
+
+            if (!res.ok) throw new Error("Failed to fetch files");
             const data = await res.json();
             setFiles(data.files || []);
         } catch (e) {
             console.error(e);
             setFiles([]);
+            notify("Could not load files", "error");
         } finally {
             setLoading(false);
         }
-    }, [user, activeProjectId, activeSessionUid, apiUrl]);
+    }, [user, activeProjectId, activeSessionUid, apiUrl, currentPath]); // NEW: currentPath dependency
+
+    // Reset path when project changes
+    useEffect(() => {
+        setCurrentPath('');
+    }, [activeProjectId, activeSessionUid]);
 
     useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
@@ -85,11 +95,17 @@ export const useFileManager = (
 
         try {
             const t = await getToken();
-            let url = `${apiUrl}/files/upload`;
-            if (activeProjectId) url += `?project_id=${activeProjectId}`;
-            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+            const params = new URLSearchParams();
+            if (activeProjectId) params.append('project_id', activeProjectId);
+            else if (activeSessionUid) params.append('project_id', activeSessionUid);
+            if (currentPath) params.append('path', currentPath); // NEW: Add path to upload
 
-            const res = await fetch(url, { method: 'POST', headers: { 'Authorization': `Bearer ${t}` }, body: formData });
+            const res = await fetch(`${apiUrl}/files/upload?${params.toString()}`, { 
+                method: 'POST', 
+                headers: { 'Authorization': `Bearer ${t}` }, 
+                body: formData 
+            });
+
             if (!res.ok) throw new Error("Upload Failed");
             
             notify(`${fileList.length} File(s) Uploaded`);
@@ -101,60 +117,60 @@ export const useFileManager = (
         }
     };
 
-    const handleDelete = async (path: string) => {
-        try {
-            const t = await getToken();
-            let url = `${apiUrl}/files/file/${path}`;
-            if (activeProjectId) url += `?project_id=${activeProjectId}`;
-            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
-
-            await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } });
-            setFiles(p => p.filter(f => f.path !== path));
-            notify("File deleted");
-        } catch (e) {
-            notify("Delete failed", "error");
-        }
-    };
-
-    // [!] UPDATED: Bulk Delete using Server-Side Endpoint
-    const handleBulkDelete = async (paths: string[]) => {
+    const handleDelete = async (paths: string[]) => {
         if (paths.length === 0) return;
-        if (!confirm(`Delete ${paths.length} files permanently?`)) return;
+        if (!confirm(`Delete ${paths.length} item(s) permanently?`)) return;
         
-        notify(`Deleting ${paths.length} files...`);
+        notify(`Deleting ${paths.length} item(s)...`);
         
         try {
             const t = await getToken();
-            let url = `${apiUrl}/files/bulk-delete`;
-            if (activeProjectId) url += `?project_id=${activeProjectId}`;
-            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+            const params = new URLSearchParams();
+            if (activeProjectId) params.append('project_id', activeProjectId);
+            else if (activeSessionUid) params.append('project_id', activeSessionUid);
 
-            const res = await fetch(url, {
+            const res = await fetch(`${apiUrl}/files/bulk-delete?${params.toString()}`, {
                 method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${t}`,
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify(paths)
+                headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({paths: paths})
             });
 
-            if (!res.ok) throw new Error("Bulk delete failed");
+            if (!res.ok) throw new Error((await res.json()).detail || "Bulk delete failed");
             
             const data = await res.json();
-            
-            // Remove deleted files from state optimistically
             const deletedSet = new Set(data.deleted);
             setFiles(prev => prev.filter(f => !deletedSet.has(f.path)));
             
             if (data.errors && data.errors.length > 0) {
-                notify(`Deleted ${data.deleted.length} files. Some failed.`, "error");
+                notify(`Deleted ${data.deleted.length} of ${paths.length} items. Some failed.`, "error");
             } else {
-                notify(`${data.deleted.length} Files deleted`);
+                notify(`${data.deleted.length} Item(s) deleted`);
             }
             
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            notify("Bulk delete failed", "error");
+            notify(e.message || "Bulk delete failed", "error");
+        }
+    };
+    
+    const handleCreateFolder = async (folderName: string) => {
+        if (!folderName.trim()) return notify("Folder name cannot be empty", "error");
+        try {
+            const t = await getToken();
+            const params = new URLSearchParams();
+            if (activeProjectId) params.append('project_id', activeProjectId);
+            else if (activeSessionUid) params.append('project_id', activeSessionUid);
+
+            const res = await fetch(`${apiUrl}/files/folder?${params.toString()}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: currentPath, name: folderName })
+            });
+            if (!res.ok) throw new Error((await res.json()).detail || "Failed to create folder");
+            notify("Folder created");
+            fetchFiles();
+        } catch (e: any) {
+            notify(e.message, "error");
         }
     };
 
@@ -166,47 +182,33 @@ export const useFileManager = (
         
         try {
             const t = await getToken();
-            let url = "";
-            if (format === 'raw') {
-                url = `${apiUrl}/files/bulk-download`;
-            } else {
-                url = `${apiUrl}/ingestion/bulk-download/${format}`;
-            }
-            if (activeProjectId) url += `?project_id=${activeProjectId}`;
-            else if (activeSessionUid) url += `?project_id=${activeSessionUid}`;
+            const params = new URLSearchParams();
+            if (activeProjectId) params.append('project_id', activeProjectId);
+            else if (activeSessionUid) params.append('project_id', activeSessionUid);
 
-            const res = await fetch(url, {
+            let url = format === 'raw' ? `${apiUrl}/files/bulk-download` : `${apiUrl}/ingestion/bulk-download/${format}`;
+
+            const res = await fetch(`${url}?${params.toString()}`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${t}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(targets) 
+                headers: { 'Authorization': `Bearer ${t}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({paths: targets})
             });
 
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || "Compression/Conversion failed");
-            }
+            if (!res.ok) throw new Error((await res.json()).detail || "Download failed");
 
             const blob = await res.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = downloadUrl;
-            
             const dateStr = new Date().toISOString().slice(0,19).replace(/:/g, "-");
-            const prefix = format === 'raw' ? 'files' : `converted_${format}`;
-            link.download = `solufuse_${prefix}_${dateStr}.zip`;
-            
+            link.download = `solufuse_export_${dateStr}.zip`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
-            notify("Archive Downloaded!");
+            notify("Download started!");
 
         } catch (e: any) {
-            console.error(e);
-            notify(e.message || "Bulk download failed", "error");
+            notify(e.message || "Download failed", "error");
         }
     };
 
@@ -220,6 +222,12 @@ export const useFileManager = (
 
         if (aStarred && !bStarred) return -1; 
         if (!aStarred && bStarred) return 1;
+
+        // NEW: Always sort folders first when sorting by name or type
+        if (sortConfig.key === 'filename' || sortConfig.key === 'type') {
+            if (a.type === 'folder' && b.type !== 'folder') return -1;
+            if (a.type !== 'folder' && b.type === 'folder') return 1;
+        }
 
         let aVal: any = a[sortConfig.key];
         let bVal: any = b[sortConfig.key];
@@ -243,11 +251,13 @@ export const useFileManager = (
         files: sortedFiles,
         loading,
         uploading,
+        currentPath,
+        setCurrentPath,
         sortConfig,
         handleSort,
         handleUpload,
-        handleDelete,
-        handleBulkDelete,
+        handleDelete, // Unified delete function
+        handleCreateFolder,
         handleBulkDownload, 
         refreshFiles: fetchFiles,
         starredFiles,
