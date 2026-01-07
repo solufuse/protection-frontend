@@ -1,9 +1,8 @@
 // src/components/diagram/CustomNode.tsx
 import React, { useState, useEffect } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
-import { Trash2, Settings } from 'lucide-react';
+import { Trash2, Settings, Activity, Database, Zap, FileText } from 'lucide-react';
 
-// CustomNode component definition.
 const CustomNode = ({ id, data, selected }: NodeProps) => {
   const { setNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(false);
@@ -37,189 +36,175 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
   const onDoubleClick = () => setIsEditing(true);
 
   // Helper to determine component type
-  const componentType = currentData.component_type || currentData.label;
+  const componentType = currentData.component_type || currentData.label || 'Unknown';
 
-  // Determine Handle visibility based on type (Top-Down flow)
-  // Tenant (Source) -> Top of diagram -> Only output (Source) at Bottom.
-  // Aboutissant (Load/Downstream) -> Bottom of diagram -> Input (Target) at Top, Output (Source) at Bottom.
-  const isSourceNode = componentType === 'Incomer' || componentType === 'Grid';
+  // Determine Node Category (Backend/Electrical vs Extraction/Formula)
+  const isExtractionNode = ['Extraction', 'Formula', 'GetCalculation', 'Data'].some(t => componentType.includes(t));
   
-  // You can define other types like 'Load' if they exist to remove the bottom handle.
-  // const isLoadNode = componentType === 'Load';
+  // Color Schemes
+  // Blue Fluo for Backend/Electrical Diagram
+  const blueStyle = "border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.4)] bg-slate-900/90 text-cyan-50";
+  const blueHeader = "bg-cyan-500/20 border-b border-cyan-500/30 text-cyan-300";
+  
+  // Red/Orange for Extraction/Specific Data
+  const redStyle = "border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)] bg-slate-900/90 text-orange-50";
+  const redHeader = "bg-orange-500/20 border-b border-orange-500/30 text-orange-300";
 
-  // Common styles for the "text diagram" look
-  const containerStyle = `relative flex flex-col items-center justify-center p-2 rounded-sm border-2 transition-all bg-white dark:bg-slate-900 ${
-    selected ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-300 dark:border-slate-600'
+  const activeStyle = isExtractionNode ? redStyle : blueStyle;
+  const headerStyle = isExtractionNode ? redHeader : blueHeader;
+
+  const containerStyle = `relative flex flex-col w-[400px] h-[300px] rounded-lg border-2 transition-all ${activeStyle} ${
+    selected ? 'ring-2 ring-white/50' : ''
   }`;
-  
-  const labelStyle = "font-bold text-xs text-slate-800 dark:text-slate-100 text-center select-none";
-  const subLabelStyle = "text-[9px] text-slate-500 dark:text-slate-400 font-mono text-center mt-0.5 select-none";
 
   // Render content based on type
   const renderContent = () => {
-    if (componentType === 'Bus') {
-        const voltage = currentData.NomlkV || currentData.KV || currentData.vn_kv || '?';
+    // Electrical Components
+    if (!isExtractionNode) {
         return (
-            <>
-                <div className={labelStyle}>{currentData.IDBus || currentData.label}</div>
-                <div className={subLabelStyle}>{voltage} kV</div>
-            </>
-        );
-    }
-    
-    if (componentType === 'Transformer') {
-        const primV = currentData.PrimkV || '?';
-        const secV = currentData.SeckV || '?';
-        const mva = currentData.MVA || '?';
-        return (
-            <>
-                <div className={labelStyle}>{currentData.ID || currentData.label}</div>
-                <div className={subLabelStyle}>{mva} MVA</div>
-                <div className="text-[8px] text-slate-400 mt-0.5">{primV}/{secV} kV</div>
-            </>
+            <div className="flex flex-col h-full p-4 space-y-4">
+               <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-md bg-white/5">
+                        <Zap size={24} className={isExtractionNode ? "text-orange-400" : "text-cyan-400"} />
+                    </div>
+                    <div>
+                        <div className="text-sm opacity-70 uppercase tracking-wider">Component</div>
+                        <div className="text-xl font-bold">{currentData.ID || currentData.label || componentType}</div>
+                    </div>
+               </div>
+
+               <div className="flex-1 bg-black/20 rounded border border-white/5 p-3 font-mono text-sm overflow-auto">
+                    {/* Display key properties dynamically */}
+                    {Object.entries(currentData).map(([k, v]) => {
+                        if (['id', 'label', 'component_type', 'width', 'height', 'position'].includes(k.toLowerCase())) return null;
+                        return (
+                            <div key={k} className="flex justify-between border-b border-white/5 py-1 last:border-0">
+                                <span className="opacity-50">{k}:</span>
+                                <span className="font-semibold">{String(v)}</span>
+                            </div>
+                        );
+                    })}
+               </div>
+               
+               <div className="flex justify-between items-center text-xs opacity-60">
+                    <span>BACKEND CALCULATED</span>
+                    <Activity size={14} />
+               </div>
+            </div>
         );
     }
 
-    if (componentType === 'Incomer' || componentType === 'Grid') {
-        return (
-            <>
-                <div className={labelStyle}>{currentData.ID || currentData.label}</div>
-                <div className={subLabelStyle}>{currentData.KV || '?'} kV</div>
-                <div className="text-[8px] text-slate-400 mt-0.5 uppercase tracking-wider">SOURCE</div>
-            </>
-        );
-    }
-
-    if (componentType.includes('Breaker') || componentType === 'Coupling' || componentType === 'Switch') {
-        const isClosed = currentData.closed !== false;
-        return (
-            <>
-                <div className={labelStyle}>{currentData.ID || currentData.label}</div>
-                <div className={`text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded ${isClosed ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
-                    {isClosed ? 'CLOSED' : 'OPEN'}
-                </div>
-            </>
-        );
-    }
-
-    // Default
+    // Extraction / Formula Components
     return (
-        <>
-            <div className={labelStyle}>{currentData.ID || currentData.label}</div>
-            <div className={subLabelStyle}>{componentType}</div>
-        </>
+        <div className="flex flex-col h-full p-4 space-y-4">
+             <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-white/5">
+                    <Database size={24} className="text-orange-400" />
+                </div>
+                <div>
+                    <div className="text-sm opacity-70 uppercase tracking-wider">Extraction Module</div>
+                    <div className="text-xl font-bold">{currentData.ID || currentData.label || "Data Extractor"}</div>
+                </div>
+           </div>
+           
+           <div className="flex-1 flex items-center justify-center bg-orange-500/5 rounded border border-orange-500/20 border-dashed">
+                <div className="text-center opacity-70">
+                    <FileText size={32} className="mx-auto mb-2 opacity-50" />
+                    <p>Formula / Data Config</p>
+                </div>
+           </div>
+        </div>
     );
   };
-
-  // Dimensions based on type
-  let width = 100;
-  let height = 50;
-  
-  if (componentType === 'Bus') {
-      width = currentData.width || 120;
-      height = currentData.height || 40;
-  } else if (componentType === 'Transformer') {
-      height = 60;
-  } else if (componentType.includes('Breaker')) {
-      width = 80;
-      height = 50;
-  }
 
   return (
     <div 
         className={containerStyle}
-        style={{ minWidth: width, minHeight: height }}
         onDoubleClick={onDoubleClick}
     >
-        {/* Handles Configuration:
-            - Standard: Top = Target (Input), Bottom = Source (Output).
-            - Source (Grid): Top = None, Bottom = Source.
-            - Bus: Both at Top/Bottom to allow flexible connections (or restrict if preferred).
+        {/* Header/Title Bar */}
+        <div className={`h-8 w-full rounded-t flex items-center justify-between px-3 ${headerStyle}`}>
+            <span className="text-[10px] font-bold tracking-widest uppercase">{componentType}</span>
+            <div className="flex gap-2">
+                 {selected && (
+                    <>
+                        <button className="hover:text-white transition-colors" onClick={() => setIsEditing(true)}>
+                            <Settings size={12} />
+                        </button>
+                        <button className="hover:text-red-400 transition-colors" onClick={onDelete}>
+                            <Trash2 size={12} />
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
+
+        {/* 
+            Connection Handles:
+            - Left: Input (Target) -> Main Flow
+            - Right: Output (Source) -> Main Flow
+            - Top: Accessory Input/Output (Target/Source) -> For attaching modules
+            - Bottom: Accessory Input/Output (Target/Source) -> For attaching modules
         */}
 
-        {/* Top Handle: Only if NOT a Source (Grid/Incomer) */}
-        {!isSourceNode && (
-            <Handle 
-                type="target" 
-                position={Position.Top} 
-                className="!bg-slate-400 !w-2 !h-2 !rounded-sm" 
-            />
-        )}
-        
-        {/* We generally don't put a Source at the Top unless it's a specific upward flow, 
-            but in standard top-down, Source is at Bottom. 
-            However, for Bus, we might want to allow connecting FROM it upwards? 
-            Usually not in strict top-down. 
-            Let's keep it simple: Top is Target, Bottom is Source. 
-        */}
+        {/* Main Flow (Left to Right) */}
+        <Handle 
+            type="target" 
+            position={Position.Left} 
+            id="in-left"
+            className="!w-4 !h-4 !bg-slate-200 !border-2 !border-slate-800 !rounded-full !-ml-2 hover:!bg-white transition-colors" 
+        />
+        <Handle 
+            type="source" 
+            position={Position.Right} 
+            id="out-right"
+            className="!w-4 !h-4 !bg-slate-200 !border-2 !border-slate-800 !rounded-full !-mr-2 hover:!bg-white transition-colors" 
+        />
 
-        {/* Bottom Handle: All nodes usually have an output, unless it's a pure Sink (Load).
-            If we had 'Load' type, we would hide this.
-        */}
+        {/* Accessory Flow (Top/Bottom) for Plug & Play Modules */}
+        <Handle 
+            type="target" 
+            position={Position.Top} 
+            id="in-top"
+            className="!w-3 !h-3 !bg-slate-500 !border-2 !border-slate-900 !rounded-sm !-mt-1.5 opacity-50 hover:opacity-100 transition-opacity" 
+        />
         <Handle 
             type="source" 
             position={Position.Bottom} 
-            className="!bg-slate-400 !w-2 !h-2 !rounded-sm" 
+            id="out-bottom"
+            className="!w-3 !h-3 !bg-slate-500 !border-2 !border-slate-900 !rounded-sm !-mb-1.5 opacity-50 hover:opacity-100 transition-opacity" 
         />
 
         {/* Content */}
         {renderContent()}
 
-        {/* Action Buttons */}
-        {selected && (
-            <div className="absolute -top-3 -right-3 flex gap-1 nodrag z-50">
-                <button className="bg-white dark:bg-slate-700 text-slate-500 hover:text-blue-500 border border-slate-200 dark:border-slate-600 rounded-full p-1 shadow-sm transition-colors" onClick={() => setIsEditing(true)}>
-                    <Settings size={12} />
-                </button>
-                <button className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-sm transition-colors" onClick={onDelete}>
-                    <Trash2 size={12} />
-                </button>
-            </div>
-        )}
-
-        {/* Editor */}
+        {/* Editor Modal */}
         {isEditing && (
-            <NodePropertiesEditor 
-                data={currentData} 
-                onChange={handleValueChange} 
-                onSave={applyChanges} 
-                onClose={() => setIsEditing(false)} 
-            />
+            <div className="absolute top-10 left-10 z-50 bg-slate-800 border border-slate-600 shadow-2xl rounded p-4 w-64 text-left" onClick={e => e.stopPropagation()}>
+                <h4 className="text-sm font-bold text-slate-300 mb-3 border-b border-slate-700 pb-2">Properties</h4>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {Object.keys(currentData).map(key => {
+                        if (['width', 'height', 'component_type', 'position', 'id'].includes(key.toLowerCase())) return null;
+                        return (
+                            <div key={key}>
+                                <label className="block text-[10px] text-slate-500 uppercase mb-1">{key}</label>
+                                <input
+                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:border-blue-500 outline-none"
+                                    value={currentData[key]}
+                                    onChange={(e) => handleValueChange(key, e.target.value)}
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="mt-3 flex gap-2">
+                    <button onClick={applyChanges} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-1.5 rounded">Save</button>
+                    <button onClick={() => setIsEditing(false)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs py-1.5 rounded">Cancel</button>
+                </div>
+            </div>
         )}
     </div>
   );
 };
-
-// Sub-component for editing properties
-const NodePropertiesEditor = ({ data, onChange, onSave, onClose }: { data: any, onChange: (k: string, v: any) => void, onSave: () => void, onClose: () => void }) => {
-    return (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded-lg p-3 min-w-[200px] max-h-[300px] overflow-y-auto cursor-default text-left" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100 dark:border-slate-700">
-                <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Settings size={10} /> Properties</span>
-                <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
-            </div>
-            
-            <div className="space-y-2">
-                {Object.keys(data).map(key => {
-                    // Skip internal fields
-                    if (['width', 'height', 'component_type', 'position', 'id'].includes(key.toLowerCase())) return null;
-                    return (
-                        <div key={key} className="flex flex-col gap-0.5">
-                            <label className="text-[9px] font-semibold text-slate-500 uppercase truncate" title={key}>{key}</label>
-                            <input
-                                type="text"
-                                value={data[key]}
-                                onChange={(e) => onChange(key, e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && onSave()}
-                                className="w-full text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 outline-none dark:text-slate-200"
-                            />
-                        </div>
-                    );
-                })}
-            </div>
-            <button onClick={onSave} className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-1.5 rounded transition-colors">SAVE</button>
-        </div>
-    );
-}
 
 export default CustomNode;
