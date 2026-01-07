@@ -113,18 +113,22 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
         {/* Body / Properties List */}
         {renderProperties()}
 
-        {/* Handles - Discrete & Professional */}
+        {/* Handles - Vertical Flow (Top -> Bottom) */}
+        
+        {/* Top Handle: Input / Target */}
         <Handle 
             type="target" 
-            position={Position.Left} 
-            id="in-left"
-            className="!w-3 !h-3 !bg-[#1e1e1e] !border-[3px] !border-slate-400 !rounded-full !-ml-[7px] hover:!border-white hover:!scale-125 transition-all" 
+            position={Position.Top} 
+            id="in-top"
+            className="!w-3 !h-3 !bg-[#1e1e1e] !border-[3px] !border-slate-400 !rounded-full !-mt-[7px] hover:!border-white hover:!scale-125 transition-all" 
         />
+        
+        {/* Bottom Handle: Output / Source */}
         <Handle 
             type="source" 
-            position={Position.Right} 
-            id="out-right"
-            className="!w-3 !h-3 !bg-[#1e1e1e] !border-[3px] !border-slate-400 !rounded-full !-mr-[7px] hover:!border-white hover:!scale-125 transition-all" 
+            position={Position.Bottom} 
+            id="out-bottom"
+            className="!w-3 !h-3 !bg-[#1e1e1e] !border-[3px] !border-slate-400 !rounded-full !-mb-[7px] hover:!border-white hover:!scale-125 transition-all" 
         />
 
         {/* Inline Editor Modal */}
