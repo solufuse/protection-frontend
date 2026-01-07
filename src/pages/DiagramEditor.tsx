@@ -26,6 +26,7 @@ import ElementsSidebar from '../components/diagram/ElementsSidebar';
 import ArchiveModal from '../components/Loadflow/ArchiveModal';
 import DiagramToolbar from '../components/diagram/DiagramToolbar';
 import FileTable from '../components/FileTable';
+import FileToolbar from '../components/FileToolbar'; // Import Toolbar
 import { useFileManager } from '../hooks/useFileManager';
 
 // Initial nodes and edges for the diagram
@@ -61,6 +62,7 @@ export default function DiagramEditor({ user }: { user: any }) {
   const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showFileSelector, setShowFileSelector] = useState<{ show: boolean, mode: 'single' | 'bulk' | null }>({ show: false, mode: null });
+  const [searchTerm, setSearchTerm] = useState(""); // Add search state for modal
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
@@ -71,7 +73,6 @@ export default function DiagramEditor({ user }: { user: any }) {
     files, 
     loading: filesLoading, 
     handleDelete, 
-    handleBulkDelete, 
     sortConfig, 
     handleSort,
     starredFiles,
@@ -79,6 +80,13 @@ export default function DiagramEditor({ user }: { user: any }) {
   } = useFileManager(user, activeProjectId, activeSessionUid, API_URL, notify);
 
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  
+  // Filter files for the selector
+  const filteredFiles = files.filter(f => {
+      const isSource = f.filename.endsWith('.si2s') || f.filename.endsWith('.lf1s') || f.filename.endsWith('.txt');
+      const matchesSearch = f.filename.toLowerCase().includes(searchTerm.toLowerCase());
+      return isSource && matchesSearch;
+  });
 
   useEffect(() => {
     if (user) {
@@ -246,6 +254,7 @@ export default function DiagramEditor({ user }: { user: any }) {
           // Open selector
           setShowFileSelector({ show: true, mode });
           setSelectedFiles(new Set()); // Reset selection
+          setSearchTerm(""); // Reset search
       }
   };
 
@@ -547,19 +556,30 @@ export default function DiagramEditor({ user }: { user: any }) {
                             ✕
                         </button>
                     </div>
+                    
+                    {/* Reusing FileToolbar for Search and Selection Count */}
+                    <div className="border border-slate-200 dark:border-slate-700 rounded-t-md border-b-0">
+                         <FileToolbar
+                             searchTerm={searchTerm}
+                             setSearchTerm={setSearchTerm}
+                             fileCount={filteredFiles.length}
+                             selectedCount={selectedFiles.size}
+                             readOnly={true} // Switches Toolbar to "Selection Mode" (Hides Upload/Actions)
+                         />
+                    </div>
 
-                    <div className="flex-1 overflow-auto min-h-0 border border-slate-200 dark:border-slate-700 rounded-md">
+                    <div className="flex-1 overflow-auto min-h-0 border border-slate-200 dark:border-slate-700 rounded-b-md border-t-0">
                          <FileTable
-                            files={files.filter(f => f.filename.endsWith('.si2s') || f.filename.endsWith('.lf1s') || f.filename.endsWith('.txt'))} // Filter only valid source files?
+                            files={filteredFiles} // Filtered files passed here
                             loading={filesLoading}
                             selectedFiles={selectedFiles}
                             setSelectedFiles={setSelectedFiles}
-                            onDelete={handleDelete}
+                            onDelete={handleDelete} // Required by type, but ignored in ReadOnly
                             sortConfig={sortConfig}
-                            onSort={handleSort} // Changed from handleSort prop to onSort prop to match FileTable definition
+                            onSort={handleSort}
                             starredFiles={starredFiles}
-                            onToggleStar={toggleStar} // Changed from toggleStar to onToggleStar
-                            readOnly={true} // Only selection
+                            onToggleStar={toggleStar}
+                            readOnly={true} // Hides per-row actions
                             onRowClick={(file) => {
                                 if (showFileSelector.mode === 'single') {
                                     // If single mode, select only one and run
