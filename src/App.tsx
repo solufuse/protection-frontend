@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { auth } from './firebase';
-import Navbar from './components/Navbar';
-import Files from './pages/Files';
+import Sidebar from './components/Sidebar';
+import Dashboard from './pages/Dashboard';
 import Protection from './pages/Protection';
 import Loadflow from './pages/Loadflow';
 import Ingestion from './pages/Ingestion';
@@ -14,13 +14,17 @@ import Extraction from './pages/Extraction';
 import Login from './pages/Login';
 import Forum from './pages/Forum'; 
 import Profile from './pages/Profile'; 
+import FileManager from './components/files/FileManager';
 import { ReactFlowProvider } from 'reactflow';
+import { X } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isFileManagerOpen, setIsFileManagerOpen] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('solufuse_theme');
@@ -39,10 +43,9 @@ export default function App() {
         setUser(currentUser);
         setLoading(false);
       } else {
-        // If no user, sign in anonymously to provide guest access
         signInAnonymously(auth).catch((error) => {
             console.error("Anonymous sign-in failed:", error);
-            setUser(null); // Fallback to no user if anonymous sign in fails
+            setUser(null);
             setLoading(false);
         });
       }
@@ -62,19 +65,26 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="flex flex-col h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-300 overflow-hidden">
+      <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-300">
         
-        {user && <Navbar user={user} onLogout={() => auth.signOut()} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />}
+        {user && (
+          <Sidebar 
+            user={user} 
+            onLogout={() => auth.signOut()} 
+            isDarkMode={isDarkMode} 
+            toggleTheme={toggleTheme} 
+            onToggleFileManager={() => setIsFileManagerOpen(!isFileManagerOpen)}
+            isFileManagerOpen={isFileManagerOpen}
+            isSidebarExpanded={isSidebarExpanded}
+            setIsSidebarExpanded={setIsSidebarExpanded}
+          />
+        )}
         
-        <main className="flex-1 overflow-y-scroll w-full relative flex flex-col">
+        <main className="flex-1 overflow-y-auto w-full relative">
           <Routes>
-            {/* Redirect to home if a user (including anonymous) exists, otherwise show login */}
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
             
-            {/* Protect routes - redirect to login if user is null (only if anonymous sign-in fails) */}
-            <Route path="/" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
-            <Route path="/files" element={user ? <Files user={user} /> : <Navigate to="/login" />} />
-            
+            <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/forum" element={user ? <Forum user={user} /> : <Navigate to="/login" />} />
             <Route path="/profile" element={user ? <Profile user={user} /> : <Navigate to="/login" />} />
             
@@ -88,6 +98,17 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
+
+        {isFileManagerOpen && user && (
+          <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center">
+            <div className="w-[95%] h-[95%] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+              <button onClick={() => setIsFileManagerOpen(false)} className="absolute top-4 right-4 z-10 p-1.5 bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200/90 dark:hover:bg-slate-700/90 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+              <FileManager user={user} />
+            </div>
+          </div>
+        )}
       </div>
     </BrowserRouter>
   );
