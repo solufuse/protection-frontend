@@ -1,6 +1,6 @@
 
-import { RefObject } from 'react';
-import { Save, Upload, Zap, Download } from 'lucide-react';
+import { RefObject, useState } from 'react';
+import { Save, Upload, Zap, Download, ChevronDown } from 'lucide-react';
 import { Icons } from '../../icons';
 import GlobalRoleBadge from '../GlobalRoleBadge';
 import ContextRoleBadge from '../ContextRoleBadge';
@@ -17,7 +17,7 @@ interface DiagramToolbarProps {
     handleImportClick: () => void;
     handleDownload: () => void;
     handleSaveToSession: () => void;
-    handleRunDiagram: () => void;
+    handleRunDiagram: (mode: 'single' | 'all' | 'bulk') => void;
     setShowHistory: (show: boolean) => void;
     isLoading: boolean;
     API_URL: string;
@@ -42,6 +42,13 @@ const DiagramToolbar = ({
     API_URL,
     currentProjectRole
 }: DiagramToolbarProps) => {
+
+    const [isRunMenuOpen, setIsRunMenuOpen] = useState(false);
+
+    const onRunClick = (mode: 'single' | 'all' | 'bulk') => {
+        handleRunDiagram(mode);
+        setIsRunMenuOpen(false);
+    }
 
     return (
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
@@ -77,7 +84,7 @@ const DiagramToolbar = ({
                     )}
                 </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 relative">
                 <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleFileChange} />
                 {userGlobalData && userGlobalData.global_role === 'super_admin' && (
                     <button onClick={() => window.open(`${API_URL}/docs`, '_blank')} className="flex items-center gap-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300 px-3 py-1.5 rounded border border-red-200 dark:border-red-900 text-red-600 font-bold transition-colors">
@@ -89,10 +96,35 @@ const DiagramToolbar = ({
                     <Icons.Archive className="w-3.5 h-3.5" /> HISTORY
                 </button>
 
-                <button onClick={handleRunDiagram} disabled={isLoading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px] disabled:opacity-50">
-                    <Zap className="w-3.5 h-3.5" />
-                    RUN DIAGRAM
-                </button>
+                <div className="relative">
+                    <button 
+                        onClick={() => setIsRunMenuOpen(!isRunMenuOpen)} 
+                        disabled={isLoading} 
+                        className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px] disabled:opacity-50"
+                    >
+                        <Zap className="w-3.5 h-3.5" />
+                        RUN DIAGRAM
+                        <ChevronDown className="w-3 h-3 ml-1" />
+                    </button>
+                    
+                    {isRunMenuOpen && (
+                         <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xl z-50 py-1">
+                            <button onClick={() => onRunClick('single')} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-200">
+                                Run Single File
+                            </button>
+                            <button onClick={() => onRunClick('all')} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-200">
+                                Run All (Project)
+                            </button>
+                            <button onClick={() => onRunClick('bulk')} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-200">
+                                Run Bulk
+                            </button>
+                         </div>
+                    )}
+                </div>
+
+                {isRunMenuOpen && (
+                    <div className="fixed inset-0 z-40" onClick={() => setIsRunMenuOpen(false)}></div>
+                )}
 
                 <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
 

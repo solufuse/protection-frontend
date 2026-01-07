@@ -25,6 +25,8 @@ import ContextMenu from '../components/diagram/ContextMenu';
 import ElementsSidebar from '../components/diagram/ElementsSidebar';
 import ArchiveModal from '../components/Loadflow/ArchiveModal';
 import DiagramToolbar from '../components/diagram/DiagramToolbar';
+import FileTable from '../components/FileTable';
+import { useFileManager } from '../hooks/useFileManager';
 
 // Initial nodes and edges for the diagram
 const initialNodes: Node[] = [];
@@ -58,10 +60,25 @@ export default function DiagramEditor({ user }: { user: any }) {
   // Correct type for ArchiveModal props
   const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showFileSelector, setShowFileSelector] = useState<{ show: boolean, mode: 'single' | 'bulk' | null }>({ show: false, mode: null });
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
+
+  // File Manager Hook
+  const { 
+    files, 
+    loading: filesLoading, 
+    handleDelete, 
+    handleBulkDelete, 
+    sortConfig, 
+    handleSort,
+    starredFiles,
+    toggleStar
+  } = useFileManager(user, activeProjectId, activeSessionUid, API_URL, notify);
+
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -222,27 +239,75 @@ export default function DiagramEditor({ user }: { user: any }) {
     }
   };
 
-  const handleRunDiagram = async () => {
+  const handleRunDiagram = async (mode: 'single' | 'all' | 'bulk' = 'all') => {
+      if (mode === 'all') {
+          await executeRun(null, 'all');
+      } else {
+          // Open selector
+          setShowFileSelector({ show: true, mode });
+          setSelectedFiles(new Set()); // Reset selection
+      }
+  };
+
+  const executeRun = async (selectedFilesList: string[] | null, mode: 'single' | 'all' | 'bulk') => {
     if (!user) return;
     setIsLoading(true);
+    setShowFileSelector({ show: false, mode: null });
+
     try {
         const token = await getToken();
         const pParam = activeProjectId ? `project_id=${activeProjectId}` : "";
         
-        // Step 1: Run Analysis on single main file if we knew it, or just trigger the bulk one.
-        // Assuming we want to run analysis on all SI2S/LF1S files in project and save topology results first.
-        // The backend `run-and-save/all` does exactly this.
-        const response1 = await fetch(`${API_URL}/topology/run-and-save/all?${pParam}&basename=topology`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        notify(`Running Analysis (${mode})...`);
+
+        let response1;
+
+        if (mode === 'all') {
+             // Run All in Project
+             response1 = await fetch(`${API_URL}/topology/run-and-save/all?${pParam}&basename=topology`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        } else if (mode === 'single' && selectedFilesList && selectedFilesList.length > 0) {
+             // Run Single File (Use the first one selected)
+             // The backend endpoint for single file run needs to be confirmed.
+             // Assuming a generic run endpoint that takes a filename?
+             // OR we use the bulk endpoint with just one file.
+             // Let's use bulk logic for simplicity if single endpoint is not distinct.
+             
+             // Actually, let's use the 'bulk' logic for both single/bulk selections.
+             response1 = await fetch(`${API_URL}/topology/run-and-save/bulk?${pParam}&basename=topology`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(selectedFilesList)
+            });
+
+        } else if (mode === 'bulk' && selectedFilesList && selectedFilesList.length > 0) {
+             // Run Bulk
+             response1 = await fetch(`${API_URL}/topology/run-and-save/bulk?${pParam}&basename=topology`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(selectedFilesList)
+            });
+        } else {
+            throw new Error("No files selected");
+        }
 
         if (!response1.ok) {
            const err = await response1.json();
            throw new Error(err.detail || "Failed to run topology analysis");
         }
 
-        // Step 2: Generate Diagram from those results
+        // Step 2: Generate Diagram from those results (Always 'all' generated results or specific?)
+        // The backend 'diagram/save/all' picks up ALL generated .json topology results.
+        // If we ran specific files, we might want to only generate diagrams for those?
+        // But for now, regenerating diagrams for all valid results is safe.
         const response2 = await fetch(`${API_URL}/topology/diagram/save/all?${pParam}&basename=diagram_result`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -258,6 +323,10 @@ export default function DiagramEditor({ user }: { user: any }) {
         if (result.filename) {
              notify(`Diagram Generated: ${result.filename}`);
              fetchHistoryFiles(); // Refresh history
+             // Optional: If single file run, auto load?
+             if (mode === 'single' && selectedFilesList?.length === 1) {
+                 // handleManualLoad(result.filename); // Maybe too aggressive
+             }
         } else {
              notify("Diagram Run Complete");
         }
@@ -477,6 +546,68 @@ export default function DiagramEditor({ user }: { user: any }) {
             <ElementsSidebar />
         </div>
         
+        {/* File Selection Modal */}
+        {showFileSelector.show && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                            Select Files for {showFileSelector.mode === 'single' ? 'Single Analysis' : 'Bulk Analysis'}
+                        </h2>
+                        <button onClick={() => setShowFileSelector({ show: false, mode: null })} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            ✕
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-auto min-h-0 border border-slate-200 dark:border-slate-700 rounded-md">
+                         <FileTable
+                            files={files.filter(f => f.filename.endsWith('.si2s') || f.filename.endsWith('.lf1s') || f.filename.endsWith('.txt'))} // Filter only valid source files?
+                            loading={filesLoading}
+                            selectedFiles={selectedFiles}
+                            setSelectedFiles={setSelectedFiles}
+                            onDelete={handleDelete}
+                            onBulkDelete={handleBulkDelete} // Not used here but required props
+                            sortConfig={sortConfig}
+                            handleSort={handleSort}
+                            starredFiles={starredFiles}
+                            toggleStar={toggleStar}
+                            readOnly={true} // Only selection
+                            onRowClick={(file) => {
+                                if (showFileSelector.mode === 'single') {
+                                    // If single mode, select only one and run
+                                    executeRun([file.path || file.filename], 'single');
+                                } else {
+                                    // Toggle selection for bulk
+                                    const newSet = new Set(selectedFiles);
+                                    if (newSet.has(file.path || file.filename)) newSet.delete(file.path || file.filename);
+                                    else newSet.add(file.path || file.filename);
+                                    setSelectedFiles(newSet);
+                                }
+                            }}
+                        />
+                    </div>
+
+                    <div className="mt-4 flex justify-end gap-2">
+                        <button 
+                            onClick={() => setShowFileSelector({ show: false, mode: null })} 
+                            className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded"
+                        >
+                            CANCEL
+                        </button>
+                        {showFileSelector.mode === 'bulk' && (
+                            <button 
+                                onClick={() => executeRun(Array.from(selectedFiles), 'bulk')}
+                                disabled={selectedFiles.size === 0}
+                                className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50"
+                            >
+                                RUN SELECTED ({selectedFiles.size})
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+
         {showHistory && <ArchiveModal historyFiles={historyFiles} onClose={() => setShowHistory(false)} onLoad={handleManualLoad} />}
         {toast.show && <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ ...toast, show: false })} />}
     </div>
