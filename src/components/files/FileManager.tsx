@@ -118,8 +118,7 @@ export default function FileManager({ user }: { user: any }) {
                         error={error}
                         selectedFiles={selectedFiles}
                         setSelectedFiles={setSelectedFiles}
-                        onDelete={handleDelete}
-                        onPathChange={setCurrentPath} // Connect path changes
+                        onPathChange={setCurrentPath}
                         sortConfig={sortConfig}
                         onSort={handleSort}
                         starredFiles={starredFiles}
