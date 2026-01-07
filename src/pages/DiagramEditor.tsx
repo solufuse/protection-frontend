@@ -469,6 +469,44 @@ export default function DiagramEditor({ user }: { user: any }) {
     reader.readAsText(file);
   };
 
+  // --- Resizing Sidebar Logic ---
+  const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback(
+    (mouseMoveEvent: MouseEvent) => {
+      if (isResizing) {
+        // Adjust these constraints as needed
+        const newWidth = mouseMoveEvent.clientX - 24; // Assuming 24px left padding on container
+        if (newWidth > 150 && newWidth < 600) {
+          setSidebarWidth(newWidth);
+        }
+      }
+    },
+    [isResizing]
+  );
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener("mousemove", resize as any);
+      window.addEventListener("mouseup", stopResizing);
+    } else {
+      window.removeEventListener("mousemove", resize as any);
+      window.removeEventListener("mouseup", stopResizing);
+    }
+    return () => {
+      window.removeEventListener("mousemove", resize as any);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
+
+
   let currentProjectRole = undefined;
   if (activeProjectId) currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;
   else if (activeSessionUid) currentProjectRole = 'admin';
