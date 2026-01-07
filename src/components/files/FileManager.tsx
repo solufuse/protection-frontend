@@ -110,7 +110,6 @@ export default function FileManager({ user }: { user: any }) {
                         selectedCount={selectedFiles.size}
                         hasWriteAccess={currentContextRole === 'admin' || currentContextRole === 'editor'}
                     />
-                    {/* NEW: Breadcrumbs component added */}
                     <Breadcrumbs path={currentPath} onPathChange={setCurrentPath} />
 
                     <FileTable
@@ -130,7 +129,7 @@ export default function FileManager({ user }: { user: any }) {
                 </div>
             </div>
 
-            {showMembersModal && activeProjectId && <MembersModal projectId={activeProjectId} userRole={activeProject?.role || 'viewer'} onClose={() => setShowMembersModal(false)} API_URL={API_URL} getToken={getToken} />}
+            {showMembersModal && activeProjectId && <MembersModal projectId={activeProjectId} currentUserUID={user.uid} onClose={() => setShowMembersModal(false)} apiUrl={API_URL} getToken={getToken} notify={notify} />}
         </div>
     );
 }

@@ -1,85 +1,96 @@
-
 import { Icons } from '../../icons';
+import { useState } from 'react';
 
 interface FileToolbarProps {
   searchTerm: string;
   setSearchTerm: (val: string) => void;
+  onUpload: (files: FileList | null) => void;
+  onCreateFolder: (name: string) => void;
+  onRefresh: () => void;
+  onDelete: () => void;
   fileCount: number;
-  activeProjectId?: string | null;
-  onShowMembers?: () => void;
-  uploading?: boolean;
-  onUpload?: (files: FileList | null) => void;
-  // [!] [CRITICAL] : New Props for Bulk Actions
   selectedCount: number;
-  onBulkDownload?: (type: 'raw' | 'xlsx' | 'json') => void;
-  onBulkDelete?: () => void;
-  readOnly?: boolean; // New prop for read-only mode (selector)
+  hasWriteAccess: boolean;
 }
 
 export default function FileToolbar({
-  searchTerm, setSearchTerm, fileCount, activeProjectId,
-  onShowMembers, uploading = false, onUpload,
-  selectedCount, onBulkDownload, onBulkDelete,
-  readOnly = false
+  searchTerm, 
+  setSearchTerm, 
+  onUpload,
+  onCreateFolder,
+  onRefresh,
+  onDelete,
+  fileCount,
+  selectedCount,
+  hasWriteAccess
 }: FileToolbarProps) {
+  
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [folderName, setFolderName] = useState("");
+
+  const handleCreateFolder = () => {
+      if(folderName) onCreateFolder(folderName);
+      setFolderName("");
+      setShowNewFolder(false);
+  }
+
   return (
-    <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-wrap justify-between items-center gap-4 min-h-[50px]">
+    <div className="p-2 border-b border-slate-200 dark:border-slate-800 flex flex-wrap justify-between items-center gap-2 min-h-[50px] bg-slate-50 dark:bg-slate-900/70">
       
-      {/* LEFT: Search or Bulk Status */}
       <div className="flex items-center gap-2 flex-1">
-        {selectedCount > 0 && !readOnly ? (
-            <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
-                <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-md border border-blue-200 dark:border-blue-800">
-                    {selectedCount} SELECTED
+        {selectedCount > 0 && hasWriteAccess ? (
+            <div className="flex items-center gap-2 animate-in fade-in">
+                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 px-2 py-1 rounded">
+                    {selectedCount} selected
                 </span>
-                <div className="h-4 w-px bg-slate-300 dark:bg-slate-700"></div>
-                
-                {onBulkDownload && (
-                <div className="flex gap-1">
-                    <button onClick={() => onBulkDownload('raw')} className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600"><Icons.FileDown className="w-3 h-3"/> RAW</button>
-                    <button onClick={() => onBulkDownload('xlsx')} className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-green-600"><Icons.FileSpreadsheet className="w-3 h-3"/> XLSX</button>
-                    <button onClick={() => onBulkDownload('json')} className="flex items-center gap-1 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-yellow-600"><Icons.FileJson className="w-3 h-3"/> JSON</button>
-                </div>
-                )}
-                
-                {onBulkDelete && (
-                <button onClick={onBulkDelete} className="ml-2 flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded text-[10px] font-bold text-red-600 dark:text-red-400 hover:bg-red-100"><Icons.Trash className="w-3 h-3"/> DELETE</button>
-                )}
+                 <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/50 rounded text-[10px] font-bold text-red-600 dark:text-red-400 hover:bg-red-200"><Icons.Trash className="w-3 h-3"/> Delete</button>
             </div>
         ) : (
-            <>
-                <div className="relative flex-1 max-w-md">
-                <Icons.Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+            <div className="relative flex-1 max-w-xs">
+                <Icons.Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400 dark:text-slate-500" />
                 <input 
                     type="text" 
                     placeholder="Filter files..." 
                     value={searchTerm} 
                     onChange={(e) => setSearchTerm(e.target.value)} 
-                    className="w-full pl-8 pr-2 py-1.5 text-[10px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded focus:outline-none focus:border-blue-400 text-slate-600 dark:text-slate-300 placeholder-slate-400" 
+                    className="w-full pl-8 pr-2 py-1.5 text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
-                </div>
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{fileCount} ITEMS {readOnly && selectedCount > 0 ? `(${selectedCount} selected)` : ''}</span>
-            </>
+            </div>
         )}
       </div>
 
-      {/* RIGHT: Actions */}
-      {!readOnly && (
-      <div className="flex gap-2">
-        {activeProjectId && onShowMembers && (
-            <button onClick={onShowMembers} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded font-bold transition-all text-[10px]">
-                <Icons.Users className="w-3.5 h-3.5" /> MEMBERS
-            </button>
-        )}
-        {onUpload && (
-        <label className={`flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded font-black shadow-sm cursor-pointer transition-all text-[10px] ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
-            <input type="file" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} disabled={uploading} />
-            {uploading ? <Icons.Refresh className="w-3.5 h-3.5 animate-spin"/> : <Icons.Upload className="w-3.5 h-3.5" />}
-            {uploading ? "UPLOADING..." : "UPLOAD"}
-        </label>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{fileCount} items</span>
+        <button onClick={onRefresh} className="p-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 transition-colors"><Icons.RefreshCw size={14}/></button>
+        
+        {hasWriteAccess && (
+        <>
+            <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+            {showNewFolder ? (
+                <div className="flex gap-1 animate-in fade-in">
+                    <input 
+                        type="text" 
+                        value={folderName}
+                        onChange={(e) => setFolderName(e.target.value)}
+                        placeholder="Folder name" 
+                        className="px-2 py-1.5 text-xs border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+                    />
+                    <button onClick={handleCreateFolder} className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs font-bold hover:bg-blue-700">Create</button>
+                    <button onClick={() => setShowNewFolder(false)} className="p-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700"><Icons.X size={14}/></button>
+                </div>
+            ) : (
+                <button onClick={() => setShowNewFolder(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors">
+                    <Icons.FolderPlus size={14} /> New Folder
+                </button>
+            )}
+            <label className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs font-bold cursor-pointer hover:bg-blue-700 transition-colors">
+                <Icons.Upload size={14}/> Upload
+                <input type="file" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
+            </label>
+        </>
         )}
       </div>
-      )}
     </div>
   );
 }

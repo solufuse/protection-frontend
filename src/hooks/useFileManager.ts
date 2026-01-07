@@ -6,12 +6,13 @@ interface UseFileManagerReturn {
     files: SessionFile[];
     loading: boolean;
     uploading: boolean;
+    error: string | null; // NEW: Expose error state
     currentPath: string;
     setCurrentPath: (path: string) => void;
     sortConfig: { key: SortKey; order: SortOrder };
     handleSort: (key: SortKey) => void;
     handleUpload: (fileList: FileList | null) => Promise<void>;
-    handleDelete: (paths: string[]) => Promise<void>; // Changed to handle bulk delete
+    handleDelete: (paths: string[]) => Promise<void>;
     handleCreateFolder: (folderName: string) => Promise<void>;
     handleBulkDownload: (selectedFiles: Set<string>, format?: 'raw' | 'xlsx' | 'json') => Promise<void>; 
     refreshFiles: () => void;
@@ -30,7 +31,8 @@ export const useFileManager = (
     const [files, setFiles] = useState<SessionFile[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [currentPath, setCurrentPath] = useState(''); // NEW: Current path state
+    const [error, setError] = useState<string | null>(null); // NEW: Error state
+    const [currentPath, setCurrentPath] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; order: SortOrder }>({ key: 'type', order: 'asc' });
     
     const [starredFiles, setStarredFiles] = useState<Set<string>>(() => {
@@ -56,30 +58,30 @@ export const useFileManager = (
     const fetchFiles = useCallback(async () => {
         if (!user) return;
         setLoading(true);
+        setError(null); // Reset error on fetch
         try {
             const t = await getToken();
             const params = new URLSearchParams();
             if (activeProjectId) params.append('project_id', activeProjectId);
             else if (activeSessionUid) params.append('project_id', activeSessionUid);
-            if (currentPath) params.append('path', currentPath); // NEW: Add path to request
+            if (currentPath) params.append('path', currentPath);
 
             const res = await fetch(`${apiUrl}/files/details?${params.toString()}`, { 
                 headers: { 'Authorization': `Bearer ${t}` } 
             });
 
-            if (!res.ok) throw new Error("Failed to fetch files");
+            if (!res.ok) throw new Error((await res.json()).detail || "Failed to fetch files");
             const data = await res.json();
             setFiles(data.files || []);
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
+            setError(e.message || "Could not load files");
             setFiles([]);
-            notify("Could not load files", "error");
         } finally {
             setLoading(false);
         }
-    }, [user, activeProjectId, activeSessionUid, apiUrl, currentPath]); // NEW: currentPath dependency
+    }, [user, activeProjectId, activeSessionUid, apiUrl, currentPath]);
 
-    // Reset path when project changes
     useEffect(() => {
         setCurrentPath('');
     }, [activeProjectId, activeSessionUid]);
@@ -98,7 +100,7 @@ export const useFileManager = (
             const params = new URLSearchParams();
             if (activeProjectId) params.append('project_id', activeProjectId);
             else if (activeSessionUid) params.append('project_id', activeSessionUid);
-            if (currentPath) params.append('path', currentPath); // NEW: Add path to upload
+            if (currentPath) params.append('path', currentPath);
 
             const res = await fetch(`${apiUrl}/files/upload?${params.toString()}`, { 
                 method: 'POST', 
@@ -217,13 +219,12 @@ export const useFileManager = (
     };
 
     const sortedFiles = [...files].sort((a, b) => {
-        const aStarred = starredFiles.has(a.path || a.filename);
-        const bStarred = starredFiles.has(b.path || b.filename);
+        const aStarred = starredFiles.has(a.path);
+        const bStarred = starredFiles.has(b.path);
 
         if (aStarred && !bStarred) return -1; 
         if (!aStarred && bStarred) return 1;
 
-        // NEW: Always sort folders first when sorting by name or type
         if (sortConfig.key === 'filename' || sortConfig.key === 'type') {
             if (a.type === 'folder' && b.type !== 'folder') return -1;
             if (a.type !== 'folder' && b.type === 'folder') return 1;
@@ -251,12 +252,13 @@ export const useFileManager = (
         files: sortedFiles,
         loading,
         uploading,
+        error, // Return error state
         currentPath,
         setCurrentPath,
         sortConfig,
         handleSort,
         handleUpload,
-        handleDelete, // Unified delete function
+        handleDelete,
         handleCreateFolder,
         handleBulkDownload, 
         refreshFiles: fetchFiles,

@@ -22,7 +22,6 @@ interface FileTableProps {
   onSort: (key: SortKey) => void;
   selectedFiles: Set<string>;
   setSelectedFiles: (selected: Set<string>) => void;
-  onDelete: (paths: string[]) => void;
   onPathChange: (path: string) => void; // NEW: For folder navigation
   starredFiles: Set<string>;
   onToggleStar: (path: string) => void;
@@ -37,7 +36,6 @@ export default function FileTable({
   onSort,
   selectedFiles, 
   setSelectedFiles,
-  onDelete,
   onPathChange,
   starredFiles, 
   onToggleStar,

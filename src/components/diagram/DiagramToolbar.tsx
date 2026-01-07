@@ -1,4 +1,3 @@
-
 import { RefObject } from 'react';
 import { Save, Upload, Zap, Download } from 'lucide-react';
 import { Icons } from '../../icons';
@@ -12,7 +11,6 @@ interface DiagramToolbarProps {
     handleRunDiagram: () => void;
     setShowHistory: (show: boolean) => void;
     isLoading: boolean;
-    API_URL: string;
 }
 
 const DiagramToolbar = ({
@@ -24,7 +22,6 @@ const DiagramToolbar = ({
     handleRunDiagram,
     setShowHistory,
     isLoading,
-    API_URL,
 }: DiagramToolbarProps) => {
 
     return (
