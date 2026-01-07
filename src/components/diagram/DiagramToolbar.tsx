@@ -1,6 +1,6 @@
 
-import { RefObject, useState } from 'react';
-import { Save, Upload, Zap, Download, ChevronDown } from 'lucide-react';
+import { RefObject } from 'react';
+import { Save, Upload, Zap, Download } from 'lucide-react';
 import { Icons } from '../../icons';
 import GlobalRoleBadge from '../GlobalRoleBadge';
 import ContextRoleBadge from '../ContextRoleBadge';
@@ -17,7 +17,7 @@ interface DiagramToolbarProps {
     handleImportClick: () => void;
     handleDownload: () => void;
     handleSaveToSession: () => void;
-    handleRunDiagram: (mode: 'single' | 'all' | 'bulk') => void;
+    handleRunDiagram: () => void; // Simplified: No mode argument
     setShowHistory: (show: boolean) => void;
     isLoading: boolean;
     API_URL: string;
@@ -42,13 +42,6 @@ const DiagramToolbar = ({
     API_URL,
     currentProjectRole
 }: DiagramToolbarProps) => {
-
-    const [isRunMenuOpen, setIsRunMenuOpen] = useState(false);
-
-    const onRunClick = (mode: 'single' | 'all' | 'bulk') => {
-        handleRunDiagram(mode);
-        setIsRunMenuOpen(false);
-    }
 
     return (
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
@@ -96,35 +89,14 @@ const DiagramToolbar = ({
                     <Icons.Archive className="w-3.5 h-3.5" /> HISTORY
                 </button>
 
-                <div className="relative">
-                    <button 
-                        onClick={() => setIsRunMenuOpen(!isRunMenuOpen)} 
-                        disabled={isLoading} 
-                        className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px] disabled:opacity-50"
-                    >
-                        <Zap className="w-3.5 h-3.5" />
-                        RUN DIAGRAM
-                        <ChevronDown className="w-3 h-3 ml-1" />
-                    </button>
-                    
-                    {isRunMenuOpen && (
-                         <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xl z-50 py-1">
-                            <button onClick={() => onRunClick('single')} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-200">
-                                Run Single File
-                            </button>
-                            <button onClick={() => onRunClick('all')} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-200">
-                                Run All (Project)
-                            </button>
-                            <button onClick={() => onRunClick('bulk')} className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-200">
-                                Run Bulk
-                            </button>
-                         </div>
-                    )}
-                </div>
-
-                {isRunMenuOpen && (
-                    <div className="fixed inset-0 z-40" onClick={() => setIsRunMenuOpen(false)}></div>
-                )}
+                <button 
+                    onClick={handleRunDiagram} 
+                    disabled={isLoading} 
+                    className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px] disabled:opacity-50"
+                >
+                    <Zap className="w-3.5 h-3.5" />
+                    RUN DIAGRAM
+                </button>
 
                 <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
