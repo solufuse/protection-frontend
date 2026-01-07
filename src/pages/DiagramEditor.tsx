@@ -24,8 +24,8 @@ import ContextMenu from '../components/diagram/ContextMenu';
 import ElementsSidebar from '../components/diagram/ElementsSidebar';
 import ArchiveModal from '../components/Loadflow/ArchiveModal';
 import DiagramToolbar from '../components/diagram/DiagramToolbar';
-import FileTable from '../components/FileTable';
-import FileToolbar from '../components/FileToolbar'; 
+import FileTable from '../components/files/FileTable';
+import FileToolbar from '../components/files/FileToolbar'; 
 import { useFileManager } from '../hooks/useFileManager';
 
 // Initial nodes and edges for the diagram
@@ -468,44 +468,6 @@ export default function DiagramEditor({ user }: { user: any }) {
     };
     reader.readAsText(file);
   };
-
-  // --- Resizing Sidebar Logic ---
-  const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
-    mouseDownEvent.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  const stopResizing = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  const resize = useCallback(
-    (mouseMoveEvent: MouseEvent) => {
-      if (isResizing) {
-        // Adjust these constraints as needed
-        const newWidth = mouseMoveEvent.clientX - 24; // Assuming 24px left padding on container
-        if (newWidth > 150 && newWidth < 600) {
-          setSidebarWidth(newWidth);
-        }
-      }
-    },
-    [isResizing]
-  );
-
-  useEffect(() => {
-    if (isResizing) {
-      window.addEventListener("mousemove", resize as any);
-      window.addEventListener("mouseup", stopResizing);
-    } else {
-      window.removeEventListener("mousemove", resize as any);
-      window.removeEventListener("mouseup", stopResizing);
-    }
-    return () => {
-      window.removeEventListener("mousemove", resize as any);
-      window.removeEventListener("mouseup", stopResizing);
-    };
-  }, [isResizing, resize, stopResizing]);
-
 
   let currentProjectRole = undefined;
   if (activeProjectId) currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;

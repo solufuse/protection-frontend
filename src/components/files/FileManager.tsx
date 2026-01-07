@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, MouseEvent } from 'react';
+import { useEffect, useState, useCallback, MouseEvent } from 'react';
 import { Icons } from '../../icons';
 import Toast from '../Toast';
 import GlobalRoleBadge from '../GlobalRoleBadge';

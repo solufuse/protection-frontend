@@ -3,7 +3,7 @@
 // [context:flow] : Handles fetching, uploading, deleting, sorting AND starring of files.
 
 import { useState, useEffect, useCallback } from 'react';
-import { SessionFile, SortKey, SortOrder } from '../components/FileTable';
+import { SessionFile, SortKey, SortOrder } from '../components/files/FileTable';
 
 interface UseFileManagerReturn {
     files: SessionFile[];
