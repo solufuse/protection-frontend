@@ -18,7 +18,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Save, Upload } from 'lucide-react';
+import { Save, Upload, Zap, Folder, HardDrive, FileSignature } from 'lucide-react';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import Toast from '../components/Toast';
 import CustomNode from '../components/diagram/CustomNode';
@@ -55,6 +55,7 @@ export default function DiagramEditor({ user }: { user: any }) {
   const [newProjectName, setNewProjectName] = useState("");
   const [userGlobalData, setUserGlobalData] = useState<any>(null);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
@@ -65,8 +66,9 @@ export default function DiagramEditor({ user }: { user: any }) {
     if (user) {
         fetchGlobalProfile();
         fetchProjects();
+        loadFromSession();
     }
-  }, [user]);
+  }, [user, activeProjectId]);
 
   // --- Project Management Functions ---
   const fetchGlobalProfile = async () => { try { const t = await getToken(); const res = await fetch(`${API_URL}/users/me`, { headers: { 'Authorization': `Bearer ${t}` } }); if (res.ok) { const data = await res.json(); setUserGlobalData(data); if (['super_admin', 'admin', 'moderator'].includes(data.global_role)) fetchAllUsers(t); } } catch (e) {} };
@@ -76,6 +78,143 @@ export default function DiagramEditor({ user }: { user: any }) {
   const deleteProject = async (projId: string, e: React.MouseEvent) => { e.stopPropagation(); if (!confirm(`Delete project "${projId}" permanently?`)) return; try { const t = await getToken(); const res = await fetch(`${API_URL}/projects/${projId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${t}` } }); if (!res.ok) throw new Error(); notify("Project Deleted"); if (activeProjectId === projId) setActiveProjectId(null); fetchProjects(); } catch (e) { notify("Delete failed", "error"); } };
   const handleCopyProjectName = () => { if (!activeProjectId) return; navigator.clipboard.writeText(activeProjectId); notify("Project ID Copied to Clipboard"); };
   const getActiveProjectName = () => { if (!activeProjectId) return null; const proj = projects.find(p => p.id === activeProjectId); return proj ? proj.name : activeProjectId; };
+
+  // --- Session Management (Load/Save like Config.tsx) ---
+  const loadFromSession = async () => {
+      if (!user) return;
+      setIsLoading(true);
+      try {
+          const token = await getToken();
+          const pParam = activeProjectId ? `?project_id=${activeProjectId}` : "";
+          const listRes = await fetch(`${API_URL}/files/details${pParam}`, { headers: { 'Authorization': `Bearer ${token}` } });
+          
+          if (!listRes.ok) throw new Error("Failed to list files");
+          const listData = await listRes.json();
+          
+          // Try to find a specific diagram file or default to diagram_config.json
+          const configFile = listData.files?.find((f: any) => f.filename.toLowerCase() === 'diagram_config.json' || f.filename.toLowerCase().endsWith('.json'));
+          
+          if (configFile) {
+              const dlParam = activeProjectId ? `&project_id=${activeProjectId}` : "";
+              const fileRes = await fetch(`${API_URL}/files/download?filename=${encodeURIComponent(configFile.filename)}&token=${token}${dlParam}`);
+              if (!fileRes.ok) throw new Error("Failed to download config");
+              
+              const blob = await fileRes.blob();
+              const text = await blob.text();
+              const sessionConfig = JSON.parse(text);
+
+              if (sessionConfig.diagram) {
+                  setNodes(sessionConfig.diagram.nodes || []);
+                  setEdges(sessionConfig.diagram.edges || []);
+              } else if (sessionConfig.diagram_data) {
+                  // Legacy support
+                  setNodes(sessionConfig.diagram_data.nodes || []);
+                  setEdges(sessionConfig.diagram_data.edges || []);
+              } else {
+                 // Try to see if it's the backend result format directly
+                 if (sessionConfig.results && sessionConfig.results.length > 0) {
+                     const firstRes = sessionConfig.results[0];
+                     if(firstRes.diagram) {
+                        setNodes(firstRes.diagram.nodes || []);
+                        setEdges(firstRes.diagram.edges || []);
+                     }
+                 }
+              }
+              notify("Diagram Loaded from Session");
+          } else {
+             // Reset if no file found for this project
+             setNodes(initialNodes);
+             setEdges(initialEdges);
+          }
+      } catch (err: any) {
+          console.error("Sync Error:", err);
+          // Don't clear on error, might just be network or no file yet
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  const handleSaveToSession = async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+        const token = await getToken();
+        const config = {
+            ...defaultConfig,
+            project_name: activeProjectId || "DIAGRAM_PROJECT", 
+            diagram: { nodes, edges }, 
+        };
+        const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+        const formData = new FormData();
+        formData.append('files', blob, 'diagram_config.json');
+        
+        const pParam = activeProjectId ? `?project_id=${activeProjectId}` : "";
+        const response = await fetch(`${API_URL}/files/upload${pParam}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        
+        if (!response.ok) throw new Error("Backend error");
+        notify(`Saved to ${activeProjectId || "Storage"}`);
+    } catch (e) {
+        notify("Save error", "error");
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  const handleRunDiagram = async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+        const token = await getToken();
+        const pParam = activeProjectId ? `project_id=${activeProjectId}` : "";
+        
+        // Step 1: Run Analysis on single main file if we knew it, or just trigger the bulk one.
+        // Assuming we want to run analysis on all SI2S/LF1S files in project and save topology results first.
+        // The backend `run-and-save/all` does exactly this.
+        const response1 = await fetch(`${API_URL}/topology/run-and-save/all?${pParam}&basename=topology`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response1.ok) {
+           const err = await response1.json();
+           throw new Error(err.detail || "Failed to run topology analysis");
+        }
+
+        // Step 2: Generate Diagram from those results (or re-process files to diagram).
+        // The backend `diagram/save/all` generates diagrams from the source files.
+        const response2 = await fetch(`${API_URL}/topology/diagram/save/all?${pParam}&basename=diagram_result`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response2.ok) {
+            const err = await response2.json();
+            throw new Error(err.detail || "Failed to generate diagram");
+        }
+
+        const result = await response2.json();
+        
+        if (result.filename) {
+             notify(`Diagram Generated: ${result.filename}`);
+             // Reload to see changes if we want to auto-load the NEW file. 
+             // Note: loadFromSession logic picks 'diagram_config.json' or .json files. 
+             // It might pick up this new file if it's latest.
+             loadFromSession(); 
+        } else {
+             notify("Diagram Run Complete");
+        }
+
+    } catch (e: any) {
+        notify(e.message, "error");
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
 
   // --- React Flow Callbacks ---
   const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)), [setNodes]);
@@ -163,7 +302,7 @@ export default function DiagramEditor({ user }: { user: any }) {
   };
 
   // --- Diagram Save and Import ---
-  const handleSave = () => {
+  const handleDownload = () => {
     const config = {
         ...defaultConfig,
         project_name: activeProjectId || "DIAGRAM_PROJECT", 
@@ -178,7 +317,7 @@ export default function DiagramEditor({ user }: { user: any }) {
     a.download = 'diagram_config.json';
     a.click();
     URL.revokeObjectURL(url);
-    notify('Diagram saved as diagram_config.json');
+    notify('Diagram downloaded as diagram_config.json');
   };
 
   const handleImportClick = () => fileInputRef.current?.click();
@@ -201,7 +340,17 @@ export default function DiagramEditor({ user }: { user: any }) {
                 setNodes(json.diagram_data.nodes || []);
                 setEdges(json.diagram_data.edges || []);
             } else {
-                // Fallback logic for very old or different formats if needed
+                // Try to see if it's the backend result format directly (list of results)
+                 if (json.results && json.results.length > 0) {
+                     const firstRes = json.results[0];
+                     if(firstRes.diagram) {
+                        setNodes(firstRes.diagram.nodes || []);
+                        setEdges(firstRes.diagram.edges || []);
+                        notify("Imported from Analysis Result");
+                        return;
+                     }
+                 }
+                // Fallback logic
                 notify("Unknown file format", "error");
                 return;
             }
@@ -237,10 +386,22 @@ export default function DiagramEditor({ user }: { user: any }) {
             <div className="flex gap-2">
                 <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleFileChange} />
                 {userGlobalData && userGlobalData.global_role === 'super_admin' && <button onClick={() => window.open(`${API_URL}/docs`, '_blank')} className="flex items-center gap-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300 px-3 py-1.5 rounded border border-red-200 dark:border-red-900 text-red-600 font-bold transition-colors"><Icons.Shield className="w-3.5 h-3.5" /> API</button>}
+                
+                <button onClick={handleRunDiagram} disabled={isLoading} className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px] disabled:opacity-50">
+                    <Zap className="w-3.5 h-3.5" />
+                    RUN DIAGRAM
+                </button>
+
+                <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
                 <button onClick={handleImportClick} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded font-bold transition-all text-[10px]"><Upload className="w-3.5 h-3.5" /> IMPORT</button>
-                <button onClick={handleSave} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px]">
+                <button onClick={handleDownload} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded font-bold transition-all text-[10px]">
+                    <Icons.Download className="w-3.5 h-3.5" />
+                    EXPORT
+                </button>
+                <button onClick={handleSaveToSession} disabled={isLoading} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold shadow-sm transition-all text-[10px] disabled:opacity-50">
                     <Save className="w-3.5 h-3.5" />
-                    SAVE DIAGRAM
+                    {isLoading ? "SAVING..." : "SAVE CLOUD"}
                 </button>
             </div>
         </div>

@@ -116,7 +116,7 @@ const ElementsSidebar = () => {
     });
 
     const onDragStart = (event: React.DragEvent, nodeType: string, label: string, data: any) => {
-        const nodeInfo = JSON.stringify({ nodeType: 'custom', label, data });
+        const nodeInfo = JSON.stringify({ nodeType, label, data });
         event.dataTransfer.setData('application/reactflow', nodeInfo);
         event.dataTransfer.effectAllowed = 'move';
     };
