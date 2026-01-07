@@ -1,4 +1,4 @@
-import { useEffect, useState, MouseEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { Icons } from '../../icons';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import Toast from '../Toast';
