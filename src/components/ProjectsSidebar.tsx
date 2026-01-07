@@ -12,12 +12,14 @@ interface ProjectsSidebarProps {
   isCreatingProject: boolean; setIsCreatingProject: (val: boolean) => void;
   newProjectName: string; setNewProjectName: (val: string) => void;
   onCreateProject: () => void; onDeleteProject: (id: string, e: React.MouseEvent) => void;
+  className?: string;
 }
 
 export default function ProjectsSidebar({
   user, userGlobalData, projects, usersList,
   activeProjectId, setActiveProjectId, activeSessionUid, setActiveSessionUid,
-  isCreatingProject, setIsCreatingProject, newProjectName, setNewProjectName, onCreateProject, onDeleteProject
+  isCreatingProject, setIsCreatingProject, newProjectName, setNewProjectName, onCreateProject, onDeleteProject,
+  className = ""
 }: ProjectsSidebarProps) {
     
   const [searchTerm, setSearchTerm] = useState("");
@@ -90,7 +92,7 @@ export default function ProjectsSidebar({
   const visibleUsers = filteredUsers.slice(0, sessionLimit);
 
   return (
-    <div className="w-60 flex flex-col gap-2 h-full flex-shrink-0">
+    <div className={`flex flex-col gap-2 h-full flex-shrink-0 ${className}`}>
       <div className="relative mb-1">
         <Icons.Search className="absolute left-2 top-1.5 w-3 h-3 text-slate-400" />
         <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded pl-7 pr-2 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400 dark:text-slate-200" />

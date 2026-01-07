@@ -64,6 +64,10 @@ export default function DiagramEditor({ user }: { user: any }) {
   const [showFileSelector, setShowFileSelector] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Resize State
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [isResizing, setIsResizing] = useState(false);
+
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
   const notify = (msg: string, type: 'success' | 'error' = 'success') => setToast({ show: true, msg, type });
   const getToken = async () => { if (!user) return null; return await user.getIdToken(); };
@@ -465,12 +469,50 @@ export default function DiagramEditor({ user }: { user: any }) {
     reader.readAsText(file);
   };
 
+  // --- Resizing Sidebar Logic ---
+  const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback(
+    (mouseMoveEvent: MouseEvent) => {
+      if (isResizing) {
+        // Adjust these constraints as needed
+        const newWidth = mouseMoveEvent.clientX - 24; // Assuming 24px left padding on container
+        if (newWidth > 150 && newWidth < 600) {
+          setSidebarWidth(newWidth);
+        }
+      }
+    },
+    [isResizing]
+  );
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener("mousemove", resize as any);
+      window.addEventListener("mouseup", stopResizing);
+    } else {
+      window.removeEventListener("mousemove", resize as any);
+      window.removeEventListener("mouseup", stopResizing);
+    }
+    return () => {
+      window.removeEventListener("mousemove", resize as any);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
+
+
   let currentProjectRole = undefined;
   if (activeProjectId) currentProjectRole = projects.find(p => p.id === activeProjectId)?.role;
   else if (activeSessionUid) currentProjectRole = 'admin';
 
   return (
-    <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col">
+    <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col select-none">
         <DiagramToolbar 
             activeProjectId={activeProjectId}
             activeSessionUid={activeSessionUid}
@@ -490,8 +532,33 @@ export default function DiagramEditor({ user }: { user: any }) {
             currentProjectRole={currentProjectRole}
         />
 
-        <div className="flex flex-1 gap-6 min-h-0">
-            <ProjectsSidebar user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} activeSessionUid={activeSessionUid} setActiveSessionUid={setActiveSessionUid} isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} newProjectName={newProjectName} setNewProjectName={setNewProjectName} onCreateProject={createProject} onDeleteProject={deleteProject} />
+        <div className="flex flex-1 gap-0 min-h-0 border-t border-slate-200 dark:border-slate-800 pt-2">
+            <div style={{ width: sidebarWidth }} className="relative flex-shrink-0 pr-2">
+                <ProjectsSidebar
+                    user={user} 
+                    userGlobalData={userGlobalData} 
+                    projects={projects} 
+                    usersList={usersList} 
+                    activeProjectId={activeProjectId} 
+                    setActiveProjectId={setActiveProjectId} 
+                    activeSessionUid={activeSessionUid} 
+                    setActiveSessionUid={setActiveSessionUid} 
+                    isCreatingProject={isCreatingProject} 
+                    setIsCreatingProject={setIsCreatingProject} 
+                    newProjectName={newProjectName} 
+                    setNewProjectName={setNewProjectName} 
+                    onCreateProject={createProject} 
+                    onDeleteProject={deleteProject}
+                    className="w-full"
+                />
+                 {/* Resize Handle */}
+                <div
+                    onMouseDown={startResizing}
+                    className={`absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 flex justify-center items-center hover:bg-blue-500/10 transition-colors group ${isResizing ? 'bg-blue-500/10' : ''}`}
+                >
+                    <div className={`w-[1px] h-full bg-slate-200 dark:bg-slate-800 group-hover:bg-blue-400 ${isResizing ? 'bg-blue-500' : ''}`} />
+                </div>
+            </div>
             
             <div ref={reactFlowWrapper} className="flex-1 h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden relative" onDrop={onDrop} onDragOver={onDragOver}>
                 <ReactFlowProvider>
