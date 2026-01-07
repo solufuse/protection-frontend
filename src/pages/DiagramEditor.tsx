@@ -18,7 +18,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Save, Upload, Zap, Folder, HardDrive, FileSignature } from 'lucide-react';
+import { Save, Upload, Zap } from 'lucide-react';
 import ProjectsSidebar, { Project, UserSummary } from '../components/ProjectsSidebar';
 import Toast from '../components/Toast';
 import CustomNode from '../components/diagram/CustomNode';
