@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, MouseEvent } from 'react';
+import { useEffect, useState, MouseEvent } from 'react';
 import { Icons } from '../../icons';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import Toast from '../Toast';
@@ -27,10 +27,7 @@ export default function FileManager({ user }: { user: any }) {
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
-  // Resize State
-  const [sidebarWidth, setSidebarWidth] = useState(240);
-  const [isResizing, setIsResizing] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // --- CONFIG ---
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
@@ -53,42 +50,6 @@ export default function FileManager({ user }: { user: any }) {
   }, [user]);
 
   useEffect(() => { setSelectedFiles(new Set()); }, [activeProjectId, activeSessionUid]);
-
-  // --- RESIZE HANDLERS ---
-  const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
-    mouseDownEvent.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  const stopResizing = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  const resize = useCallback(
-    (mouseMoveEvent: MouseEvent) => {
-      if (isResizing) {
-        const newWidth = mouseMoveEvent.clientX - 24; // 24px padding-left of container
-        if (newWidth > 150 && newWidth < 600) {
-          setSidebarWidth(newWidth);
-        }
-      }
-    },
-    [isResizing]
-  );
-
-  useEffect(() => {
-    if (isResizing) {
-      window.addEventListener("mousemove", resize as any);
-      window.addEventListener("mouseup", stopResizing);
-    } else {
-      window.removeEventListener("mousemove", resize as any);
-      window.removeEventListener("mouseup", stopResizing);
-    }
-    return () => {
-      window.removeEventListener("mousemove", resize as any);
-      window.removeEventListener("mouseup", stopResizing);
-    };
-  }, [isResizing, resize, stopResizing]);
 
   // --- HELPERS ---
   const handleGoogleLogin = async () => { await signInWithPopup(auth, new GoogleAuthProvider()); };
@@ -160,7 +121,7 @@ export default function FileManager({ user }: { user: any }) {
   const getActiveProjectName = () => { if (!activeProjectId) return null; const proj = projects.find(p => p.id === activeProjectId); return proj ? proj.name : activeProjectId; };
 
   return (
-    <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col select-none">
+    <div className="w-full px-6 py-6 text-[11px] font-sans h-full flex flex-col select-none relative">
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
         <div className="flex flex-col">
           <div className="flex items-center gap-2 mb-1">
@@ -200,10 +161,10 @@ export default function FileManager({ user }: { user: any }) {
         </div>
       )}
 
-      <div className="flex flex-1 gap-0 min-h-0">
-         {/* Resizable Sidebar Container */}
+      <div className="flex flex-1 gap-0 min-h-0 relative">
+         {/* Overlay Sidebar */}
         {isSidebarOpen && (
-            <div style={{ width: sidebarWidth }} className="relative flex-shrink-0 pr-2">
+            <div className="absolute left-0 top-0 bottom-0 z-30 w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-2xl h-full flex flex-col">
                 <ProjectsSidebar 
                     user={user} userGlobalData={userGlobalData} projects={projects} usersList={usersList} 
                     activeProjectId={activeProjectId} setActiveProjectId={setActiveProjectId} 
@@ -211,17 +172,16 @@ export default function FileManager({ user }: { user: any }) {
                     isCreatingProject={isCreatingProject} setIsCreatingProject={setIsCreatingProject} 
                     newProjectName={newProjectName} setNewProjectName={setNewProjectName} 
                     onCreateProject={createProject} onDeleteProject={deleteProject} 
-                    className="w-full"
+                    className="w-full h-full"
                 />
-                {/* Handle */}
-                <div
-                    onMouseDown={startResizing}
-                    className={`absolute top-0 right-0 w-1 h-full cursor-col-resize z-10 flex justify-center items-center hover:bg-blue-500/10 transition-colors group ${isResizing ? 'bg-blue-500/10' : ''}`}
-                >
-                    <div className={`w-[1px] h-full bg-slate-200 dark:bg-slate-800 group-hover:bg-blue-400 ${isResizing ? 'bg-blue-500' : ''}`} />
-                </div>
             </div>
         )}
+
+        {/* Backdrop for mobile or just to dismiss? Optional but good for UX if overlay. 
+            The user didn't ask for it, but "opens on top" usually implies modal-like behavior. 
+            I'll skip the backdrop to keep it simple unless needed. 
+            The user can close it with the toggle button. 
+        */}
 
         <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-sm overflow-hidden font-bold relative transition-all" onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files as any); }}>
             
