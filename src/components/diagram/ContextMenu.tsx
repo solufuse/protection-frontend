@@ -9,7 +9,16 @@ interface ContextMenuProps {
   onSelect: (type: string) => void;
 }
 
-const CONTEXT_MENU_ITEMS = ['Grid', 'Busbar', 'Transformer', 'Circuit Breaker'];
+const CONTEXT_MENU_ITEMS = [
+    'Incomer',
+    'Bus',
+    'Cable',
+    'Transformer',
+    'Incomer Breaker',
+    'Coupling',
+    'Load',
+    'SGen'
+];
 
 const ContextMenu = ({ x, y, onClose, onSelect }: ContextMenuProps) => {
   const handleSelect = (e: MouseEvent, type: string) => {

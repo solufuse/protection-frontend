@@ -29,23 +29,9 @@ import GlobalRoleBadge from '../components/GlobalRoleBadge';
 import ContextRoleBadge from '../components/ContextRoleBadge';
 
 // Initial nodes and edges for the diagram
-const initialNodes: Node[] = [
-  { id: '1', type: 'custom', data: { label: 'Grid' }, position: { x: 250, y: 5 } },
-  {
-    id: '2',
-    type: 'custom',
-    data: { label: 'Busbar', width: 400, name: "BUS-1", vn_kv: 20 },
-    position: { x: 50, y: 100 },
-  },
-  { id: '3', type: 'custom', data: { label: 'Transformer', name: 'TX-1', sn_kva: 1000, u_kv: 20, ratio_iencl: 8, tau_ms: 400 }, position: { x: 100, y: 200 } },
-  { id: '4', type: 'custom', data: { label: 'Circuit Breaker' }, position: { x: 400, y: 200 } },
-];
+const initialNodes: Node[] = [];
 
-const initialEdges: Edge[] = [
-    { id: 'e1-2', source: '1', target: '2', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-    { id: 'e2-3', source: '2', target: '3', label: 'Câble 1', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, data: { id: 'LINK-1', length_km: 1.0, impedance_zd: "0+j0", impedance_z0: "0+j0" } },
-    { id: 'e2-4', source: '2', target: '4', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed } },
-];
+const initialEdges: Edge[] = [];
 
 const nodeTypes = {
     custom: CustomNode,
@@ -131,7 +117,7 @@ export default function DiagramEditor({ user }: { user: any }) {
       const nodeInfoStr = event.dataTransfer.getData('application/reactflow');
       
       if (!nodeInfoStr) return;
-      const { label } = JSON.parse(nodeInfoStr);
+      const { label, data: droppedData } = JSON.parse(nodeInfoStr);
 
       const position = reactFlowInstance.project({
         x: event.clientX - reactFlowBounds.left,
@@ -142,7 +128,7 @@ export default function DiagramEditor({ user }: { user: any }) {
         id: `${label}-${+new Date()}`,
         type: 'custom',
         position,
-        data: { label, width: label === 'Busbar' ? 400 : undefined },
+        data: { ...droppedData }, // Use the data from the sidebar (contains component_type etc.)
       };
 
       setNodes((nds) => nds.concat(newNode));
@@ -153,10 +139,23 @@ export default function DiagramEditor({ user }: { user: any }) {
   const addNode = (type: string) => {
     if (!reactFlowInstance || !contextMenu) return;
     const position = reactFlowInstance.project({ x: contextMenu.x, y: contextMenu.y });
+    
+    // Provide default data for context menu additions
+    let defaultData: any = { label: type, component_type: type };
+    if (type === 'Bus') {
+        defaultData = { ...defaultData, component_type: 'Bus', NomlkV: 20.5, width: 350 };
+    } else if (type === 'Incomer') {
+        defaultData = { ...defaultData, component_type: 'Incomer', KV: 225 };
+    } else if (type === 'Transformer') {
+        defaultData = { ...defaultData, component_type: 'Transformer', PrimkV: 20, SeckV: 0.4 };
+    } else if (type === 'Cable') {
+        defaultData = { ...defaultData, component_type: 'Cable', Length: 1 };
+    }
+
     const newNode: Node = {
-      id: `${+new Date()}`,
+      id: `${type}-${+new Date()}`,
       type: 'custom',
-      data: { label: type, width: type === 'Busbar' ? 400 : undefined },
+      data: defaultData,
       position,
     };
     setNodes((nds) => nds.concat(newNode));
@@ -168,30 +167,7 @@ export default function DiagramEditor({ user }: { user: any }) {
     const config = {
         ...defaultConfig,
         project_name: activeProjectId || "DIAGRAM_PROJECT", 
-        diagram_data: { nodes, edges }, // Save raw diagram data
-        transformers: nodes
-            .filter(node => node.data.label === 'Transformer')
-            .map(node => ({
-                name: node.data.name || node.id,
-                sn_kva: node.data.sn_kva || 0,
-                u_kv: node.data.u_kv || 0,
-                ratio_iencl: node.data.ratio_iencl || 8,
-                tau_ms: node.data.tau_ms || 400,
-            })),
-        links_data: edges
-            .filter(edge => edge.label) // Only export named links
-            .map(edge => ({
-                id: edge.label || edge.id,
-                length_km: edge.data?.length_km || 1.0,
-                impedance_zd: edge.data?.impedance_zd || "0+j0",
-                impedance_z0: edge.data?.impedance_z0 || "0+j0",
-                bus_from: edge.source,
-                bus_to: edge.target
-            })),
-        loadflow_settings: {
-            ...defaultConfig.loadflow_settings,
-            swing_bus_id: nodes.find(n => n.data.label === 'Grid')?.id || ""
-        },
+        diagram: { nodes, edges }, // Save full diagram data as received from backend
     };
 
     const jsonConfig = JSON.stringify(config, null, 2);
@@ -216,21 +192,18 @@ export default function DiagramEditor({ user }: { user: any }) {
         try {
             const json = JSON.parse(event.target?.result as string);
             
-            if (json.diagram_data) {
+            if (json.diagram) {
+                // If the structure matches the backend response
+                setNodes(json.diagram.nodes || []);
+                setEdges(json.diagram.edges || []);
+            } else if (json.diagram_data) {
+                // Legacy support
                 setNodes(json.diagram_data.nodes || []);
                 setEdges(json.diagram_data.edges || []);
             } else {
-                // Fallback logic
-                const newNodes: Node[] = [];
-                const newEdges: Edge[] = [];
-                let yPos = 50;
-                json.transformers?.forEach((tx: any, index: number) => {
-                    const id = `tx-${index + 1}`;
-                    newNodes.push({ id, position: { x: 250, y: yPos }, type: 'custom', data: { label: 'Transformer', ...tx } });
-                    yPos += 150;
-                });
-                setNodes(newNodes);
-                setEdges(newEdges);
+                // Fallback logic for very old or different formats if needed
+                notify("Unknown file format", "error");
+                return;
             }
             notify("Diagram imported successfully!");
         } catch (err) {
@@ -298,7 +271,7 @@ export default function DiagramEditor({ user }: { user: any }) {
                                 return '#eee';
                             }}
                             nodeColor={(n: Node) => {
-                                if (n.data.label === 'Busbar') return '#374151';
+                                if (n.data?.component_type === 'Bus' || n.data?.label === 'Busbar') return '#374151';
                                 return '#fff';
                             }}
                             nodeBorderRadius={2}

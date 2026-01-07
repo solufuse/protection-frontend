@@ -2,17 +2,107 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 const CATEGORIES = {
-    'Power Sources': ['Grid'],
-    'Conductors': ['Busbar'],
+    'Power Sources': ['Incomer'],
+    'Conductors': ['Bus', 'Cable'],
     'Transformers': ['Transformer'],
-    'Circuit Protection': ['Circuit Breaker'],
+    'Switching': ['Incomer Breaker', 'Coupling'],
+    'Loads': ['Load'],
+    'Generation': ['SGen'],
 };
 
 const NODE_DEFINITIONS = [
-    { type: 'Grid', label: 'Grid', data: { label: 'Grid', name: 'Grid-1', type: 'ext_grid', vm_pu: 1.0, va_degree: 0.0 } },
-    { type: 'Busbar', label: 'Busbar', data: { label: 'Busbar', name: 'BUS-1', type: 'bus', vm_pu: 1.0, va_degree: 0.0 } },
-    { type: 'Transformer', label: 'Transformer', data: { label: 'Transformer', name: 'TX-1', type: 'trafo', sn_kva: 1000, vn_hv_kv: 10, vn_lv_kv: 0.4 } },
-    { type: 'Circuit Breaker', label: 'Circuit Breaker', data: { label: 'Circuit Breaker', name: 'CB-1', type: 'switch', closed: true } },
+    // Power Sources
+    { 
+        type: 'Incomer', 
+        label: 'Incomer', 
+        category: 'Power Sources',
+        data: { 
+            label: 'Incomer', 
+            component_type: 'Incomer',
+            KV: 225,
+            MVA3ph: 7600,
+        } 
+    },
+    
+    // Conductors
+    { 
+        type: 'Bus', 
+        label: 'Bus', 
+        category: 'Conductors',
+        data: { 
+            label: 'Bus', 
+            component_type: 'Bus',
+            NomlkV: 20.5
+        } 
+    },
+    { 
+        type: 'Cable', 
+        label: 'Cable', 
+        category: 'Conductors',
+        data: { 
+            label: 'Cable', 
+            component_type: 'Cable',
+            Length: 1.0
+        } 
+    },
+
+    // Transformers
+    { 
+        type: 'Transformer', 
+        label: 'Transformer', 
+        category: 'Transformers',
+        data: { 
+            label: 'Transformer', 
+            component_type: 'Transformer',
+            PrimkV: 20,
+            SeckV: 0.4,
+            MVA: 1.0
+        } 
+    },
+
+    // Switching
+    { 
+        type: 'Incomer Breaker', 
+        label: 'Incomer Breaker', 
+        category: 'Switching',
+        data: { 
+            label: 'Incomer Breaker', 
+            component_type: 'Incomer Breaker',
+            Type: 'Tie Breakr'
+        } 
+    },
+    { 
+        type: 'Coupling', 
+        label: 'Coupling', 
+        category: 'Switching',
+        data: { 
+            label: 'Coupling', 
+            component_type: 'Coupling',
+            Type: 'Tie Breakr'
+        } 
+    },
+
+    // Loads (Placeholder)
+    { 
+        type: 'Load', 
+        label: 'Load', 
+        category: 'Loads',
+        data: { 
+            label: 'Load', 
+            component_type: 'Load',
+        } 
+    },
+
+    // Generation (Placeholder)
+    { 
+        type: 'SGen', 
+        label: 'Static Gen', 
+        category: 'Generation',
+        data: { 
+            label: 'Static Gen', 
+            component_type: 'SGen',
+        } 
+    },
 ];
 
 const ElementsSidebar = () => {
@@ -20,11 +110,13 @@ const ElementsSidebar = () => {
         'Power Sources': true,
         'Conductors': true,
         'Transformers': true,
-        'Circuit Protection': true,
+        'Switching': true,
+        'Loads': false,
+        'Generation': false,
     });
 
     const onDragStart = (event: React.DragEvent, nodeType: string, label: string, data: any) => {
-        const nodeInfo = JSON.stringify({ nodeType, label, data });
+        const nodeInfo = JSON.stringify({ nodeType: 'custom', label, data });
         event.dataTransfer.setData('application/reactflow', nodeInfo);
         event.dataTransfer.effectAllowed = 'move';
     };

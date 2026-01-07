@@ -46,17 +46,21 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
     setIsEditing(true);
   };
 
-  // Style for Busbar handles: always visible, styled as connection blocks.
-  const busbarHandleStyle = {
-    background: '#a3a3a3', // Solid grey background.
-    border: '1px solid #717171', // Darker grey border.
-    width: 10, // Slightly larger width for easier interaction.
-    height: 10, // Slightly larger height.
-  };
+  // Helper to determine component type
+  const componentType = currentData.component_type || currentData.label;
 
-  // Special rendering logic for the 'Busbar' node.
-  if (currentData.label === 'Busbar') {
-    // Define a higher number of connection points for a multi-point busbar.
+  // --- BUS COMPONENT ---
+  if (componentType === 'Bus') {
+    // Style for Busbar handles: always visible, styled as connection blocks.
+    const busbarHandleStyle = {
+        background: '#a3a3a3', // Solid grey background.
+        border: '1px solid #717171', // Darker grey border.
+        width: 8, 
+        height: 8,
+        borderRadius: '2px',
+    };
+
+    // Define a number of connection points for a multi-point busbar.
     const numHandles = 10; 
     // Calculate positions for handles to distribute them evenly across the busbar's length.
     const handlePositions = Array.from({ length: numHandles + 2 }).map((_, i) => { 
@@ -104,29 +108,29 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
           {/* Top and Bottom Handles for Busbar: Always visible connection blocks. */}
           {handlePositions.map((pos, index) => (
             <React.Fragment key={`busbar-handle-${index}`}>
-              <Handle type="target" position={Position.Top} style={{ ...busbarHandleStyle, left: pos, top: 0 }} />
-              <Handle type="source" position={Position.Top} style={{ ...busbarHandleStyle, left: pos, top: 0 }} />
-              <Handle type="target" position={Position.Bottom} style={{ ...busbarHandleStyle, left: pos, bottom: 0, top: 'auto' }} />
-              <Handle type="source" position={Position.Bottom} style={{ ...busbarHandleStyle, left: pos, bottom: 0, top: 'auto' }} />
+              <Handle type="target" position={Position.Top} style={{ ...busbarHandleStyle, left: pos, top: -4 }} id={`t-${index}`} />
+              <Handle type="source" position={Position.Top} style={{ ...busbarHandleStyle, left: pos, top: -4 }} id={`s-${index}`} />
+              <Handle type="target" position={Position.Bottom} style={{ ...busbarHandleStyle, left: pos, bottom: -4, top: 'auto' }} id={`tb-${index}`} />
+              <Handle type="source" position={Position.Bottom} style={{ ...busbarHandleStyle, left: pos, bottom: -4, top: 'auto' }} id={`sb-${index}`} />
             </React.Fragment>
           ))}
 
           {/* Main Busbar Body */}
           <div 
               style={{
-                  width: currentData.width || 200, 
+                  width: currentData.width || 350, 
                   height: busbarHeight,
                   backgroundColor: '#374151', // Dark grey background.
                   border: selected ? '2px solid #4f46e5' : '2px solid #1f2937', // Border color based on selection.
                   borderRadius: 2,
-                  position: 'relative', // Essential for z-index to work correctly on children if needed
-                  zIndex: 1, // Ensures this div is above its own handles (though handles are typically children of the outer div)
+                  position: 'relative', 
+                  zIndex: 1, 
               }}
               className="flex items-center justify-center transition-all"
               onDoubleClick={onDoubleClick}
           >
               <span className="text-[9px] text-white font-bold select-none px-1 overflow-hidden whitespace-nowrap">
-                  {currentData.name || currentData.label}
+                  {currentData.IDBus || currentData.label}
               </span>
           </div>
 
@@ -142,11 +146,11 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
 
           {/* Edit Popover for Busbar properties */}
           {isEditing && (
-            <div className="absolute top-6 left-0 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded p-2 min-w-[150px]">
-                <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">Properties</div>
+            <div className="absolute top-6 left-0 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded p-2 min-w-[200px]">
+                <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">Bus Properties</div>
                 {Object.keys(currentData).map(key => {
                     // Skip internal properties like width, height, and label from being edited directly.
-                    if (key === 'width' || key === 'height' || key === 'label') return null; 
+                    if (['width', 'height', 'label', 'component_type'].includes(key)) return null; 
                     return (
                         <div key={key} className="mb-1">
                             <label className="text-[9px] block text-slate-500">{key}</label>
@@ -168,39 +172,32 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
     );
   }
 
-  // Default rendering for other nodes (Grid, Transformer, etc.)
+  // --- DEFAULT COMPONENT RENDERING ---
   return (
     <div 
         className={`relative flex flex-col items-center justify-center p-2 rounded-md bg-white dark:bg-slate-900 border-2 transition-all ${selected ? 'border-blue-500 shadow-lg' : 'border-slate-200 dark:border-slate-700'}`}
-        style={{ minWidth: '60px', minHeight: '60px' }}
+        style={{ minWidth: '80px', minHeight: '60px' }}
         onDoubleClick={onDoubleClick}
     >
-      {/* Conditionally render handles for Grid node. */}
-      {currentData.label === 'Grid' ? (
-        <>
-          {/* Grid as an incomer, source handle at the bottom. */}
-          <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3" />
-        </>
-      ) : (
-        <>
-          {/* Default handles for other nodes (top target and source). */}
-          <Handle type="target" position={Position.Top} className="!bg-slate-400 !w-3 !h-3" />
-          <Handle type="source" position={Position.Top} className="!bg-slate-400 !w-3 !h-3" />
-        </>
-      )}
-      
+      {/* Handles logic based on component type */}
+      {/* Top Handles */}
+      <Handle type="target" position={Position.Top} className="!bg-slate-400 !w-3 !h-3 !rounded-sm" />
+      <Handle type="source" position={Position.Top} className="!bg-slate-400 !w-3 !h-3 !rounded-sm" />
+
       {/* Display node label/name */}
-      <div className="text-slate-700 dark:text-slate-200 mb-1 font-bold">
-        {currentData.name || currentData.label}
+      <div className="text-slate-700 dark:text-slate-200 mb-1 font-bold text-xs text-center">
+        {currentData.ID || currentData.label}
+      </div>
+      
+      {/* Sub-label for type */}
+      <div className="text-[9px] text-slate-400 uppercase tracking-wider text-center">
+         {componentType}
       </div>
 
-      {/* Only show bottom handles for non-Grid nodes. */}
-      {currentData.label !== 'Grid' && ( 
-        <>
-          <Handle type="target" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3" />
-          <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3" />
-        </>
-      )}
+      {/* Bottom Handles */}
+      <Handle type="target" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3 !rounded-sm" />
+      <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-3 !h-3 !rounded-sm" />
+
 
       {selected && (
         <button
@@ -214,10 +211,10 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
 
       {/* Edit Popover for general components. */}
       {isEditing && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded p-2 min-w-[160px]">
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-xl rounded p-2 min-w-[200px] max-h-[300px] overflow-y-auto">
             <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">Properties</div>
             {Object.keys(currentData).map(key => {
-                if (key === 'label') return null; // Skip label from being edited directly.
+                if (['label', 'component_type'].includes(key)) return null; // Skip non-editable fields
                 return (
                     <div key={key} className="mb-1">
                         <label className="text-[9px] block text-slate-500">{key}</label>
