@@ -1,4 +1,3 @@
-
 // DiagramEditor.tsx
 import { useState, useCallback, useEffect, useRef, MouseEvent, DragEvent } from 'react';
 import ReactFlow, {
@@ -77,16 +76,23 @@ export default function DiagramEditor({ user }: { user: any }) {
     sortConfig, 
     handleSort,
     starredFiles,
-    toggleStar
+    toggleStar,
+    refreshFiles 
   } = useFileManager(user, activeProjectId, activeSessionUid, API_URL, notify);
 
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   
-  // Filter files for the selector
+  // Updated Filter: More permissive to ensure files appear
   const filteredFiles = files.filter(f => {
-      const isSource = f.filename.endsWith('.si2s') || f.filename.endsWith('.lf1s') || f.filename.endsWith('.txt');
+      // Include standard inputs AND json/csv data files
+      const validExtensions = ['.si2s', '.lf1s', '.txt', '.json', '.csv', '.xml'];
+      const ext = f.filename.substring(f.filename.lastIndexOf('.')).toLowerCase();
+      const isSource = validExtensions.includes(ext);
+      
       const matchesSearch = f.filename.toLowerCase().includes(searchTerm.toLowerCase());
-      return isSource && matchesSearch;
+      
+      // Allow user to find any file if they search, otherwise default filter
+      return matchesSearch && (searchTerm ? true : isSource); 
   });
 
   useEffect(() => {
@@ -249,10 +255,10 @@ export default function DiagramEditor({ user }: { user: any }) {
   };
 
   const handleRunDiagram = () => {
-      // Just open the selector, no modes anymore
+      refreshFiles(); // Ensure we have the latest list
       setShowFileSelector(true);
-      setSelectedFiles(new Set()); // Reset selection
-      setSearchTerm(""); // Reset search
+      setSelectedFiles(new Set()); 
+      setSearchTerm(""); 
   };
 
   const executeRun = async (selectedFilesList: string[]) => {
@@ -297,6 +303,14 @@ export default function DiagramEditor({ user }: { user: any }) {
         if (result.filename) {
              notify(`Diagram Generated: ${result.filename}`);
              fetchHistoryFiles(); // Refresh history
+             
+             // --- AUTO LOAD THE RESULT ---
+             // Immediately load the file we just generated
+             await handleManualLoad(result.filename);
+
+             // Refresh the file manager list if needed to show new files in sidebar/tables
+             if (refreshFiles) refreshFiles();
+
         } else {
              notify("Diagram Run Complete");
         }
@@ -541,25 +555,32 @@ export default function DiagramEditor({ user }: { user: any }) {
                     </div>
 
                     <div className="flex-1 overflow-auto min-h-0 border border-slate-200 dark:border-slate-700 rounded-b-md border-t-0">
-                         <FileTable
-                            files={filteredFiles} // Filtered files passed here
-                            loading={filesLoading}
-                            selectedFiles={selectedFiles}
-                            setSelectedFiles={setSelectedFiles}
-                            onDelete={handleDelete} // Required by type, but ignored in ReadOnly
-                            sortConfig={sortConfig}
-                            onSort={handleSort}
-                            starredFiles={starredFiles}
-                            onToggleStar={toggleStar}
-                            readOnly={true} // Hides per-row actions
-                            onRowClick={(file) => {
-                                // Toggle selection for bulk
-                                const newSet = new Set(selectedFiles);
-                                if (newSet.has(file.path || file.filename)) newSet.delete(file.path || file.filename);
-                                else newSet.add(file.path || file.filename);
-                                setSelectedFiles(newSet);
-                            }}
-                        />
+                        {filteredFiles.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+                                <p>No compatible files found.</p>
+                                <p className="text-xs mt-1">Allowed formats: .si2s, .lf1s, .txt, .json, .csv, .xml</p>
+                            </div>
+                        ) : (
+                             <FileTable
+                                files={filteredFiles} // Filtered files passed here
+                                loading={filesLoading}
+                                selectedFiles={selectedFiles}
+                                setSelectedFiles={setSelectedFiles}
+                                onDelete={handleDelete} // Required by type, but ignored in ReadOnly
+                                sortConfig={sortConfig}
+                                onSort={handleSort}
+                                starredFiles={starredFiles}
+                                onToggleStar={toggleStar}
+                                readOnly={true} // Hides per-row actions
+                                onRowClick={(file) => {
+                                    // Toggle selection for bulk
+                                    const newSet = new Set(selectedFiles);
+                                    if (newSet.has(file.path || file.filename)) newSet.delete(file.path || file.filename);
+                                    else newSet.add(file.path || file.filename);
+                                    setSelectedFiles(newSet);
+                                }}
+                            />
+                        )}
                     </div>
 
                     <div className="mt-4 flex justify-end gap-2">
