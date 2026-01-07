@@ -39,6 +39,14 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
   // Helper to determine component type
   const componentType = currentData.component_type || currentData.label;
 
+  // Determine Handle visibility based on type (Top-Down flow)
+  // Tenant (Source) -> Top of diagram -> Only output (Source) at Bottom.
+  // Aboutissant (Load/Downstream) -> Bottom of diagram -> Input (Target) at Top, Output (Source) at Bottom.
+  const isSourceNode = componentType === 'Incomer' || componentType === 'Grid';
+  
+  // You can define other types like 'Load' if they exist to remove the bottom handle.
+  // const isLoadNode = componentType === 'Load';
+
   // Common styles for the "text diagram" look
   const containerStyle = `relative flex flex-col items-center justify-center p-2 rounded-sm border-2 transition-all bg-white dark:bg-slate-900 ${
     selected ? 'border-blue-500 shadow-md ring-1 ring-blue-500' : 'border-slate-300 dark:border-slate-600'
@@ -123,11 +131,36 @@ const CustomNode = ({ id, data, selected }: NodeProps) => {
         style={{ minWidth: width, minHeight: height }}
         onDoubleClick={onDoubleClick}
     >
-        {/* Handles */}
-        <Handle type="target" position={Position.Top} className="!bg-slate-400 !w-2 !h-2 !rounded-sm" />
-        <Handle type="source" position={Position.Top} className="!bg-slate-400 !w-2 !h-2 !rounded-sm" />
-        <Handle type="target" position={Position.Bottom} className="!bg-slate-400 !w-2 !h-2 !rounded-sm" />
-        <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-2 !h-2 !rounded-sm" />
+        {/* Handles Configuration:
+            - Standard: Top = Target (Input), Bottom = Source (Output).
+            - Source (Grid): Top = None, Bottom = Source.
+            - Bus: Both at Top/Bottom to allow flexible connections (or restrict if preferred).
+        */}
+
+        {/* Top Handle: Only if NOT a Source (Grid/Incomer) */}
+        {!isSourceNode && (
+            <Handle 
+                type="target" 
+                position={Position.Top} 
+                className="!bg-slate-400 !w-2 !h-2 !rounded-sm" 
+            />
+        )}
+        
+        {/* We generally don't put a Source at the Top unless it's a specific upward flow, 
+            but in standard top-down, Source is at Bottom. 
+            However, for Bus, we might want to allow connecting FROM it upwards? 
+            Usually not in strict top-down. 
+            Let's keep it simple: Top is Target, Bottom is Source. 
+        */}
+
+        {/* Bottom Handle: All nodes usually have an output, unless it's a pure Sink (Load).
+            If we had 'Load' type, we would hide this.
+        */}
+        <Handle 
+            type="source" 
+            position={Position.Bottom} 
+            className="!bg-slate-400 !w-2 !h-2 !rounded-sm" 
+        />
 
         {/* Content */}
         {renderContent()}
