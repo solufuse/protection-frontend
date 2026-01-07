@@ -269,13 +269,7 @@ export default function DiagramEditor({ user }: { user: any }) {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
         } else if (mode === 'single' && selectedFilesList && selectedFilesList.length > 0) {
-             // Run Single File (Use the first one selected)
-             // The backend endpoint for single file run needs to be confirmed.
-             // Assuming a generic run endpoint that takes a filename?
-             // OR we use the bulk endpoint with just one file.
-             // Let's use bulk logic for simplicity if single endpoint is not distinct.
-             
-             // Actually, let's use the 'bulk' logic for both single/bulk selections.
+             // Run Single (Use bulk endpoint but with one file)
              response1 = await fetch(`${API_URL}/topology/run-and-save/bulk?${pParam}&basename=topology`, {
                 method: 'POST',
                 headers: { 
@@ -305,9 +299,6 @@ export default function DiagramEditor({ user }: { user: any }) {
         }
 
         // Step 2: Generate Diagram from those results (Always 'all' generated results or specific?)
-        // The backend 'diagram/save/all' picks up ALL generated .json topology results.
-        // If we ran specific files, we might want to only generate diagrams for those?
-        // But for now, regenerating diagrams for all valid results is safe.
         const response2 = await fetch(`${API_URL}/topology/diagram/save/all?${pParam}&basename=diagram_result`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -324,9 +315,7 @@ export default function DiagramEditor({ user }: { user: any }) {
              notify(`Diagram Generated: ${result.filename}`);
              fetchHistoryFiles(); // Refresh history
              // Optional: If single file run, auto load?
-             if (mode === 'single' && selectedFilesList?.length === 1) {
-                 // handleManualLoad(result.filename); // Maybe too aggressive
-             }
+             // if (mode === 'single' && selectedFilesList?.length === 1) { ... }
         } else {
              notify("Diagram Run Complete");
         }
@@ -566,11 +555,10 @@ export default function DiagramEditor({ user }: { user: any }) {
                             selectedFiles={selectedFiles}
                             setSelectedFiles={setSelectedFiles}
                             onDelete={handleDelete}
-                            onBulkDelete={handleBulkDelete} // Not used here but required props
                             sortConfig={sortConfig}
-                            handleSort={handleSort}
+                            onSort={handleSort} // Changed from handleSort prop to onSort prop to match FileTable definition
                             starredFiles={starredFiles}
-                            toggleStar={toggleStar}
+                            onToggleStar={toggleStar} // Changed from toggleStar to onToggleStar
                             readOnly={true} // Only selection
                             onRowClick={(file) => {
                                 if (showFileSelector.mode === 'single') {

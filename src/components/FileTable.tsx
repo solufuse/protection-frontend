@@ -24,7 +24,7 @@ interface FileTableProps {
   onSort?: (key: SortKey) => void;
   searchTerm?: string;
   onOpenLink?: (type: string, filename: string) => void;
-  onDelete: (path: string) => void;
+  onDelete?: (path: string) => void; // Made optional for ReadOnly mode
   onBulkDelete?: (paths: string[]) => void;
   formatBytes?: (bytes: number) => string;
   selectedFiles: Set<string>;
@@ -192,7 +192,9 @@ export default function FileTable({
                                 </>
                                 )}
                                 
-                                <button onClick={() => onDelete(file.path)} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 rounded transition-colors ml-1"><Icons.Trash className="w-3.5 h-3.5"/></button>
+                                {onDelete && (
+                                    <button onClick={() => onDelete(file.path)} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 rounded transition-colors ml-1"><Icons.Trash className="w-3.5 h-3.5"/></button>
+                                )}
                             </div>
                           )}
                           {readOnly && (
