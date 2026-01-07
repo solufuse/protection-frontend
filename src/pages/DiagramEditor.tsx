@@ -55,7 +55,8 @@ export default function DiagramEditor({ user }: { user: any }) {
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' as 'success' | 'error' });
   const [isLoading, setIsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [historyFiles, setHistoryFiles] = useState<string[]>([]);
+  // Correct type for ArchiveModal props
+  const [historyFiles, setHistoryFiles] = useState<{name: string, date: string}[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const API_URL = import.meta.env.VITE_API_URL || "https://api.solufuse.com";
@@ -90,10 +91,12 @@ export default function DiagramEditor({ user }: { user: any }) {
           if (res.ok) {
               const data = await res.json();
               const files = data.files
-                .map((f: any) => f.filename)
-                .filter((name: string) => name.includes('diagram_result') && name.endsWith('.json'))
-                .sort()
-                .reverse();
+                .filter((f: any) => f.filename.includes('diagram_result') && f.filename.endsWith('.json'))
+                .map((f: any) => ({
+                    name: f.filename,
+                    date: f.uploaded_at || new Date().toISOString() // Fallback if no date
+                }))
+                .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
               setHistoryFiles(files);
           }
       } catch (e) { console.error("Failed to fetch history", e); }
@@ -227,6 +230,8 @@ export default function DiagramEditor({ user }: { user: any }) {
         const pParam = activeProjectId ? `project_id=${activeProjectId}` : "";
         
         // Step 1: Run Analysis on single main file if we knew it, or just trigger the bulk one.
+        // Assuming we want to run analysis on all SI2S/LF1S files in project and save topology results first.
+        // The backend `run-and-save/all` does exactly this.
         const response1 = await fetch(`${API_URL}/topology/run-and-save/all?${pParam}&basename=topology`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
