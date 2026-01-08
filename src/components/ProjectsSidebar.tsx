@@ -89,8 +89,16 @@ const ProjectsSidebar = ({
         setActiveProjectId(null);
     }
 
+    // Filter projects based on roles
+    const myProjects = projects.filter(p => ['owner', 'admin', 'editor', 'viewer'].includes(p.role));
+    const otherProjects = projects.filter(p => !['owner', 'admin', 'editor', 'viewer'].includes(p.role));
+
+    // Sort users alphabetically
+    const sortedUsers = [...usersList].sort((a, b) => a.username.localeCompare(b.username));
+
+
     return (
-        <div className={`flex flex-col h-full p-2 text-xs ${className}`}>
+        <div className={`flex flex-col h-full p-2 text-xs ${className} w-64 flex-shrink-0 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700`}>
             {/* --- Personal Session --- */}
             <div className="mb-3">
                  <button 
@@ -100,9 +108,9 @@ const ProjectsSidebar = ({
                 </button>
             </div>
 
-            {/* --- Projects Section --- */}
+            {/* --- My Projects Section --- */}
             <CollapsibleSection
-                title="Projects"
+                title="My Projects"
                 icon={<Icons.Folder className="w-4 h-4 text-slate-500" />}
                 defaultOpen={true}
                 action={
@@ -124,7 +132,7 @@ const ProjectsSidebar = ({
                     </div>
                 )}
                 <div className="space-y-1 mt-1">
-                    {projects.map(p => (
+                    {myProjects.map(p => (
                         <div key={p.id} onClick={() => handleProjectClick(p.id)} className={`group flex justify-between items-center w-full text-left gap-2 pl-3 pr-1 py-1.5 rounded-md cursor-pointer transition-colors font-semibold ${activeProjectId === p.id ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
                             <span className="truncate">{p.name}</span>
                             {p.role === 'admin' && (
@@ -134,24 +142,41 @@ const ProjectsSidebar = ({
                             )}
                         </div>
                     ))}
-                     {projects.length === 0 && !isCreatingProject && <p className='text-slate-400 pl-3 py-1'>No projects yet.</p>}
+                     {myProjects.length === 0 && !isCreatingProject && <p className='text-slate-400 pl-3 py-1'>No projects joined.</p>}
                 </div>
             </CollapsibleSection>
+
+            {/* --- Other Projects Section (if any, typically public or viewable but not joined) --- */}
+            {otherProjects.length > 0 && (
+                <CollapsibleSection
+                    title="Public / Other Projects"
+                    icon={<Icons.Globe className="w-4 h-4 text-slate-500" />}
+                    defaultOpen={false}
+                >
+                    <div className="space-y-1 mt-1">
+                        {otherProjects.map(p => (
+                            <div key={p.id} onClick={() => handleProjectClick(p.id)} className={`group flex justify-between items-center w-full text-left gap-2 pl-3 pr-1 py-1.5 rounded-md cursor-pointer transition-colors font-semibold ${activeProjectId === p.id ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
+                                <span className="truncate">{p.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                </CollapsibleSection>
+            )}
             
             {/* --- Admin: User Sessions Section --- */}
-            {isAdmin && usersList && usersList.length > 0 && (
+            {isAdmin && sortedUsers.length > 0 && (
                 <div className="border-t border-slate-200 dark:border-slate-700 mt-2 pt-2">
                     <CollapsibleSection
-                        title="User Sessions"
+                        title={`User Sessions (${sortedUsers.length})`}
                         icon={<Icons.Users className="w-4 h-4 text-slate-500" />}
                     >
-                        <div className="space-y-1 mt-1">
-                            {usersList.map(u => (
+                        <div className="space-y-1 mt-1 max-h-60 overflow-y-auto custom-scrollbar">
+                            {sortedUsers.map(u => (
                                 <button 
                                     key={u.uid} 
                                     onClick={() => handleSessionClick(u.uid)}
                                     className={`w-full text-left flex items-center gap-2 pl-3 pr-1 py-1.5 rounded-md transition-colors font-semibold ${activeSessionUid === u.uid ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300' : 'hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
-                                    <span className="truncate">{u.username}</span>
+                                    <span className="truncate" title={u.email}>{u.username || u.email}</span>
                                 </button>
                             ))}
                         </div>
