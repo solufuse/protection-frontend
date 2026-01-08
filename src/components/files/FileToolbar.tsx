@@ -4,13 +4,14 @@ import { useState } from 'react';
 interface FileToolbarProps {
   searchTerm: string;
   setSearchTerm: (val: string) => void;
-  onUpload: (files: FileList | null) => void;
-  onCreateFolder: (name: string) => void;
-  onRefresh: () => void;
-  onDelete: () => void;
+  onUpload?: (files: FileList | null) => void;
+  onCreateFolder?: (name: string) => void;
+  onRefresh?: () => void;
+  onDelete?: () => void;
   fileCount: number;
   selectedCount: number;
-  hasWriteAccess: boolean;
+  hasWriteAccess?: boolean;
+  readOnly?: boolean;
 }
 
 export default function FileToolbar({
@@ -22,14 +23,17 @@ export default function FileToolbar({
   onDelete,
   fileCount,
   selectedCount,
-  hasWriteAccess
+  hasWriteAccess = false,
+  readOnly = false
 }: FileToolbarProps) {
   
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [folderName, setFolderName] = useState("");
 
+  const effectiveWriteAccess = hasWriteAccess && !readOnly;
+
   const handleCreateFolder = () => {
-      if(folderName) onCreateFolder(folderName);
+      if(folderName && onCreateFolder) onCreateFolder(folderName);
       setFolderName("");
       setShowNewFolder(false);
   }
@@ -38,12 +42,12 @@ export default function FileToolbar({
     <div className="p-2 border-b border-slate-200 dark:border-slate-800 flex flex-wrap justify-between items-center gap-2 min-h-[50px] bg-slate-50 dark:bg-slate-900/70">
       
       <div className="flex items-center gap-2 flex-1">
-        {selectedCount > 0 && hasWriteAccess ? (
+        {selectedCount > 0 && effectiveWriteAccess ? (
             <div className="flex items-center gap-2 animate-in fade-in">
                 <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 px-2 py-1 rounded">
                     {selectedCount} selected
                 </span>
-                 <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/50 rounded text-[10px] font-bold text-red-600 dark:text-red-400 hover:bg-red-200"><Icons.Trash className="w-3 h-3"/> Delete</button>
+                 {onDelete && <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/50 rounded text-[10px] font-bold text-red-600 dark:text-red-400 hover:bg-red-200"><Icons.Trash className="w-3 h-3"/> Delete</button>}
             </div>
         ) : (
             <div className="relative flex-1 max-w-xs">
@@ -61,9 +65,9 @@ export default function FileToolbar({
 
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{fileCount} items</span>
-        <button onClick={onRefresh} className="p-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 transition-colors"><Icons.RefreshCw size={14}/></button>
+        {onRefresh && <button onClick={onRefresh} className="p-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 transition-colors"><Icons.RefreshCw size={14}/></button>}
         
-        {hasWriteAccess && (
+        {effectiveWriteAccess && (
         <>
             <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1"></div>
             {showNewFolder ? (
@@ -86,7 +90,7 @@ export default function FileToolbar({
             )}
             <label className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs font-bold cursor-pointer hover:bg-blue-700 transition-colors">
                 <Icons.Upload size={14}/> Upload
-                <input type="file" multiple className="hidden" onChange={(e) => onUpload(e.target.files)} />
+                <input type="file" multiple className="hidden" onChange={(e) => onUpload && onUpload(e.target.files)} />
             </label>
         </>
         )}

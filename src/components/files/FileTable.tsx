@@ -22,10 +22,12 @@ interface FileTableProps {
   onSort: (key: SortKey) => void;
   selectedFiles: Set<string>;
   setSelectedFiles: (selected: Set<string>) => void;
-  onPathChange: (path: string) => void; // NEW: For folder navigation
+  onPathChange?: (path: string) => void; 
   starredFiles: Set<string>;
   onToggleStar: (path: string) => void;
-  hasWriteAccess: boolean;
+  hasWriteAccess?: boolean;
+  readOnly?: boolean;
+  onRowClick?: (file: SessionFile) => void;
 }
 
 export default function FileTable({
@@ -39,9 +41,13 @@ export default function FileTable({
   onPathChange,
   starredFiles, 
   onToggleStar,
-  hasWriteAccess
+  hasWriteAccess = false,
+  readOnly = false,
+  onRowClick
 }: FileTableProps) {
   
+    const effectiveWriteAccess = hasWriteAccess && !readOnly;
+
     const formatBytes = (bytes: number, decimals = 2) => {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
@@ -64,10 +70,14 @@ export default function FileTable({
   };
 
   const handleRowDoubleClick = (file: SessionFile) => {
-    if (file.type === 'folder') {
+    if (file.type === 'folder' && onPathChange) {
       onPathChange(file.path);
     }
   };
+
+  const handleRowClick = (file: SessionFile) => {
+      if (onRowClick) onRowClick(file);
+  }
   
   const allSelected = files.length > 0 && selectedFiles.size === files.length;
 
@@ -103,7 +113,7 @@ export default function FileTable({
                     type="checkbox" 
                     checked={allSelected} 
                     onChange={(e) => handleSelectAll(e.target.checked)}
-                    disabled={!hasWriteAccess}
+                    disabled={!effectiveWriteAccess}
                     className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
                 />
             </th>
@@ -126,19 +136,20 @@ export default function FileTable({
                 <Fragment key={file.path}>
                     <tr 
                         onDoubleClick={() => handleRowDoubleClick(file)}
+                        onClick={() => handleRowClick(file)}
                         className={`group transition-colors select-none ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'} ${file.type === 'folder' ? 'cursor-pointer' : 'cursor-default'}`}
                     >
-                      <td className="px-3 py-1.5 text-center">
+                      <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                           <input 
                             type="checkbox" 
                             checked={isSelected} 
                             onChange={() => handleToggleSelect(file.path)}
-                            disabled={!hasWriteAccess}
+                            disabled={!effectiveWriteAccess}
                             className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
                           />
                       </td>
 
-                      <td className="px-1 py-1.5 text-center">
+                      <td className="px-1 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                           <button 
                             onClick={() => onToggleStar(file.path)}
                             className={`p-1 rounded-full transition-all ${isStarred ? 'text-yellow-400 hover:text-yellow-500' : 'text-slate-300 dark:text-slate-600 opacity-20 group-hover:opacity-100 hover:!opacity-100 hover:text-yellow-400'}`}

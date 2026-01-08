@@ -23,7 +23,7 @@ import ContextMenu from '../components/diagram/ContextMenu';
 import ElementsSidebar from '../components/diagram/ElementsSidebar';
 import ArchiveModal from '../components/Loadflow/ArchiveModal';
 import DiagramToolbar from '../components/diagram/DiagramToolbar';
-import FileTable from '../components/files/FileTable';
+import FileTable, { SessionFile } from '../components/files/FileTable';
 import FileToolbar from '../components/files/FileToolbar'; 
 import { useFileManager } from '../hooks/useFileManager';
 
@@ -60,7 +60,7 @@ export default function DiagramEditor({ user }: { user: any }) {
   const { 
     files, 
     loading: filesLoading, 
-    handleDelete, 
+    // handleDelete removed as unused
     sortConfig, 
     handleSort,
     starredFiles,
@@ -408,7 +408,7 @@ export default function DiagramEditor({ user }: { user: any }) {
             handleRunDiagram={handleRunDiagram}
             setShowHistory={setShowHistory}
             isLoading={isLoading}
-            API_URL={API_URL}
+            // API_URL removed
         />
 
         <div className="flex flex-1 gap-0 min-h-0 border-t border-slate-200 dark:border-slate-800 pt-2">
@@ -453,6 +453,7 @@ export default function DiagramEditor({ user }: { user: any }) {
                              fileCount={filteredFiles.length}
                              selectedCount={selectedFiles.size}
                              readOnly={true}
+                             // Removed hasWriteAccess (optional, defaults to false which is ok but readOnly overrides)
                          />
                     </div>
 
@@ -465,13 +466,13 @@ export default function DiagramEditor({ user }: { user: any }) {
                                 loading={filesLoading}
                                 selectedFiles={selectedFiles}
                                 setSelectedFiles={setSelectedFiles}
-                                onDelete={() => {}}
+                                // onDelete removed
                                 sortConfig={sortConfig}
                                 onSort={handleSort}
                                 starredFiles={starredFiles}
                                 onToggleStar={toggleStar}
                                 readOnly={true}
-                                onRowClick={(file) => {
+                                onRowClick={(file: SessionFile) => {
                                     const newSet = new Set(selectedFiles);
                                     if (newSet.has(file.path || file.filename)) newSet.delete(file.path || file.filename);
                                     else newSet.add(file.path || file.filename);
