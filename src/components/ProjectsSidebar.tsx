@@ -16,16 +16,16 @@ export interface UserSummary {
     global_role: string;
 }
 
-// Props (no change)
+// Props (updated to optional)
 interface ProjectsSidebarProps {
     user: User | null;
-    userGlobalData: any;
+    userGlobalData?: any;
     projects: Project[];
-    usersList: UserSummary[];
+    usersList?: UserSummary[];
     activeProjectId: string | null;
     setActiveProjectId: (id: string | null) => void;
-    activeSessionUid: string | null;
-    setActiveSessionUid: (uid: string | null) => void;
+    activeSessionUid?: string | null;
+    setActiveSessionUid?: (uid: string | null) => void;
     isCreatingProject: boolean;
     setIsCreatingProject: (isCreating: boolean) => void;
     newProjectName: string;
@@ -71,7 +71,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, icon, ch
 
 // --- Main ProjectsSidebar Component ---
 const ProjectsSidebar = ({ 
-    user, userGlobalData, projects, usersList,
+    user, userGlobalData, projects, usersList = [],
     activeProjectId, setActiveProjectId, activeSessionUid, setActiveSessionUid,
     isCreatingProject, setIsCreatingProject, newProjectName, setNewProjectName,
     onCreateProject, onDeleteProject, className
@@ -81,11 +81,11 @@ const ProjectsSidebar = ({
 
     const handleProjectClick = (id: string) => {
         setActiveProjectId(id);
-        setActiveSessionUid(null);
+        if (setActiveSessionUid) setActiveSessionUid(null);
     }
 
     const handleSessionClick = (uid: string | null) => {
-        setActiveSessionUid(uid);
+        if (setActiveSessionUid) setActiveSessionUid(uid);
         setActiveProjectId(null);
     }
 
@@ -139,7 +139,7 @@ const ProjectsSidebar = ({
             </CollapsibleSection>
             
             {/* --- Admin: User Sessions Section --- */}
-            {isAdmin && usersList.length > 0 && (
+            {isAdmin && usersList && usersList.length > 0 && (
                 <div className="border-t border-slate-200 dark:border-slate-700 mt-2 pt-2">
                     <CollapsibleSection
                         title="User Sessions"
